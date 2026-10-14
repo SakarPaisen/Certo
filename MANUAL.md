@@ -1738,6 +1738,17 @@ uv run pytest -q
 
 ## Known limitations
 
+- **`--execution docker` needs a source checkout, not just `pip install
+  certo`.** The first Docker run builds the `certo/agent-server:local`
+  image from `docker/agent-server.Dockerfile` using the repo root as build
+  context (it copies `src/certo/` into the image). Neither is inside the
+  installed wheel, so from a pip install the build fails. Workaround: clone
+  the repo and build the image once (`docker build -f
+  docker/agent-server.Dockerfile -t certo/agent-server:local .`), or point
+  `CERTO_DOCKER_IMAGE` at an already-built image; once the image exists,
+  `certo` doesn't rebuild it. Docker mode also needs the `sandbox` extra
+  (`pip install "certo[sandbox]"`).
+
 - **Third-party skill license detection is a narrow text heuristic.**
   `certo-admin skills` recognizes only a small set of permissive
   licenses. Everything else, including GPL-family licenses, is reported as

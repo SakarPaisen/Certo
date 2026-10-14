@@ -230,6 +230,15 @@ decisions log below for *why* a given design was chosen.
   no ESLint/tsconfig-based inference the way `_ruff_configured()` infers
   Python lint relevance with no named script (ESLint config formats/flat-config
   variants make this a harder question than the ruff/mypy case).
+- **Docker execution from a pip install** — `workspace.py` builds the
+  agent-server image from `docker/agent-server.Dockerfile` with the repo
+  root as context (`_REPO_ROOT` is computed from `__file__`). From an
+  installed wheel that path is `site-packages/..`, and neither the
+  Dockerfile nor `src/` is there, so a first Docker run fails unless the
+  image was already built from a checkout. Options: ship the Dockerfile
+  and tool source as package data and build from a temp context, or
+  publish a prebuilt image. Undecided; documented in MANUAL "Known
+  limitations".
 - **`/v1/chat/completions` doesn't surface `verification_state`** — its wire
   format has no natural field for it; a caller using only that adapter gets
   the agent's final text with no independent verification signal.
