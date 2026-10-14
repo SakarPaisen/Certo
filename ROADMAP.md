@@ -594,6 +594,9 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   fails loudly and the fix is one env var. `usage_id` changes are
   unversioned, since they're only per-run telemetry keys. The
   third-party skills lockfile never carried the old name.
+  GitHub repo rename/description/topics and PyPI are prepared but not
+  applied (`docs/launch/github-rename.md`). `docs/ROADMAP.txt` is a
+  frozen snapshot, so it keeps the old names on purpose.
 - **Live entrypoint-ordering/smoke-run test built its own throwaway
   `tmp_path` fixture, not `projects/hanoi/` or anything under `projects/`**
   — that directory is user-managed runtime state the harness must stay
