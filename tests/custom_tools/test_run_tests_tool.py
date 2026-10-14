@@ -363,6 +363,7 @@ def test_python_plan_marks_ruff_unavailable_when_not_installed(tmp_path, monkeyp
     assert "not installed" in ruff_spec.unavailable_reason
 
 
+@pytest.mark.skipif(shutil.which("mypy") is not None, reason="mypy installed")
 def test_python_plan_marks_mypy_unavailable_when_not_installed(tmp_path):
     # mypy genuinely isn't installed in this dev environment — a real,
     # not-monkeypatched exercise of the "configured but not installed" path.
@@ -1238,6 +1239,7 @@ def test_full_verification_rust_project_real_pass(tmp_path):
     assert {c.name for c in run.checks} == {"cargo test", "cargo check", "cargo clippy"}
 
 
+@pytest.mark.skipif(shutil.which("mvn") is not None, reason="mvn installed (e.g. CI runners)")
 def test_full_verification_java_maven_project_reports_unavailable(tmp_path):
     # mvn/mvnw genuinely aren't installed in this dev environment — a real
     # exercise of the "configured but no toolchain" path, same pattern as

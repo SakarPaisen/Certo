@@ -629,6 +629,14 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   entry carries the real model name. Always computed (not gated on
   `CERTO_ARTIFACTS_DIR`), and read defensively in the `finally` so a
   metrics failure can't mask the run's own outcome or exception.
+- **Release workflow: `verify` → `build` → `publish` jobs, trusted
+  publishing only.** A PyPI version can never be reused, so the tag must
+  equal `pyproject.toml`'s version and the suite must pass before anything
+  is built; only the `publish` job (environment `pypi`) gets `id-token:
+  write`, and it uploads exactly the artifact the `build` job checked with
+  `twine check`. No ruff gate yet: `main` currently has lint/format
+  findings. Tests asserting a tool is *absent* (`mvn`, `mypy`) now skip
+  when it's installed, since GitHub's Ubuntu runner ships Maven.
 - **`sqlalchemy` is in the `dev` extra, not `importorskip`-guarded** — the
   sqlite `SQLTaskStore` tests are the only automated coverage of the code
   path shared with mysql/postgres, so a plain `.[dev]` install must run
