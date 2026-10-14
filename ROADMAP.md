@@ -394,9 +394,12 @@ for full transcripts if a fix needs revisiting:
    dependency. Fix: `project_env.py`, a per-project environment shared by
    the agent's terminal and verification, with pytest installed into it
    when tests need it, and nothing ever run with or installed into
-   `sys.executable`. **Status: applied. Unit-tested, and terminal
-   resolution checked against the real SDK terminal. Not yet re-run as a
-   full live task.**
+   `sys.executable`. Plus `scripts/release_check.sh`, which installs the
+   built wheel with `uv tool install` and runs `certo verify` on fixtures
+   before every release. **Status: applied. Unit-tested, terminal
+   resolution checked against the real SDK terminal, and the release check
+   passes against a real tool install. The live task is re-run only by
+   `release_check.sh --with-llm`.**
 
 ## Decisions log (why, not just what)
 
@@ -772,6 +775,14 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   `verify`, still reachable as `certo -- verify`. It lives in `certo`, not
   `certo-admin`, because it's the user-facing check, not store
   maintenance.
+- **Release check installs the wheel like a user (`scripts/release_check.sh`)
+  and gates publishing on it**, because the pytest suite runs inside the dev
+  venv and structurally can't see "works only in the dev venv" bugs. Bash,
+  not Python: it must not run inside any Certo-related interpreter. It runs
+  in the release workflow's `build` job against the exact `dist/*.whl`
+  that `publish` uploads. There is no pull-request CI workflow to attach it
+  to yet. The dependency fixture asserts its package is *not* importable
+  from Certo's tool env, so a pass can't come from Certo's own packages.
 - **`check-llm` lives in `certo-admin`, not the `certo` CLI** — `certo`
   requires a task positional, while `certo-admin` is already the
   subcommand-based maintenance CLI. There's no `--api-key` flag, so a key

@@ -1708,6 +1708,34 @@ exactly what was checked and what was found.
 uv run pytest -q
 ```
 
+### Release check (installed wheel)
+
+```bash
+scripts/release_check.sh                 # build the wheel, then check it
+scripts/release_check.sh --wheel PATH    # check an already-built wheel
+scripts/release_check.sh --with-llm      # also run a real agent task
+```
+
+The test suite runs inside the dev venv, where pytest and every dev tool
+are installed. That hid a real bug: Certo 0.1.0 verified projects with its
+own interpreter, which only worked there. `release_check.sh` installs the
+wheel with `uv tool install` into a throwaway `UV_TOOL_DIR` /
+`UV_TOOL_BIN_DIR` (never your real ones). From an empty temp directory, it
+runs `certo --help` and `certo verify` on three fixture projects:
+
+| Fixture | Expected |
+|---|---|
+| passing Python project | `Verification: verified`, exit `0` |
+| failing Python project | `Verification: failed`, exit `1` |
+| tests import a package installed only in the project's own `.venv` (no pytest there) | `verified`, exit `0`; pytest installed into that `.venv`; Certo's own environment still has no pytest |
+
+`--with-llm` also runs `certo "Create hello.py that prints hello, plus a
+pytest test for it" --project smoke` with whatever `LLM_*` variables are
+exported (no `.env` is read, since it runs from an empty directory) and
+expects `Verification: verified`. The release workflow runs the non-LLM part
+against the exact wheel it is about to publish. It needs `uv` and network
+access. Run it directly, not through `uv run`.
+
 - `tests/test_config.py` — env parsing, no SDK, no network. Includes
   `resolve_project_dir()`'s containment checks: a normal name resolves
   inside `projects_dir`, an absolute name/`..`-traversal/empty-or-dot name

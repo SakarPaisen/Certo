@@ -2,7 +2,9 @@ name: release
 
 # Publishes to PyPI via trusted publishing (no API token anywhere) when a
 # `v*` tag is pushed. A PyPI version number can never be reused, so nothing is
-# built until the tag matches pyproject.toml and the full test suite passes.
+# built until the tag matches pyproject.toml and the full test suite passes,
+# and nothing is published unless the built wheel passes
+# scripts/release_check.sh once installed.
 on:
   push:
     tags: ["v*"]
@@ -46,6 +48,11 @@ jobs:
           python-version: "3.12"
       - run: uv build
       - run: uvx twine check --strict dist/*
+      # Installs exactly this wheel with `uv tool install`, the way users do,
+      # and runs `certo verify` on fixture projects from an empty directory.
+      # Catches "works in the dev venv only" bugs before anything is published.
+      - name: Release check (installed wheel, no LLM)
+        run: scripts/release_check.sh --wheel dist/*.whl
       - uses: actions/upload-artifact@v4
         with:
           name: dist

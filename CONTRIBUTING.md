@@ -18,11 +18,14 @@ Releases are published to PyPI by `.github/workflows/release.yml` through
 trusted publishing. There is no API token to manage.
 
 1. Bump `version` in `pyproject.toml` (for example `0.1.0` → `0.1.1`).
+   Run `scripts/release_check.sh` (add `--with-llm` with a model exported):
+   it installs the wheel the way users do and checks it outside the dev venv.
 2. Commit it: `git commit -am "Release vX.Y.Z"`.
 3. Tag and push: `git tag vX.Y.Z && git push && git push --tags`.
 4. The workflow checks that the tag matches the version in
    `pyproject.toml`, runs the full test suite, builds the sdist and wheel,
-   runs `twine check`, and publishes. A mismatch or a failing test stops it
+   runs `twine check` and `scripts/release_check.sh` on that wheel, and
+   publishes. A mismatch or a failing test stops it
    before anything is built.
 
 **A version number can never be reused.** PyPI rejects a re-upload of any
