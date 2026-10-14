@@ -540,6 +540,7 @@ dependencies = [
 dev = [
     { name = "pytest" },
     { name = "ruff" },
+    { name = "sqlalchemy" },
 ]
 sandbox = [
     { name = "openhands-agent-server" },
@@ -580,6 +581,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "redis", marker = "extra == 'store-redis'", specifier = ">=5.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
+    { name = "sqlalchemy", marker = "extra == 'dev'", specifier = ">=2.0" },
     { name = "sqlalchemy", marker = "extra == 'store-mysql'", specifier = ">=2.0" },
     { name = "sqlalchemy", marker = "extra == 'store-postgres'", specifier = ">=2.0" },
     { name = "sqlalchemy", marker = "extra == 'store-sqlite'", specifier = ">=2.0" },

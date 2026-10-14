@@ -23,7 +23,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ruff>=0.6"]
+# sqlalchemy: tests/test_task_store.py exercises SQLTaskStore against real sqlite.
+dev = ["pytest>=8.0", "ruff>=0.6", "sqlalchemy>=2.0"]
 # Sandboxed/remote execution (CERTO_EXECUTION=docker). See docs/SPEC.md section 9.
 sandbox = ["openhands-workspace", "openhands-agent-server"]
 # HTTP/WebSocket server mode (certo-server). See docs/SPEC.md section 9.

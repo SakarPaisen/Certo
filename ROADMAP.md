@@ -629,6 +629,10 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   entry carries the real model name. Always computed (not gated on
   `CERTO_ARTIFACTS_DIR`), and read defensively in the `finally` so a
   metrics failure can't mask the run's own outcome or exception.
+- **`sqlalchemy` is in the `dev` extra, not `importorskip`-guarded** — the
+  sqlite `SQLTaskStore` tests are the only automated coverage of the code
+  path shared with mysql/postgres, so a plain `.[dev]` install must run
+  them rather than silently skip them.
 - **`check-llm` lives in `certo-admin`, not the `certo` CLI** — `certo`
   requires a task positional, while `certo-admin` is already the
   subcommand-based maintenance CLI. There's no `--api-key` flag, so a key

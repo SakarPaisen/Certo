@@ -1,179 +1,120 @@
+# Certo
+
+**The coding agent that doesn't take its own word for it.**
+
+[![PyPI](https://img.shields.io/pypi/v/certo.svg)](https://pypi.org/project/certo/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](pyproject.toml)
+[![Built on OpenHands SDK](https://img.shields.io/badge/built%20on-OpenHands%20SDK-6f42c1.svg)](https://docs.openhands.dev/sdk)
+
+Give Certo a task. An agent plans, edits files and runs commands until it says it's done. Then Certo re-runs your project's real tests and build itself, with no LLM involved, and tells you whether the work is actually verified. Any model, local or cloud. *Certo* is Italian for "sure".
+
+<!-- TODO: 20-second terminal GIF. Agent says "done", Certo catches a failing check, sends it back, ends on "Verification: verified". -->
+![Certo catching a false "done"](docs/demo.gif)
+
+## Why
+
+Coding agents are confident, and often wrong about being finished. One example from building this tool: an agent wrote a Tower of Hanoi game, every unit test passed, and the program crashed the moment a user picked "solve". The agent had reported success, and so had pytest.
+
+Certo exists to catch that. When the agent finishes, the harness checks the result independently, sends real failures back for another attempt, and stops when a fix attempt changes nothing.
+
+## Quickstart
+
+With a local model (no API key):
+
+```bash
+pip install certo
+ollama pull qwen2.5-coder
+
+export LLM_MODEL=ollama/qwen2.5-coder
+export LLM_BASE_URL=http://localhost:11434
+
+certo "Build a CLI todo app in Python, with tests" --project todo
 ```
-_________                __
-\_   ___ \  ____________/  |_  ____
-/    \  \/_/ __ \_  __ \   __\/  _ \
-\     \___\  ___/|  | \/|  | (  <_> )
- \______  /\___  >__|   |__|  \____/
-        \/     \/
+
+With a cloud model, change two lines:
+
+```bash
+export LLM_MODEL=anthropic/claude-sonnet-4-5-20250929   # or openai/..., gemini/..., deepseek/...
+export LLM_API_KEY=sk-...
 ```
 
-# Certo — autonomous software engineering agents that prove their work.
+The generated project lands in `./projects/todo`. The last line of output is the verdict:
 
-![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
-![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)
-![Built on OpenHands SDK](https://img.shields.io/badge/built%20on-OpenHands%20SDK-6f42c1.svg)
+```
+Verification: verified
+```
 
-Give Certo a task. It plans, edits files, runs commands, and iterates in a
-loop using the [OpenHands Software Agent SDK](https://docs.openhands.dev/sdk)
-— but unlike a bare agent loop, it doesn't take the agent's word for it:
-Certo independently re-runs the project's own tests/build after the agent
-finishes and only reports success once that's actually confirmed. Switch LLM
-provider or model with a one-line `.env` edit; no code change, ever.
+## What the verdict means
 
-**See [`MANUAL.md`](MANUAL.md) for the full usage guide** — configuration
-reference, CLI flags, projects, execution modes, server mode, adding a
-custom tool, and known limitations/troubleshooting. This README is a
-quickstart and a tour of what makes Certo worth using.
+| State | Meaning |
+| --- | --- |
+| `verified` | The project's own tests or build ran and passed. |
+| `inconclusive` | Nothing could be checked (no tests yet, unknown project type, missing toolchain). |
+| `retry_exhausted` | A check kept failing after the automatic fix attempts. |
+| `no_progress` | A fix attempt changed nothing in the failing output, so Certo stopped early. |
+| `incomplete` | The agent left items on its own to-do list unfinished. |
+| `budget_exhausted` | The task ran out of its time budget. |
 
-## Why Certo
+The exit code is nonzero for every failure state, so Certo works in scripts and CI. Add `--require-verification` to make `inconclusive` fail too. The full list of states is in the [manual](MANUAL.md#test-verification).
 
-- **It verifies, it doesn't just trust.** An agent calling `finish` is not
-  proof of success. Certo re-runs the project's real checks itself —
-  no LLM involved in the verification step — and distinguishes "verified,"
-  "no tests to run yet," "a check kept failing," "a fix attempt changed
-  nothing observable," and "the run never reached a coherent stopping
-  point," instead of collapsing all of that into a single pass/fail. This
-  exists because it kept catching real bugs a naive "trust the agent" loop
-  missed — see `ROADMAP.md`'s known-limitations log for the (increasingly
-  entertaining) history of exactly how.
-- **Language-neutral verification**, not just Python. Detects and verifies
-  Python, Node/JS/TS, Go, Rust, and Java (Maven/Gradle) projects — running
-  each ecosystem's real test/build/lint/typecheck commands, never inventing
-  one a project doesn't configure.
-- **Genuinely model-agnostic.** Anthropic, OpenAI, Gemini, DeepSeek,
-  Moonshot/Kimi, or a fully local/offline model via Ollama (Llama, Gemma,
-  Qwen, Qwen-Coder, GLM) — picking a provider is one line in `.env`, never
-  a code change, and never hardcoded anywhere in the source.
-- **Deterministic automatic model selection**, if you want it. Hand-curate
-  a catalog of candidate models with cost/quality ratings in `models.yaml`,
-  and Certo scores and ranks them per task (a debugging task weighted
-  toward reasoning, a scaffolding task weighted toward cost — no extra LLM
-  call to decide), with automatic fallback to the next-best candidate on a
-  provider failure. Toggle models on/off with a single `activated: false`
-  without deleting them from the catalog.
-- **Real safety rails, not just a system prompt.** A hard iteration cap, a
-  shared wall-clock task budget spanning every retry, task-tracker
-  completion enforcement (an agent can't quietly leave half its own
-  declared to-do list undone and still call `finish`), and an optional
-  confirm-before-every-tool-call mode.
-- **Run it your way**: a one-shot CLI, a local sandbox or a Docker
-  container, a REST + WebSocket server for async/streaming integrations, or
-  an OpenAI-compatible `/v1/chat/completions` endpoint that drops into
-  tooling already built for that API.
-- **Full observability.** Opt into a per-run artifacts directory holding
-  the complete message transcript plus real token/cost metrics (including a
-  per-model breakdown when auto-selection escalates through a fallback
-  chain), and a human-readable `MODEL_DECISIONS.md` audit trail of exactly
-  which model was picked, why, and what it fell back to.
-- **Extensible by design.** Drop in a custom tool (terminal/file-editing
-  plus whatever you add), or a new skill (project-specific or shared across
-  every run) — no framework to fight, just files in the right folder.
+## Features
 
-## Requirements
+- **Independent verification.** Re-runs the project's real test, build, lint and typecheck commands after the agent finishes. It never invents a command the project doesn't configure.
+- **Works across languages.** Detects and verifies Python, Node/JS/TS, Go, Rust and Java (Maven/Gradle) projects.
+- **Any model, one setting.** Ollama, Anthropic, OpenAI, Gemini, DeepSeek or Moonshot. Switching is one environment variable.
+- **Picks the best model per task.** List your models with cost and quality ratings in `models.yaml` and Certo routes each task to the best fit, with fallback when a provider fails. No extra LLM call to decide. Add `--auto-model`.
+- **Hard limits.** An iteration cap, a wall-clock budget across all retries, and an optional approve-every-action mode.
+- **Sandboxed runs.** Add `--execution docker` to run the agent in a container.
+- **Server mode.** REST, WebSocket streaming, and an OpenAI-compatible `/v1/chat/completions` endpoint.
+- **Run records.** Full transcript, token counts and cost per run, plus a log of which model was picked and why.
+- **Skills and custom tools.** Add project conventions or new tools by dropping files in a folder.
 
-- Python 3.12+
-- [uv](https://docs.astral.sh/uv/) for the virtual environment and
-  dependencies
-- An API key for at least one supported provider — or nothing at all if
-  you run a fully local model via [Ollama](https://ollama.com)
-- Docker, only if you plan to use `CERTO_EXECUTION=docker`
+## More ways to run it
 
-## Install & setup
+```bash
+# Work inside a sandbox
+certo "Add a /version endpoint" --project my-api --execution docker
+
+# Let Certo choose the model for the task
+certo "Fix the failing test in payments.py" --project my-api --auto-model
+
+# Take the task from a file or URL
+certo ./tasks/spec.md --project my-api
+
+# Pause and ask you questions instead of guessing
+certo "Scaffold a FastAPI service" --project my-api --interactive
+```
+
+## How it works
+
+Certo is built on the [OpenHands Software Agent SDK](https://docs.openhands.dev/sdk), which runs the agent loop and tools. Certo adds the parts the SDK leaves open: what counts as verified, which model runs and when to fall back, the budgets, and the CLI and server you talk to.
+
+## Known limits
+
+- Server mode has no authentication. Run it on localhost or behind your own gateway.
+- Java projects are detected, but verification needs Maven or Gradle installed.
+- Under Docker, automatic model selection makes the initial pick but does not fall back mid-task.
+- Small local models can struggle with multi-step tool use. A coder-tuned model gives the best results.
+
+The full list is in the [manual](MANUAL.md#known-limitations).
+
+## Documentation
+
+- [MANUAL.md](MANUAL.md): configuration, CLI flags, server API, skills, custom tools
+- [ROADMAP.md](ROADMAP.md): status, backlog, and the log of every agent failure that shaped the design
+
+## Contributing
+
+Issues and pull requests are welcome. Issues labelled [good first issue](https://github.com/alessioricco/certo/labels/good%20first%20issue) are a good place to start. To work on the code:
 
 ```bash
 git clone https://github.com/alessioricco/certo.git
 cd certo
-
-cp .env.example .env          # then fill in LLM_MODEL and LLM_API_KEY
-uv pip install -e ".[dev]"    # installs openhands-sdk, openhands-tools, and dev tools
-```
-
-`openhands-sdk` and `openhands-tools` are a matched set — always
-install/upgrade them together at the same version (see `pyproject.toml`).
-Optional extras for server mode, sandboxed Docker execution, and each
-task-store backend are listed in `pyproject.toml`'s
-`[project.optional-dependencies]` and documented in `MANUAL.md`.
-
-Verify the install:
-
-```bash
-uv run pytest -q       # runs with no API key needed — nothing here calls a real LLM
-```
-
-## Run it
-
-```bash
-uv run python -m certo "Refactor utils.py to remove duplication, then run the tests."
-
-# A named project, in its own subfolder under ./projects/, run in Docker
-uv run python -m certo "Scaffold a FastAPI service with a /health endpoint." \
-  --project my-api --execution docker
-
-# Let Certo pick the best-fit model from your models.yaml catalog
-uv run python -m certo "Fix the failing test in payments.py" --auto-model
-```
-
-`uv pip install -e .` also installs `certo`, `certo-server`, and
-`certo-admin` as regular console scripts, so `certo "<task>"` works the
-same way without the `uv run python -m` prefix once your venv is active.
-
-Full flag/env-var reference, the projects/execution-mode model, server
-mode, and how to add a custom tool: **[`MANUAL.md`](MANUAL.md)**.
-
-## Switching model / provider
-
-Edit only `LLM_MODEL` in `.env` — no code changes. See
-[`MANUAL.md`](MANUAL.md#switching-llm-provider--model) for supported
-prefixes and the `LLM_BASE_URL` gotcha, and
-[`MANUAL.md`](MANUAL.md#automatic-model-selection) for the optional
-`models.yaml`-driven automatic selection described above
-(`models.yaml.example` is a ready-to-copy starting catalog).
-
-## How it works, briefly
-
-Certo builds config, custom tools, and policy **on top of** the OpenHands
-SDK — it doesn't reimplement the agent loop, tool protocol, or
-model-agnostic LLM routing (LiteLLM under the hood). The harness's own job
-is everything the SDK doesn't opinionate about: which model runs and when
-it falls back, what "actually verified" means for a given project, safety
-budgets, and the CLI/server/OpenAI-compatible interfaces you talk to it
-through. See `docs/SPEC.md` for the original build plan and `ROADMAP.md`
-for the full, still-growing decisions log behind every non-obvious choice.
-
-## Status
-
-Config, LLM/tools/agent/runner wiring, a custom tool, the CLI, Docker
-execution, and an HTTP/WebSocket server mode are all implemented and tested
-— see `MANUAL.md` for usage. **For current milestone status, the
-optional-feature backlog, and known limitations, see
-[`ROADMAP.md`](ROADMAP.md)** — it's the up-to-date tracker; don't rely on
-this paragraph to stay current.
-
-## Building with Claude Code
-
-This project was built by Claude Code following `docs/SPEC.md`, milestone
-by milestone. Project config lives in `CLAUDE.md` (memory/guardrails) and
-`.claude/` (permissions + the `/next-milestone`, `/verify-sdk`, `/add-tool`
-commands). `ROADMAP.md` is the living status/backlog/decisions tracker that
-goes with it — check it before assuming what's done. Start with
-`docs/KICKOFF.md`.
-
-## Layout
-
-```
-CLAUDE.md            # Claude Code memory + guardrails
-MANUAL.md            # full usage guide — kept up to date with every change
-ROADMAP.md           # status/backlog/decisions memory — kept up to date with every change
-docs/SPEC.md         # the build plan (milestones)
-docs/KICKOFF.md      # how to drive the build
-.claude/             # permissions + slash commands
-docker/              # agent-server.Dockerfile (docker execution image)
-skills/              # shared skill catalog, loaded into every agent (see MANUAL.md)
-src/certo/           # the certo package, incl. server.py (server mode)
-tests/               # mirrors src/certo/
-projects/            # generated software, one subfolder per --project (git-ignored)
+uv pip install -e ".[dev]"
+uv run pytest -q     # no API key needed
 ```
 
 ## License
 
-[MIT](LICENSE) — see `LICENSE` for the full text.
+[MIT](LICENSE). Built by [Alessio Ricco](https://github.com/alessioricco).
