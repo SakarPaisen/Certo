@@ -3,8 +3,8 @@
 **The coding agent that doesn't take its own word for it.**
 
 [![PyPI](https://img.shields.io/pypi/v/certo.svg)](https://pypi.org/project/certo/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/alessioricco/certo/blob/main/LICENSE)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://github.com/alessioricco/certo/blob/main/pyproject.toml)
 [![Built on OpenHands SDK](https://img.shields.io/badge/built%20on-OpenHands%20SDK-6f42c1.svg)](https://docs.openhands.dev/sdk)
 
 Give Certo a task. An agent plans, edits files and runs commands until it says it's done. Then Certo re-runs your project's real tests and build itself, with no LLM involved, and tells you whether the work is actually verified. Any model, local or cloud. *Certo* is Italian for "sure".
@@ -54,7 +54,7 @@ Verification: verified
 | `incomplete` | The agent left items on its own to-do list unfinished. |
 | `budget_exhausted` | The task ran out of its time budget. |
 
-The exit code is nonzero for every failure state, so Certo works in scripts and CI. Add `--require-verification` to make `inconclusive` fail too. The full list of states is in the [manual](MANUAL.md#test-verification).
+The exit code is nonzero for every failure state, so Certo works in scripts and CI. Add `--require-verification` to make `inconclusive` fail too. The full list of states is in the [manual](https://github.com/alessioricco/certo/blob/main/MANUAL.md#test-verification).
 
 ## Features
 
@@ -95,12 +95,12 @@ Certo is built on the [OpenHands Software Agent SDK](https://docs.openhands.dev/
 - Under Docker, automatic model selection makes the initial pick but does not fall back mid-task.
 - Small local models can struggle with multi-step tool use. A coder-tuned model gives the best results.
 
-The full list is in the [manual](MANUAL.md#known-limitations).
+The full list is in the [manual](https://github.com/alessioricco/certo/blob/main/MANUAL.md#known-limitations).
 
 ## Documentation
 
-- [MANUAL.md](MANUAL.md): configuration, CLI flags, server API, skills, custom tools
-- [ROADMAP.md](ROADMAP.md): status, backlog, and the log of every agent failure that shaped the design
+- [MANUAL.md](https://github.com/alessioricco/certo/blob/main/MANUAL.md): configuration, CLI flags, server API, skills, custom tools
+- [ROADMAP.md](https://github.com/alessioricco/certo/blob/main/ROADMAP.md): status, backlog, and the log of every agent failure that shaped the design
 
 ## Contributing
 
@@ -115,4 +115,4 @@ uv run pytest -q     # no API key needed
 
 ## License
 
-[MIT](LICENSE). Built by [Alessio Ricco](https://github.com/alessioricco).
+[MIT](https://github.com/alessioricco/certo/blob/main/LICENSE). Built by [Alessio Ricco](https://github.com/alessioricco).
