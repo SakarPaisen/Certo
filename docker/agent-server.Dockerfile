@@ -2,7 +2,7 @@
 #
 # Wraps the published OpenHands agent-server image so our custom tools are
 # importable and registered inside the container. register_tool() only
-# affects the process that calls it; under HARNESS_EXECUTION=docker the agent
+# affects the process that calls it; under CERTO_EXECUTION=docker the agent
 # loop runs inside this container's own agent-server process, not the
 # harness's local Python process, so the tool source has to ship with the
 # image. Build from the repo root (src/certo/workspace.py does this
@@ -12,7 +12,7 @@
 #
 # This same image is meant to generalize beyond local `docker run`: push it to
 # a registry (e.g. ECR) and any compute backend that can run a container and
-# reach it over HTTP (ECS, EC2, ...) can serve as a HARNESS_EXECUTION backend
+# reach it over HTTP (ECS, EC2, ...) can serve as a CERTO_EXECUTION backend
 # later without changing this Dockerfile — only src/certo/workspace.py's
 # dispatch needs a new branch.
 ARG BASE_IMAGE=ghcr.io/openhands/agent-server:latest-python

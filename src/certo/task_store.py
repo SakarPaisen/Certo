@@ -4,7 +4,7 @@
 for a dev/demo server, a real liability for anything long-running (memory
 grows forever; task history is lost on every restart; nothing is shared
 across multiple server processes). This module makes that registry a
-pluggable `TaskStore`, selected via `HARNESS_TASK_STORE`
+pluggable `TaskStore`, selected via `CERTO_TASK_STORE`
 (`memory` | `redis` | `sqlite` | `mysql` | `postgres`), so a deployment
 that needs persistence or a bounded footprint can opt into one without any
 change to `server.py`'s request-handling code — every backend implements
@@ -423,7 +423,7 @@ def _build_sql_url(cfg: Config) -> str:
 
 def build_task_store(cfg: Config) -> TaskStore:
     """Construct the `TaskStore` selected by `cfg.task_store`. The one
-    place that maps `HARNESS_TASK_STORE` to a concrete backend — `server.py`
+    place that maps `CERTO_TASK_STORE` to a concrete backend — `server.py`
     and `admin_cli.py` both call this instead of importing a specific
     backend class, so adding a future backend means one new branch here.
 
@@ -438,7 +438,7 @@ def build_task_store(cfg: Config) -> TaskStore:
             import redis  # noqa: F401
         except ImportError as exc:
             raise RuntimeError(
-                'HARNESS_TASK_STORE=redis requires the "store-redis" extra: '
+                'CERTO_TASK_STORE=redis requires the "store-redis" extra: '
                 'run `uv pip install -e ".[store-redis]"`.'
             ) from exc
         return RedisTaskStore(
@@ -455,8 +455,8 @@ def build_task_store(cfg: Config) -> TaskStore:
             import sqlalchemy  # noqa: F401
         except ImportError as exc:
             raise RuntimeError(
-                f'HARNESS_TASK_STORE={cfg.task_store} requires the "{extra}" extra: '
+                f'CERTO_TASK_STORE={cfg.task_store} requires the "{extra}" extra: '
                 f'run `uv pip install -e ".[{extra}]"`.'
             ) from exc
         return SQLTaskStore(_build_sql_url(cfg))
-    raise ValueError(f"Unsupported HARNESS_TASK_STORE: {cfg.task_store!r}")
+    raise ValueError(f"Unsupported CERTO_TASK_STORE: {cfg.task_store!r}")

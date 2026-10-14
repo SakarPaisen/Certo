@@ -110,7 +110,7 @@ def test_create_task_returns_immediately_with_pending_status(monkeypatch):
 
 
 def test_create_task_passes_the_record_id_and_project_as_run_id_and_project(monkeypatch, tmp_path):
-    # So a task's artifacts folder (HARNESS_ARTIFACTS_DIR) is named after
+    # So a task's artifacts folder (CERTO_ARTIFACTS_DIR) is named after
     # the exact same id GET /tasks/{id} returns.
     calls = {}
 

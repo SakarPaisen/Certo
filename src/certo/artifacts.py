@@ -1,9 +1,9 @@
-"""Opt-in, per-run artifacts directory (`HARNESS_ARTIFACTS_DIR`) — a durable,
+"""Opt-in, per-run artifacts directory (`CERTO_ARTIFACTS_DIR`) — a durable,
 git-ignorable record of how a task run actually went: metadata, the full
 message transcript, and token/cost metrics. `runner.py` is the only caller.
 
 Deliberately a *separate*, sibling top-level directory (mirroring
-`HARNESS_PROJECTS_DIR`'s own shape: one subfolder per project, `_unscoped`
+`CERTO_PROJECTS_DIR`'s own shape: one subfolder per project, `_unscoped`
 when no `--project` was given), not a hidden folder nested inside each
 generated project — this is harness-internal telemetry, not part of the
 project a user might `git init` and commit. `MODEL_DECISIONS.md` stays
@@ -34,10 +34,10 @@ def resolve_run_artifacts_dir(artifacts_dir: str, project: str | None, run_id: s
     to stay inside `artifacts_dir`.
 
     `project` gets the same validation `config.resolve_project_dir()`
-    applies to `HARNESS_PROJECTS_DIR` (non-empty, relative, no `..`
+    applies to `CERTO_PROJECTS_DIR` (non-empty, relative, no `..`
     segment) plus a symlink-followed containment check — a separate
     implementation, not a shared call, since that function's own error
-    messages name `HARNESS_PROJECTS_DIR` specifically, which would be
+    messages name `CERTO_PROJECTS_DIR` specifically, which would be
     actively wrong here (same "different root, different error context"
     call already made for `acceptance.py`'s path containment). `run_id` is
     never caller-supplied text (minted by the harness, or `server.py`'s own
@@ -58,7 +58,7 @@ def resolve_run_artifacts_dir(artifacts_dir: str, project: str | None, run_id: s
     resolved_root = os.path.realpath(artifacts_root)
     resolved_run_dir = os.path.realpath(run_dir)
     if not Path(resolved_run_dir).is_relative_to(Path(resolved_root)):
-        raise ConfigError(f"Artifacts path escapes HARNESS_ARTIFACTS_DIR: {bucket!r}")
+        raise ConfigError(f"Artifacts path escapes CERTO_ARTIFACTS_DIR: {bucket!r}")
 
     return run_dir
 

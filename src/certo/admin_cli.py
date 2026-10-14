@@ -4,7 +4,7 @@ skills, and an LLM connectivity check (`check-llm`, see llm_check.py).
 The `skills` subcommand group manages local-only third-party skills (see
 third_party_skills.py and MANUAL.md "Third-party skills").
 
-Talks directly to whatever backend `HARNESS_TASK_STORE` selects (via
+Talks directly to whatever backend `CERTO_TASK_STORE` selects (via
 `build_task_store(load_config())`), the same store `server.py` uses — this
 is the CLI half of "delete all records for a project," alongside the REST
 `DELETE /tasks`/`DELETE /tasks/{id}` endpoints (see ROADMAP.md's decisions
@@ -286,7 +286,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="certo-admin",
         description="Maintenance CLI for the Certo server's task store "
-        "(HARNESS_TASK_STORE-configured backend), local third-party skills, and an "
+        "(CERTO_TASK_STORE-configured backend), local third-party skills, and an "
         "LLM connectivity check.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -310,7 +310,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--ttl-seconds",
         type=int,
         default=None,
-        help="Override HARNESS_TASK_TTL_SECONDS for this run. Records whose last update is "
+        help="Override CERTO_TASK_TTL_SECONDS for this run. Records whose last update is "
         "older than this are deleted; a value <= 0 refuses to run (use the configured "
         "default instead of accidentally deleting everything).",
     )

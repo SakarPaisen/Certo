@@ -1,7 +1,7 @@
 # Copy to models.yaml and fill in real keys. models.yaml is git-ignored and
 # must never be committed — same rule as .env (see CLAUDE.md).
 #
-# Consulted only when HARNESS_MODEL_SELECTION=auto (or --auto-model). With
+# Consulted only when CERTO_MODEL_SELECTION=auto (or --auto-model). With
 # the default (manual), none of this is read — LLM_MODEL/LLM_API_KEY from
 # .env are used exactly as they are today. See MANUAL.md "Automatic model
 # selection" for the full writeup.

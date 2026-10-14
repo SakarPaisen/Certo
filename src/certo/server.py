@@ -25,7 +25,7 @@ from .skills import write_project_context
 from .task_store import TaskRecord, TaskStore, build_task_store
 
 # How often the background purge loop checks for expired records — not
-# itself configurable (unlike HARNESS_TASK_TTL_SECONDS): a fixed interval
+# itself configurable (unlike CERTO_TASK_TTL_SECONDS): a fixed interval
 # is a reasonable default for a sweep that only matters when a TTL is set
 # at all, and this project's config-surface philosophy is to add a knob
 # only for what a user actually asked to control (see ROADMAP.md).

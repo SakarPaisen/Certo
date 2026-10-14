@@ -1,4 +1,4 @@
-"""Orchestration layer for `HARNESS_MODEL_SELECTION=auto`, the SDK-touching
+"""Orchestration layer for `CERTO_MODEL_SELECTION=auto`, the SDK-touching
 half of model_catalog.py's pure data/scoring layer — `runner.py` is the only
 caller.
 

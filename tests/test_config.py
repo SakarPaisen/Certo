@@ -64,16 +64,16 @@ def test_all_values_parsed():
         _base_env(
             LLM_BASE_URL="http://localhost:11434",
             LLM_REASONING_EFFORT="low",
-            HARNESS_WORKSPACE="/tmp/ws",
-            HARNESS_MAX_ITERATIONS="12",
-            HARNESS_CONFIRM_MODE="always",
-            HARNESS_EXECUTION="docker",
-            HARNESS_PROJECTS_DIR="/tmp/projects",
-            HARNESS_SKILLS_DIR="/tmp/skills",
-            HARNESS_DOCKER_IMAGE="myorg/agent-server:custom",
-            HARNESS_DOCKER_PLATFORM="linux/amd64",
-            HARNESS_VERIFY_TESTS="never",
-            HARNESS_MAX_VERIFY_RETRIES="5",
+            CERTO_WORKSPACE="/tmp/ws",
+            CERTO_MAX_ITERATIONS="12",
+            CERTO_CONFIRM_MODE="always",
+            CERTO_EXECUTION="docker",
+            CERTO_PROJECTS_DIR="/tmp/projects",
+            CERTO_SKILLS_DIR="/tmp/skills",
+            CERTO_DOCKER_IMAGE="myorg/agent-server:custom",
+            CERTO_DOCKER_PLATFORM="linux/amd64",
+            CERTO_VERIFY_TESTS="never",
+            CERTO_MAX_VERIFY_RETRIES="5",
         )
     )
     assert cfg.base_url == "http://localhost:11434"
@@ -104,14 +104,14 @@ def test_reasoning_effort_accepts_forward_compatible_value():
 
 
 def test_invalid_verify_tests_raises():
-    with pytest.raises(ConfigError, match="HARNESS_VERIFY_TESTS"):
-        load_config(_base_env(HARNESS_VERIFY_TESTS="sometimes"))
+    with pytest.raises(ConfigError, match="CERTO_VERIFY_TESTS"):
+        load_config(_base_env(CERTO_VERIFY_TESTS="sometimes"))
 
 
 @pytest.mark.parametrize("bad", ["0", "-1", "abc"])
 def test_invalid_max_verify_retries_raises(bad):
-    with pytest.raises(ConfigError, match="HARNESS_MAX_VERIFY_RETRIES"):
-        load_config(_base_env(HARNESS_MAX_VERIFY_RETRIES=bad))
+    with pytest.raises(ConfigError, match="CERTO_MAX_VERIFY_RETRIES"):
+        load_config(_base_env(CERTO_MAX_VERIFY_RETRIES=bad))
 
 
 def test_max_task_seconds_defaults_when_unset():
@@ -120,19 +120,19 @@ def test_max_task_seconds_defaults_when_unset():
 
 
 def test_max_task_seconds_reads_a_custom_value():
-    cfg = load_config(_base_env(HARNESS_MAX_TASK_SECONDS="60"))
+    cfg = load_config(_base_env(CERTO_MAX_TASK_SECONDS="60"))
     assert cfg.max_task_seconds == 60
 
 
 @pytest.mark.parametrize("bad", ["0", "-1", "abc", "3.5"])
 def test_invalid_max_task_seconds_raises(bad):
-    with pytest.raises(ConfigError, match="HARNESS_MAX_TASK_SECONDS"):
-        load_config(_base_env(HARNESS_MAX_TASK_SECONDS=bad))
+    with pytest.raises(ConfigError, match="CERTO_MAX_TASK_SECONDS"):
+        load_config(_base_env(CERTO_MAX_TASK_SECONDS=bad))
 
 
 def test_invalid_docker_platform_raises():
-    with pytest.raises(ConfigError, match="HARNESS_DOCKER_PLATFORM"):
-        load_config(_base_env(HARNESS_DOCKER_PLATFORM="linux/mips"))
+    with pytest.raises(ConfigError, match="CERTO_DOCKER_PLATFORM"):
+        load_config(_base_env(CERTO_DOCKER_PLATFORM="linux/mips"))
 
 
 def test_missing_model_raises():
@@ -153,7 +153,7 @@ def test_base_url_allows_missing_key():
 
 
 def test_blank_values_treated_as_absent():
-    cfg = load_config(_base_env(HARNESS_WORKSPACE="   ", HARNESS_CONFIRM_MODE=""))
+    cfg = load_config(_base_env(CERTO_WORKSPACE="   ", CERTO_CONFIRM_MODE=""))
     assert cfg.workspace == DEFAULT_WORKSPACE
     assert cfg.confirm_mode == DEFAULT_CONFIRM_MODE
 
@@ -165,22 +165,22 @@ def test_whitespace_is_trimmed():
 
 @pytest.mark.parametrize("bad", ["0", "-3", "abc", "3.5"])
 def test_invalid_max_iterations_raises(bad):
-    with pytest.raises(ConfigError, match="HARNESS_MAX_ITERATIONS"):
-        load_config(_base_env(HARNESS_MAX_ITERATIONS=bad))
+    with pytest.raises(ConfigError, match="CERTO_MAX_ITERATIONS"):
+        load_config(_base_env(CERTO_MAX_ITERATIONS=bad))
 
 
 def test_invalid_confirm_mode_raises():
-    with pytest.raises(ConfigError, match="HARNESS_CONFIRM_MODE"):
-        load_config(_base_env(HARNESS_CONFIRM_MODE="sometimes"))
+    with pytest.raises(ConfigError, match="CERTO_CONFIRM_MODE"):
+        load_config(_base_env(CERTO_CONFIRM_MODE="sometimes"))
 
 
 def test_invalid_execution_raises():
-    with pytest.raises(ConfigError, match="HARNESS_EXECUTION"):
-        load_config(_base_env(HARNESS_EXECUTION="kubernetes"))
+    with pytest.raises(ConfigError, match="CERTO_EXECUTION"):
+        load_config(_base_env(CERTO_EXECUTION="kubernetes"))
 
 
 def test_choices_are_case_insensitive():
-    cfg = load_config(_base_env(HARNESS_CONFIRM_MODE="ALWAYS", HARNESS_EXECUTION="Docker"))
+    cfg = load_config(_base_env(CERTO_CONFIRM_MODE="ALWAYS", CERTO_EXECUTION="Docker"))
     assert cfg.confirm_mode == "always"
     assert cfg.execution == "docker"
 
@@ -315,7 +315,7 @@ def test_resolve_project_dir_rejects_a_symlinked_escape(tmp_path):
     outside.mkdir()
     (projects_dir / "myapp").symlink_to(outside, target_is_directory=True)
 
-    with pytest.raises(ConfigError, match="escapes HARNESS_PROJECTS_DIR"):
+    with pytest.raises(ConfigError, match="escapes CERTO_PROJECTS_DIR"):
         resolve_project_dir(str(projects_dir), "myapp")
 
 
@@ -346,41 +346,41 @@ def test_task_store_defaults_to_memory_with_no_ttl():
 
 def test_task_store_accepts_each_backend():
     for backend in ("memory", "redis", "sqlite", "mysql", "postgres"):
-        cfg = load_config(_base_env(HARNESS_TASK_STORE=backend))
+        cfg = load_config(_base_env(CERTO_TASK_STORE=backend))
         assert cfg.task_store == backend
 
 
 def test_task_store_is_case_insensitive():
-    cfg = load_config(_base_env(HARNESS_TASK_STORE="SQLITE"))
+    cfg = load_config(_base_env(CERTO_TASK_STORE="SQLITE"))
     assert cfg.task_store == "sqlite"
 
 
 def test_invalid_task_store_raises():
-    with pytest.raises(ConfigError, match="HARNESS_TASK_STORE"):
-        load_config(_base_env(HARNESS_TASK_STORE="oracle"))
+    with pytest.raises(ConfigError, match="CERTO_TASK_STORE"):
+        load_config(_base_env(CERTO_TASK_STORE="oracle"))
 
 
 def test_task_ttl_seconds_zero_means_keep_forever():
-    cfg = load_config(_base_env(HARNESS_TASK_TTL_SECONDS="0"))
+    cfg = load_config(_base_env(CERTO_TASK_TTL_SECONDS="0"))
     assert cfg.task_ttl_seconds == 0
 
 
 def test_task_ttl_seconds_accepts_a_positive_value():
-    cfg = load_config(_base_env(HARNESS_TASK_TTL_SECONDS="3600"))
+    cfg = load_config(_base_env(CERTO_TASK_TTL_SECONDS="3600"))
     assert cfg.task_ttl_seconds == 3600
 
 
 @pytest.mark.parametrize("bad", ["-1", "abc", "3.5"])
 def test_invalid_task_ttl_seconds_raises(bad):
-    with pytest.raises(ConfigError, match="HARNESS_TASK_TTL_SECONDS"):
-        load_config(_base_env(HARNESS_TASK_TTL_SECONDS=bad))
+    with pytest.raises(ConfigError, match="CERTO_TASK_TTL_SECONDS"):
+        load_config(_base_env(CERTO_TASK_TTL_SECONDS=bad))
 
 
 def test_task_store_sqlite_path_defaults_and_overrides():
     cfg = load_config(_base_env())
     assert cfg.task_store_sqlite_path == DEFAULT_TASK_STORE_SQLITE_PATH
 
-    cfg = load_config(_base_env(HARNESS_TASK_STORE_SQLITE_PATH="/tmp/custom.db"))
+    cfg = load_config(_base_env(CERTO_TASK_STORE_SQLITE_PATH="/tmp/custom.db"))
     assert cfg.task_store_sqlite_path == "/tmp/custom.db"
 
 
@@ -394,11 +394,11 @@ def test_task_store_mysql_fields_default_and_override():
 
     cfg = load_config(
         _base_env(
-            HARNESS_TASK_STORE_MYSQL_HOST="db.internal",
-            HARNESS_TASK_STORE_MYSQL_PORT="3307",
-            HARNESS_TASK_STORE_MYSQL_USER="harness_user",
-            HARNESS_TASK_STORE_MYSQL_PASSWORD="secret",
-            HARNESS_TASK_STORE_MYSQL_DATABASE="harness_prod",
+            CERTO_TASK_STORE_MYSQL_HOST="db.internal",
+            CERTO_TASK_STORE_MYSQL_PORT="3307",
+            CERTO_TASK_STORE_MYSQL_USER="harness_user",
+            CERTO_TASK_STORE_MYSQL_PASSWORD="secret",
+            CERTO_TASK_STORE_MYSQL_DATABASE="harness_prod",
         )
     )
     assert cfg.task_store_mysql_host == "db.internal"
@@ -409,8 +409,8 @@ def test_task_store_mysql_fields_default_and_override():
 
 
 def test_invalid_task_store_mysql_port_raises():
-    with pytest.raises(ConfigError, match="HARNESS_TASK_STORE_MYSQL_PORT"):
-        load_config(_base_env(HARNESS_TASK_STORE_MYSQL_PORT="not-a-port"))
+    with pytest.raises(ConfigError, match="CERTO_TASK_STORE_MYSQL_PORT"):
+        load_config(_base_env(CERTO_TASK_STORE_MYSQL_PORT="not-a-port"))
 
 
 def test_task_store_postgres_fields_default_and_override():
@@ -423,11 +423,11 @@ def test_task_store_postgres_fields_default_and_override():
 
     cfg = load_config(
         _base_env(
-            HARNESS_TASK_STORE_POSTGRES_HOST="pg.internal",
-            HARNESS_TASK_STORE_POSTGRES_PORT="5433",
-            HARNESS_TASK_STORE_POSTGRES_USER="harness_user",
-            HARNESS_TASK_STORE_POSTGRES_PASSWORD="secret",
-            HARNESS_TASK_STORE_POSTGRES_DATABASE="harness_prod",
+            CERTO_TASK_STORE_POSTGRES_HOST="pg.internal",
+            CERTO_TASK_STORE_POSTGRES_PORT="5433",
+            CERTO_TASK_STORE_POSTGRES_USER="harness_user",
+            CERTO_TASK_STORE_POSTGRES_PASSWORD="secret",
+            CERTO_TASK_STORE_POSTGRES_DATABASE="harness_prod",
         )
     )
     assert cfg.task_store_postgres_host == "pg.internal"
@@ -447,11 +447,11 @@ def test_task_store_redis_fields_default_and_override():
 
     cfg = load_config(
         _base_env(
-            HARNESS_TASK_STORE_REDIS_HOST="redis.internal",
-            HARNESS_TASK_STORE_REDIS_PORT="6380",
-            HARNESS_TASK_STORE_REDIS_DB="2",
-            HARNESS_TASK_STORE_REDIS_PASSWORD="secret",
-            HARNESS_TASK_STORE_REDIS_USE_TLS="true",
+            CERTO_TASK_STORE_REDIS_HOST="redis.internal",
+            CERTO_TASK_STORE_REDIS_PORT="6380",
+            CERTO_TASK_STORE_REDIS_DB="2",
+            CERTO_TASK_STORE_REDIS_PASSWORD="secret",
+            CERTO_TASK_STORE_REDIS_USE_TLS="true",
         )
     )
     assert cfg.task_store_redis_host == "redis.internal"
@@ -463,15 +463,15 @@ def test_task_store_redis_fields_default_and_override():
 
 @pytest.mark.parametrize("bad", ["-1", "abc"])
 def test_invalid_task_store_redis_db_raises(bad):
-    with pytest.raises(ConfigError, match="HARNESS_TASK_STORE_REDIS_DB"):
-        load_config(_base_env(HARNESS_TASK_STORE_REDIS_DB=bad))
+    with pytest.raises(ConfigError, match="CERTO_TASK_STORE_REDIS_DB"):
+        load_config(_base_env(CERTO_TASK_STORE_REDIS_DB=bad))
 
 
 @pytest.mark.parametrize(
     "value,expected", [("true", True), ("1", True), ("yes", True), ("on", True)]
 )
 def test_task_store_redis_use_tls_accepts_true_spellings(value, expected):
-    cfg = load_config(_base_env(HARNESS_TASK_STORE_REDIS_USE_TLS=value))
+    cfg = load_config(_base_env(CERTO_TASK_STORE_REDIS_USE_TLS=value))
     assert cfg.task_store_redis_use_tls is expected
 
 
@@ -479,16 +479,16 @@ def test_task_store_redis_use_tls_accepts_true_spellings(value, expected):
     "value,expected", [("false", False), ("0", False), ("no", False), ("off", False)]
 )
 def test_task_store_redis_use_tls_accepts_false_spellings(value, expected):
-    cfg = load_config(_base_env(HARNESS_TASK_STORE_REDIS_USE_TLS=value))
+    cfg = load_config(_base_env(CERTO_TASK_STORE_REDIS_USE_TLS=value))
     assert cfg.task_store_redis_use_tls is expected
 
 
 def test_invalid_task_store_redis_use_tls_raises():
-    with pytest.raises(ConfigError, match="HARNESS_TASK_STORE_REDIS_USE_TLS"):
-        load_config(_base_env(HARNESS_TASK_STORE_REDIS_USE_TLS="maybe"))
+    with pytest.raises(ConfigError, match="CERTO_TASK_STORE_REDIS_USE_TLS"):
+        load_config(_base_env(CERTO_TASK_STORE_REDIS_USE_TLS="maybe"))
 
 
-# --- Interactive mode (HARNESS_INTERACTIVE) ---------------------------------
+# --- Interactive mode (CERTO_INTERACTIVE) ---------------------------------
 
 
 def test_interactive_defaults_to_false():
@@ -500,7 +500,7 @@ def test_interactive_defaults_to_false():
     "value,expected", [("true", True), ("1", True), ("yes", True), ("on", True)]
 )
 def test_interactive_accepts_true_spellings(value, expected):
-    cfg = load_config(_base_env(HARNESS_INTERACTIVE=value))
+    cfg = load_config(_base_env(CERTO_INTERACTIVE=value))
     assert cfg.interactive is expected
 
 
@@ -508,16 +508,16 @@ def test_interactive_accepts_true_spellings(value, expected):
     "value,expected", [("false", False), ("0", False), ("no", False), ("off", False)]
 )
 def test_interactive_accepts_false_spellings(value, expected):
-    cfg = load_config(_base_env(HARNESS_INTERACTIVE=value))
+    cfg = load_config(_base_env(CERTO_INTERACTIVE=value))
     assert cfg.interactive is expected
 
 
 def test_invalid_interactive_raises():
-    with pytest.raises(ConfigError, match="HARNESS_INTERACTIVE"):
-        load_config(_base_env(HARNESS_INTERACTIVE="maybe"))
+    with pytest.raises(ConfigError, match="CERTO_INTERACTIVE"):
+        load_config(_base_env(CERTO_INTERACTIVE="maybe"))
 
 
-# --- Deterministic auto model selection (HARNESS_MODEL_SELECTION) ----------
+# --- Deterministic auto model selection (CERTO_MODEL_SELECTION) ----------
 
 
 def test_model_selection_defaults_to_manual():
@@ -527,26 +527,26 @@ def test_model_selection_defaults_to_manual():
 
 
 def test_model_selection_accepts_auto():
-    cfg = load_config(_base_env(HARNESS_MODEL_SELECTION="auto"))
+    cfg = load_config(_base_env(CERTO_MODEL_SELECTION="auto"))
     assert cfg.model_selection == "auto"
 
 
 def test_model_selection_is_case_insensitive():
-    cfg = load_config(_base_env(HARNESS_MODEL_SELECTION="AUTO"))
+    cfg = load_config(_base_env(CERTO_MODEL_SELECTION="AUTO"))
     assert cfg.model_selection == "auto"
 
 
 def test_invalid_model_selection_raises():
-    with pytest.raises(ConfigError, match="HARNESS_MODEL_SELECTION"):
-        load_config(_base_env(HARNESS_MODEL_SELECTION="sometimes"))
+    with pytest.raises(ConfigError, match="CERTO_MODEL_SELECTION"):
+        load_config(_base_env(CERTO_MODEL_SELECTION="sometimes"))
 
 
 def test_models_file_defaults_and_override():
-    cfg = load_config(_base_env(HARNESS_MODELS_FILE="./custom-models.yaml"))
+    cfg = load_config(_base_env(CERTO_MODELS_FILE="./custom-models.yaml"))
     assert cfg.models_file == "./custom-models.yaml"
 
 
-# --- Per-run artifacts directory (HARNESS_ARTIFACTS_DIR) --------------------
+# --- Per-run artifacts directory (CERTO_ARTIFACTS_DIR) --------------------
 
 
 def test_artifacts_dir_defaults_to_blank():
@@ -555,10 +555,80 @@ def test_artifacts_dir_defaults_to_blank():
 
 
 def test_artifacts_dir_override():
-    cfg = load_config(_base_env(HARNESS_ARTIFACTS_DIR="./artifacts"))
+    cfg = load_config(_base_env(CERTO_ARTIFACTS_DIR="./artifacts"))
     assert cfg.artifacts_dir == "./artifacts"
 
 
 def test_artifacts_dir_blank_value_stays_blank():
-    cfg = load_config(_base_env(HARNESS_ARTIFACTS_DIR="   "))
+    cfg = load_config(_base_env(CERTO_ARTIFACTS_DIR="   "))
     assert cfg.artifacts_dir == ""
+
+
+# --- HARNESS_* -> CERTO_* deprecation fallback -------------------------------
+
+
+@pytest.fixture
+def fresh_legacy_warnings(monkeypatch):
+    """The once-per-process warning memory is module state; isolate it."""
+    import certo.config as config_mod
+
+    monkeypatch.setattr(config_mod, "_warned_legacy_vars", set())
+
+
+def _legacy_warnings(caplog) -> list[str]:
+    return [r.getMessage() for r in caplog.records if "deprecated" in r.getMessage()]
+
+
+def test_new_env_name_only(fresh_legacy_warnings, caplog):
+    cfg = load_config(_base_env(CERTO_MAX_ITERATIONS="7", CERTO_EXECUTION="docker"))
+    assert cfg.max_iterations == 7
+    assert cfg.execution == "docker"
+    assert _legacy_warnings(caplog) == []
+
+
+def test_legacy_env_name_only_is_used_and_warns_naming_the_new_var(fresh_legacy_warnings, caplog):
+    cfg = load_config(_base_env(HARNESS_MAX_ITERATIONS="7", HARNESS_SKILLS_DIR="./old-skills"))
+    assert cfg.max_iterations == 7
+    assert cfg.skills_dir == "./old-skills"
+    assert sorted(_legacy_warnings(caplog)) == [
+        "HARNESS_MAX_ITERATIONS is deprecated; rename it to CERTO_MAX_ITERATIONS.",
+        "HARNESS_SKILLS_DIR is deprecated; rename it to CERTO_SKILLS_DIR.",
+    ]
+
+
+def test_legacy_env_warning_is_logged_once_per_variable(fresh_legacy_warnings, caplog):
+    load_config(_base_env(HARNESS_MAX_ITERATIONS="7"))
+    load_config(_base_env(HARNESS_MAX_ITERATIONS="7"))
+    assert len(_legacy_warnings(caplog)) == 1
+
+
+def test_both_env_names_set_new_wins_silently(fresh_legacy_warnings, caplog):
+    cfg = load_config(_base_env(CERTO_MAX_ITERATIONS="7", HARNESS_MAX_ITERATIONS="99"))
+    assert cfg.max_iterations == 7
+    assert _legacy_warnings(caplog) == []
+
+
+def test_blank_new_env_name_falls_back_to_legacy(fresh_legacy_warnings):
+    cfg = load_config(_base_env(CERTO_EXECUTION="", HARNESS_EXECUTION="docker"))
+    assert cfg.execution == "docker"
+
+
+def test_invalid_legacy_value_error_names_the_legacy_var(fresh_legacy_warnings):
+    with pytest.raises(ConfigError, match="HARNESS_MAX_ITERATIONS"):
+        load_config(_base_env(HARNESS_MAX_ITERATIONS="abc"))
+
+
+@pytest.mark.parametrize(
+    "suffix, value, field, expected",
+    [
+        ("CONFIRM_MODE", "always", "confirm_mode", "always"),
+        ("TASK_TTL_SECONDS", "0", "task_ttl_seconds", 0),
+        ("TASK_STORE_REDIS_USE_TLS", "true", "task_store_redis_use_tls", True),
+        ("ARTIFACTS_DIR", "./arts", "artifacts_dir", "./arts"),
+    ],
+)
+def test_legacy_fallback_covers_every_parser_kind(
+    fresh_legacy_warnings, suffix, value, field, expected
+):
+    assert getattr(load_config(_base_env(**{f"HARNESS_{suffix}": value})), field) == expected
+    assert getattr(load_config(_base_env(**{f"CERTO_{suffix}": value})), field) == expected

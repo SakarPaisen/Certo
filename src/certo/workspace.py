@@ -1,6 +1,6 @@
 """Builds the workspace the agent operates in.
 
-Single dispatch point for execution backends: HARNESS_EXECUTION selects a
+Single dispatch point for execution backends: CERTO_EXECUTION selects a
 branch here. Adding a future backend (ECS, EC2, ...) means adding one branch
 in this module and one value to config.EXECUTION_MODES — not touching
 agent.py, runner.py, or cli.py.
@@ -42,7 +42,7 @@ def build_workspace(cfg: Config) -> Any:
             from openhands.workspace import DockerWorkspace
         except ImportError as exc:
             raise RuntimeError(
-                "HARNESS_EXECUTION=docker requires the 'sandbox' extra: "
+                "CERTO_EXECUTION=docker requires the 'sandbox' extra: "
                 'run `uv pip install -e ".[sandbox]"`.'
             ) from exc
 
@@ -55,4 +55,4 @@ def build_workspace(cfg: Config) -> Any:
             volumes=[f"{host_dir}:/workspace"],
         )
 
-    raise ValueError(f"Unsupported HARNESS_EXECUTION: {cfg.execution!r}")
+    raise ValueError(f"Unsupported CERTO_EXECUTION: {cfg.execution!r}")

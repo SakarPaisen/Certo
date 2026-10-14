@@ -29,12 +29,12 @@ def _looks_like_url(value: str) -> bool:
 
 
 def _confirm_pending_actions(pending: Sequence[ActionEvent]) -> bool:
-    """Interactive terminal handler for `HARNESS_CONFIRM_MODE=always`:
+    """Interactive terminal handler for `CERTO_CONFIRM_MODE=always`:
     prints each pending action and asks the user to approve or reject it.
     Any answer other than an explicit yes rejects — the safer default for
     a prompt nobody may be watching closely.
     """
-    print("\n--- Confirmation required (HARNESS_CONFIRM_MODE=always) ---")
+    print("\n--- Confirmation required (CERTO_CONFIRM_MODE=always) ---")
     for action in pending:
         print(f"  {action.tool_name}: {action.action}")
     answer = input("Approve? [y/N] ").strip().lower()
@@ -42,7 +42,7 @@ def _confirm_pending_actions(pending: Sequence[ActionEvent]) -> bool:
 
 
 def _prompt_for_continuation(narrative: str) -> str | None:
-    """Interactive terminal handler for `HARNESS_INTERACTIVE=yes`: prints
+    """Interactive terminal handler for `CERTO_INTERACTIVE=yes`: prints
     the agent's latest reply and lets the user type a follow-up, or press
     Enter to accept it as done. The SDK can't tell a genuine clarifying
     question apart from real completion (see agent.py's `_AUTONOMOUS_SUFFIX`
@@ -58,7 +58,7 @@ def _prompt_for_continuation(narrative: str) -> str | None:
 def _prompt_for_model_choice(
     candidates: list[ModelCatalogEntry], recommended_index: int, reason: str
 ) -> int:
-    """Interactive terminal handler for `HARNESS_MODEL_SELECTION=auto`: shows
+    """Interactive terminal handler for `CERTO_MODEL_SELECTION=auto`: shows
     the full ranked candidate list and lets the user accept the recommended
     one (Enter) or type the number of an alternative instead.
     """
@@ -163,9 +163,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--execution",
         choices=("local", "docker"),
         default=None,
-        help=(
-            "Override HARNESS_EXECUTION for this run. Defaults to the value in .env (or 'local')."
-        ),
+        help=("Override CERTO_EXECUTION for this run. Defaults to the value in .env (or 'local')."),
     )
     parser.add_argument(
         "--model",
@@ -201,9 +199,9 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Project name. The agent's workspace becomes "
-            "<HARNESS_PROJECTS_DIR>/<project> (created if missing), so each "
+            "<CERTO_PROJECTS_DIR>/<project> (created if missing), so each "
             "project's generated software lands in its own subfolder. "
-            "Defaults to HARNESS_WORKSPACE when omitted."
+            "Defaults to CERTO_WORKSPACE when omitted."
         ),
     )
     parser.add_argument(
@@ -236,7 +234,7 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Pick the best-fit model for this task from a hand-curated "
-            "catalog (models.yaml, or HARNESS_MODELS_FILE), scored by task "
+            "catalog (models.yaml, or CERTO_MODELS_FILE), scored by task "
             "type instead of always using LLM_MODEL. Falls back to the next "
             "candidate on a provider-level failure (auth/rate-limit/outage) "
             "or a failed verification/task_tracker retry. Combine with "
@@ -370,7 +368,7 @@ def main(argv: list[str] | None = None) -> int:
     # verification failed and couldn't be fixed, made no observable progress
     # on a fix attempt, kept timing out, whose own task_tracker list was
     # left incomplete, needed a confirm-mode approval nobody could answer,
-    # ran out of its shared HARNESS_MAX_TASK_SECONDS budget, failed a
+    # ran out of its shared CERTO_MAX_TASK_SECONDS budget, failed a
     # required --acceptance-checks criterion, or whose run never reached a
     # coherent finish, is a nonzero exit; "inconclusive" (nothing runnable
     # to check) is not an error but is still printed so it isn't mistaken

@@ -33,7 +33,7 @@ in one command at the same version.
 ```bash
 pip install -U openhands-sdk openhands-tools python-dotenv
 pip install -U pytest ruff            # dev
-# Optional (only if HARNESS_EXECUTION=docker later):
+# Optional (only if CERTO_EXECUTION=docker later):
 # pip install -U openhands-workspace openhands-agent-server
 ```
 
@@ -42,7 +42,7 @@ Pin exact versions in `pyproject.toml` once a working version is confirmed.
 ## 4. Configuration (the model-agnostic core)
 
 See `.env.example` for the canonical list. The SDK reads `LLM_MODEL` /
-`LLM_API_KEY` / `LLM_BASE_URL` via `LLM.load_from_env()`. Our own `HARNESS_*`
+`LLM_API_KEY` / `LLM_BASE_URL` via `LLM.load_from_env()`. Our own `CERTO_*`
 vars wrap policy that isn't the LLM's (workspace, iteration cap, confirm mode,
 execution mode). Switching provider = edit `LLM_MODEL` only.
 
@@ -63,7 +63,7 @@ certo/
 │   └── commands/          # /next-milestone, /verify-sdk, /add-tool
 └── src/certo/
     ├── __init__.py
-    ├── config.py          # load HARNESS_* env into a Config dataclass
+    ├── config.py          # load CERTO_* env into a Config dataclass
     ├── llm.py             # build the LLM via LLM.load_from_env (+ validation)
     ├── tools.py           # assemble built-in + custom tools
     ├── agent.py           # build_agent(): wire LLM + tools + policy
@@ -214,9 +214,9 @@ indexer/searcher, a project-specific linter, a deploy/PR trigger.
 ## 8. Execution mode & safety
 
 - **Local (default):** tools run in the current process/workspace.
-- **Docker/remote:** gate behind `HARNESS_EXECUTION=docker`; use
+- **Docker/remote:** gate behind `CERTO_EXECUTION=docker`; use
   `openhands-workspace` / `openhands-agent-server` per the remote-execution guide.
-- **Confirmation:** `HARNESS_CONFIRM_MODE=always` attaches a policy that pauses
+- **Confirmation:** `CERTO_CONFIRM_MODE=always` attaches a policy that pauses
   before each tool call.
 - Keep API keys in env only; never place secrets in prompts, tool args, or logs.
 
@@ -228,7 +228,7 @@ indexer/searcher, a project-specific linter, a deploy/PR trigger.
 
 ## 10. Testing
 
-- `test_config.py`: HARNESS_* parsing, defaults, invalid values.
+- `test_config.py`: CERTO_* parsing, defaults, invalid values.
 - `test_*_tool.py`: each custom tool's executor via a constructed Action; no LLM.
 - `test_runner.py`: end-to-end smoke test that SKIPS when no API key is present;
   when a key exists, runs a tiny cheap task (e.g. create HELLO.txt).
@@ -252,7 +252,7 @@ indexer/searcher, a project-specific linter, a deploy/PR trigger.
 - Switching provider/model requires editing only `LLM_MODEL` (+ the right key).
 - The agent completes a multi-step coding task (edit files + run commands) e2e.
 - At least one custom tool is registered and invoked by the agent.
-- `HARNESS_MAX_ITERATIONS` reliably bounds runaway loops.
+- `CERTO_MAX_ITERATIONS` reliably bounds runaway loops.
 - Custom-tool tests pass with no network; runner smoke test skips without a key.
 - README documents `.env`, provider switching (incl. a local model), and adding a tool.
 

@@ -76,7 +76,7 @@ quickstart and a tour of what makes Certo worth using.
   dependencies
 - An API key for at least one supported provider — or nothing at all if
   you run a fully local model via [Ollama](https://ollama.com)
-- Docker, only if you plan to use `HARNESS_EXECUTION=docker`
+- Docker, only if you plan to use `CERTO_EXECUTION=docker`
 
 ## Install & setup
 

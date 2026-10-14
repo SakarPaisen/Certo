@@ -130,7 +130,7 @@ def test_agent_context_still_loads_project_skills():
     assert agent.agent_context.load_project_skills is True
 
 
-# --- HARNESS_INTERACTIVE=yes: drops _AUTONOMOUS_SUFFIX, keeps the rest -----
+# --- CERTO_INTERACTIVE=yes: drops _AUTONOMOUS_SUFFIX, keeps the rest -----
 
 
 def test_autonomous_suffix_present_by_default():

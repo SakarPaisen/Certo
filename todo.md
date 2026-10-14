@@ -21,7 +21,7 @@ Pinned both to `==1.47.0` (the version already verified throughout
 (`uv pip install -e ".[dev]"`) and full suite re-run (240 passed). See
 `ROADMAP.md` decisions log for the full rationale.
 
-### 2. ~~`HARNESS_CONFIRM_MODE=always` — wire the pause-before-tool-call gate~~ — DONE
+### 2. ~~`CERTO_CONFIRM_MODE=always` — wire the pause-before-tool-call gate~~ — DONE
 Verified the SDK's confirmation-policy API live (`AlwaysConfirm`,
 `get_unmatched_actions`, `reject_pending_actions`) before wiring it. Added
 `_run_with_confirmation()` in `runner.py`, wrapping all three
@@ -38,7 +38,7 @@ Added `_enforce_task_tracker_completion()` (`runner.py`), which runs right
 after the agent's first turn and before project verification: scans
 `conversation.state.events` for the most recently observed `task_tracker`
 tool state, and if any item is still `todo`/`in_progress`, sends a
-follow-up and re-runs the agent (bounded by `HARNESS_MAX_VERIFY_RETRIES`).
+follow-up and re-runs the agent (bounded by `CERTO_MAX_VERIFY_RETRIES`).
 An unresolved list becomes a new `"incomplete"` terminal `verification_state`
 that skips project verification entirely (a task the agent's own tracking
 says isn't finished can't be meaningfully "verified" by tests). Verified
@@ -47,7 +47,7 @@ live end-to-end: reproduced the exact failure (create 2 tasks, leave one
 completed the item on the follow-up. See `ROADMAP.md` decisions log and
 `MANUAL.md` "Test verification" → "Task-tracker completion".
 
-### 4. ~~Test coverage for `HARNESS_MAX_ITERATIONS`~~ — DONE
+### 4. ~~Test coverage for `CERTO_MAX_ITERATIONS`~~ — DONE
 Added `tests/test_runner.py::test_stream_task_wires_max_iterations_to_conversation`
 — a no-LLM unit test (monkeypatches `Conversation`/`build_agent`/
 `build_workspace`) asserting `stream_task()` passes
@@ -67,7 +67,7 @@ caller can redirect outbound LLM calls to an arbitrary URL. This is
 already named in `MANUAL.md`'s Known Limitations ("No authentication on
 any server-mode endpoint") but isn't tracked as an actionable fix anywhere.
 Minimal remediation: a shared-secret header check (e.g.
-`HARNESS_SERVER_API_KEY`, checked via a FastAPI dependency — plain FastAPI,
+`CERTO_SERVER_API_KEY`, checked via a FastAPI dependency — plain FastAPI,
 no SDK verification needed) gating all task-submission routes, plus a loud
 `MANUAL.md` warning against `--host 0.0.0.0` without one.
 
@@ -98,7 +98,7 @@ Verified live via the real CLI (same task, same inconclusive result,
 `MANUAL.md` "CLI reference"/"Server mode".
 
 ### 8. ~~Add a global task execution budget~~ — DONE
-Added `HARNESS_MAX_TASK_SECONDS` (default `1800`) — a shared, wall-clock
+Added `CERTO_MAX_TASK_SECONDS` (default `1800`) — a shared, wall-clock
 task-level budget, chosen over reverse-engineering a cumulative iteration
 count (the SDK exposes no API to read back iterations consumed by a past
 `.run()` call, and an event-counting proxy would systematically undercount
@@ -111,7 +111,7 @@ confirm-mode approve/reject round-trip, and returns a three-way result
 `_verify_and_report`/`_enforce_task_tracker_completion` also check it once
 at entry. Exhausting it produces a new `"budget_exhausted"` terminal
 state, wired into `cli.py`'s nonzero-exit set. Verified live end-to-end
-(`HARNESS_MAX_TASK_SECONDS=1`: real work completes, then reports
+(`CERTO_MAX_TASK_SECONDS=1`: real work completes, then reports
 `budget_exhausted` with exit `1`; default budget behaves as before) — this
 same live check caught a real omission (the CLI exit-code tuple wasn't
 updated on the first pass), fixed and re-verified, with a dedicated
@@ -181,7 +181,7 @@ custom field or a trailing system message), not a quick patch.
 Expanded well beyond the original "just a TTL purge" scope, per an explicit
 follow-up ask: a pluggable `task_store.py` with five backends (`memory`
 default, `redis`, `sqlite`, `mysql`, `postgres`), fully configurable via
-`.env` (`HARNESS_TASK_STORE*`), a `HARNESS_TASK_TTL_SECONDS` retention
+`.env` (`CERTO_TASK_STORE*`), a `CERTO_TASK_TTL_SECONDS` retention
 setting (`0` = keep forever), and delete-by-project exposed both ways —
 `DELETE /tasks?project=NAME` / `DELETE /tasks/{id}` on `server.py`, and a
 new `certo-admin` CLI (`show`/`delete-task`/`delete-project`/`purge`).
@@ -197,7 +197,7 @@ the way.
 
 ### 15. ECS/EC2 (or other remote) execution backend
 `workspace.py`'s `build_workspace()` is already a single dispatch point —
-adding a backend is one new branch plus a new `HARNESS_EXECUTION` value,
+adding a backend is one new branch plus a new `CERTO_EXECUTION` value,
 not a rewrite. Useful if tasks need to run somewhere other than
 local/Docker (e.g. ephemeral cloud runners for parallel tasks), but
 nothing today demonstrates a concrete need for it.
@@ -216,8 +216,8 @@ live: the agent left the fixture untouched as instructed, the harness
 caught the entrypoint-ordering failure, sent the automated follow-up, and
 the agent fixed it — final state `verified` after 1 retry.
 
-### 17. Per-task cost ceiling (`HARNESS_MAX_COST_USD`)
-`HARNESS_MAX_ITERATIONS` bounds how many *iterations* a run can take, but
+### 17. Per-task cost ceiling (`CERTO_MAX_COST_USD`)
+`CERTO_MAX_ITERATIONS` bounds how many *iterations* a run can take, but
 not how many *dollars* it can spend — a single expensive iteration (a huge
 context, a costly reasoning-effort setting) isn't capped by an iteration
 count at all. Confirmed the SDK actually tracks this per conversation:
@@ -239,22 +239,22 @@ locally, per `CLAUDE.md`'s own working-style rule. A minimal workflow
 on push/PR) would catch a regression before it lands rather than relying
 on manual discipline every session.
 
-### 19. ~~Optional interactive mode (`HARNESS_INTERACTIVE=yes` / `--interactive`), default off~~ — DONE
+### 19. ~~Optional interactive mode (`CERTO_INTERACTIVE=yes` / `--interactive`), default off~~ — DONE
 Implemented per a plan reviewed with the user first (`EnterPlanMode` +
 `AskUserQuestion`, matching this item's own "real design work... before
 implementation" ask). Confirmed scope: the interactive checkpoint wraps
 only the *initial* `conversation.run()` — once the human ends the
 back-and-forth (or there was nothing to ask), the existing
 `_enforce_task_tracker_completion`/`_verify_and_report` retry loops proceed
-completely unchanged, still fully autonomous. `HARNESS_INTERACTIVE`
+completely unchanged, still fully autonomous. `CERTO_INTERACTIVE`
 (`Config.interactive`, default `False`) drops `agent.py`'s
 `_AUTONOMOUS_SUFFIX`; `runner.py`'s `stream_task`/`run_task` gained an
 `on_awaiting_input: Callable[[str], str | None]` parameter consulted only
 around that initial run; `cli.py`'s new `--interactive` flag wires a real
 terminal handler (`_prompt_for_continuation`, mirroring
 `_confirm_pending_actions`'s shape) — `server.py` supplies none, matching
-`HARNESS_CONFIRM_MODE=always`'s existing server-mode gotcha. Time spent
-waiting on the human's reply is excluded from `HARNESS_MAX_TASK_SECONDS`
+`CERTO_CONFIRM_MODE=always`'s existing server-mode gotcha. Time spent
+waiting on the human's reply is excluded from `CERTO_MAX_TASK_SECONDS`
 (the deadline is pushed forward by the wait duration). Verified live twice
 against a real LLM call: a single-round accept-and-finish, and a
 multi-round conversation where a typed follow-up made the agent create a
@@ -280,7 +280,7 @@ during its single tree walk instead of returning on the first one a DFS
 happens to visit (which wasn't actually "shallowest wins" as claimed —
 `os.walk` fully explores one branch before a shallower sibling). The
 workspace root itself, if it has a manifest, is authoritative and returned
-immediately (the caller's `HARNESS_WORKSPACE`/`--project` already *is* the
+immediately (the caller's `CERTO_WORKSPACE`/`--project` already *is* the
 explicit root — nothing further to disambiguate). Otherwise, if more than
 one distinct directory matches at the shallowest depth found, detection
 reports a new `ProjectDetection(language="ambiguous", candidates=(...))`
@@ -429,7 +429,7 @@ exist on the SDK and are worth checking), not just swap between
 already-separate `.run()` calls the way today's escalation does. Real,
 open-ended design work.
 
-### 34. Auto model selection: mid-task fallback under `HARNESS_EXECUTION=docker`
+### 34. Auto model selection: mid-task fallback under `CERTO_EXECUTION=docker`
 Confirmed live against the SDK source: `RemoteConversation`'s Python
 client has no `switch_llm`/`switch_profile` method, even though the remote
 agent-server it talks to already exposes a matching `POST

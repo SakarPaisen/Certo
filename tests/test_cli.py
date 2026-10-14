@@ -197,7 +197,7 @@ def test_run_task_error_is_reported_and_exits_nonzero(monkeypatch, capsys):
         run_id=None,
         project=None,
     ):
-        raise RuntimeError("HARNESS_EXECUTION=docker requires the 'sandbox' extra")
+        raise RuntimeError("CERTO_EXECUTION=docker requires the 'sandbox' extra")
 
     monkeypatch.setattr(cli, "load_config", lambda: _cfg())
     monkeypatch.setattr(cli, "run_task", _fake_run_task)
@@ -608,7 +608,7 @@ def test_exits_nonzero_when_task_budget_is_exhausted(monkeypatch, capsys):
             verification_state="budget_exhausted",
             limitations=[
                 (
-                    "The task's shared wall-clock budget (HARNESS_MAX_TASK_SECONDS=1800) "
+                    "The task's shared wall-clock budget (CERTO_MAX_TASK_SECONDS=1800) "
                     "ran out before the task reached a normal finish, so its own "
                     "completion claim, if any, was not verified."
                 )
@@ -623,7 +623,7 @@ def test_exits_nonzero_when_task_budget_is_exhausted(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert exit_code == 1
     assert "Verification: budget_exhausted" in out
-    assert "HARNESS_MAX_TASK_SECONDS" in out
+    assert "CERTO_MAX_TASK_SECONDS" in out
 
 
 def test_inconclusive_verification_still_exits_zero_but_is_visible(monkeypatch, capsys):
@@ -825,7 +825,7 @@ def test_execution_flag_overrides_configured_docker_default(monkeypatch):
     assert calls["cfg"].execution == "local"
 
 
-# --- HARNESS_CONFIRM_MODE=always wiring -------------------------------------
+# --- CERTO_CONFIRM_MODE=always wiring -------------------------------------
 
 
 def test_exits_nonzero_when_confirmation_required_with_no_handler(monkeypatch, capsys):

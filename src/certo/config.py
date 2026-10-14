@@ -12,6 +12,7 @@ provider, model, or base URL.
 
 from __future__ import annotations
 
+import logging
 import os
 import platform as _platform
 from collections.abc import Mapping
@@ -24,6 +25,8 @@ DOCKER_PLATFORMS = ("linux/amd64", "linux/arm64")
 VERIFY_TESTS_MODES = ("always", "never")
 TASK_STORE_BACKENDS = ("memory", "redis", "sqlite", "mysql", "postgres")
 MODEL_SELECTION_MODES = ("manual", "auto")
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_WORKSPACE = "."
 DEFAULT_MAX_ITERATIONS = 50
@@ -87,7 +90,7 @@ class Config:
     confirm_mode: str  # one of CONFIRM_MODES
     execution: str  # one of EXECUTION_MODES
 
-    # Where generated projects live: workspace defaults to plain HARNESS_WORKSPACE,
+    # Where generated projects live: workspace defaults to plain CERTO_WORKSPACE,
     # but `--project NAME` (cli.py) overrides it to `projects_dir/NAME`, created if
     # missing, so each project's generated software lands in its own subfolder.
     projects_dir: str = DEFAULT_PROJECTS_DIR
@@ -165,7 +168,7 @@ class Config:
     # the system prompt so the agent may pause/ask instead of being told to
     # always push forward on its own. Only meaningful for a caller that also
     # supplies an on_awaiting_input callback (cli.py's --interactive does;
-    # server.py never does, same as HARNESS_CONFIRM_MODE=always having no
+    # server.py never does, same as CERTO_CONFIRM_MODE=always having no
     # effect there) — default false, current fully-autonomous behavior
     # unchanged.
     interactive: bool = False
@@ -181,7 +184,7 @@ class Config:
     # full message transcript, and token/cost metrics for each task run,
     # one subfolder per project per run. Blank (the default) means the
     # feature is off entirely — same "blank means off" convention as
-    # LLM_BASE_URL/HARNESS_DOCKER_PLATFORM, no separate on/off flag needed.
+    # LLM_BASE_URL/CERTO_DOCKER_PLATFORM, no separate on/off flag needed.
     artifacts_dir: str = ""
 
 
@@ -193,7 +196,41 @@ def _clean(value: str | None) -> str | None:
     return value or None
 
 
-def _parse_positive_int(value: str | None, *, default: int, name: str) -> int:
+# Every policy env var is CERTO_<NAME>. The pre-rename HARNESS_<NAME> spelling
+# is still read as a fallback for one release: a non-blank CERTO_ value wins,
+# otherwise a non-blank HARNESS_ value is used and logged once per process as
+# deprecated. Blank counts as unset on both sides, so a fresh .env copied from
+# .env.example (blank CERTO_ lines) doesn't mask an old HARNESS_ setting.
+ENV_PREFIX = "CERTO_"
+LEGACY_ENV_PREFIX = "HARNESS_"
+
+_warned_legacy_vars: set[str] = set()
+
+
+def _read(env: Mapping[str, str], suffix: str) -> tuple[str | None, str]:
+    """Return `(raw value, name of the variable it came from)` for one
+    CERTO_/HARNESS_ setting. The name is what error messages quote, so a bad
+    value is reported under the variable the user actually set."""
+    name = ENV_PREFIX + suffix
+    value = env.get(name)
+    if _clean(value) is not None:
+        return value, name
+    legacy_name = LEGACY_ENV_PREFIX + suffix
+    legacy_value = env.get(legacy_name)
+    if _clean(legacy_value) is not None:
+        if legacy_name not in _warned_legacy_vars:
+            _warned_legacy_vars.add(legacy_name)
+            logger.warning("%s is deprecated; rename it to %s.", legacy_name, name)
+        return legacy_value, legacy_name
+    return value, name
+
+
+def _get(env: Mapping[str, str], suffix: str) -> str | None:
+    return _clean(_read(env, suffix)[0])
+
+
+def _parse_positive_int(env: Mapping[str, str], suffix: str, *, default: int) -> int:
+    value, name = _read(env, suffix)
     if _clean(value) is None:
         return default
     try:
@@ -205,7 +242,10 @@ def _parse_positive_int(value: str | None, *, default: int, name: str) -> int:
     return parsed
 
 
-def _parse_choice(value: str | None, *, default: str, choices: tuple[str, ...], name: str) -> str:
+def _parse_choice(
+    env: Mapping[str, str], suffix: str, *, default: str, choices: tuple[str, ...]
+) -> str:
+    value, name = _read(env, suffix)
     resolved = (_clean(value) or default).lower()
     if resolved not in choices:
         allowed = " | ".join(choices)
@@ -213,10 +253,11 @@ def _parse_choice(value: str | None, *, default: str, choices: tuple[str, ...], 
     return resolved
 
 
-def _parse_nonnegative_int(value: str | None, *, default: int, name: str) -> int:
+def _parse_nonnegative_int(env: Mapping[str, str], suffix: str, *, default: int) -> int:
     """Like `_parse_positive_int` but allows `0` — used only where `0` is a
     real, meaningful setting ("no limit"/"keep forever"), not "unset".
     """
+    value, name = _read(env, suffix)
     if _clean(value) is None:
         return default
     try:
@@ -228,7 +269,8 @@ def _parse_nonnegative_int(value: str | None, *, default: int, name: str) -> int
     return parsed
 
 
-def _parse_bool(value: str | None, *, default: bool, name: str) -> bool:
+def _parse_bool(env: Mapping[str, str], suffix: str, *, default: bool) -> bool:
+    value, name = _read(env, suffix)
     cleaned = _clean(value)
     if cleaned is None:
         return default
@@ -279,31 +321,29 @@ def load_config(env: Mapping[str, str] | None = None, *, dotenv_path: str = ".en
         )
     reasoning_effort = _clean(env.get("LLM_REASONING_EFFORT"))
 
-    workspace = _clean(env.get("HARNESS_WORKSPACE")) or DEFAULT_WORKSPACE
+    workspace = _get(env, "WORKSPACE") or DEFAULT_WORKSPACE
     max_iterations = _parse_positive_int(
-        env.get("HARNESS_MAX_ITERATIONS"),
+        env,
+        "MAX_ITERATIONS",
         default=DEFAULT_MAX_ITERATIONS,
-        name="HARNESS_MAX_ITERATIONS",
     )
     confirm_mode = _parse_choice(
-        env.get("HARNESS_CONFIRM_MODE"),
+        env,
+        "CONFIRM_MODE",
         default=DEFAULT_CONFIRM_MODE,
         choices=CONFIRM_MODES,
-        name="HARNESS_CONFIRM_MODE",
     )
     execution = _parse_choice(
-        env.get("HARNESS_EXECUTION"),
+        env,
+        "EXECUTION",
         default=DEFAULT_EXECUTION,
         choices=EXECUTION_MODES,
-        name="HARNESS_EXECUTION",
     )
-    projects_dir = _clean(env.get("HARNESS_PROJECTS_DIR")) or DEFAULT_PROJECTS_DIR
-    skills_dir = _clean(env.get("HARNESS_SKILLS_DIR")) or DEFAULT_SKILLS_DIR
-    third_party_skills_dir = (
-        _clean(env.get("HARNESS_THIRD_PARTY_SKILLS_DIR")) or DEFAULT_THIRD_PARTY_SKILLS_DIR
-    )
+    projects_dir = _get(env, "PROJECTS_DIR") or DEFAULT_PROJECTS_DIR
+    skills_dir = _get(env, "SKILLS_DIR") or DEFAULT_SKILLS_DIR
+    third_party_skills_dir = _get(env, "THIRD_PARTY_SKILLS_DIR") or DEFAULT_THIRD_PARTY_SKILLS_DIR
     third_party_skills_lock = (
-        _clean(env.get("HARNESS_THIRD_PARTY_SKILLS_LOCK")) or DEFAULT_THIRD_PARTY_SKILLS_LOCK
+        _get(env, "THIRD_PARTY_SKILLS_LOCK") or DEFAULT_THIRD_PARTY_SKILLS_LOCK
     )
     # The first-party loader rglob()s every .md under skills_dir, so a
     # third-party directory nested inside it would load downloaded content
@@ -311,110 +351,101 @@ def load_config(env: Mapping[str, str] | None = None, *, dotenv_path: str = ".en
     _tp, _fp = Path(third_party_skills_dir).resolve(), Path(skills_dir).resolve()
     if _tp == _fp or _tp.is_relative_to(_fp) or _fp.is_relative_to(_tp):
         raise ConfigError(
-            "HARNESS_THIRD_PARTY_SKILLS_DIR must not overlap HARNESS_SKILLS_DIR "
+            "CERTO_THIRD_PARTY_SKILLS_DIR must not overlap CERTO_SKILLS_DIR "
             f"({third_party_skills_dir!r} vs {skills_dir!r})."
         )
-    docker_image = _clean(env.get("HARNESS_DOCKER_IMAGE")) or DEFAULT_DOCKER_IMAGE
+    docker_image = _get(env, "DOCKER_IMAGE") or DEFAULT_DOCKER_IMAGE
     docker_platform = _parse_choice(
-        env.get("HARNESS_DOCKER_PLATFORM"),
+        env,
+        "DOCKER_PLATFORM",
         default=DEFAULT_DOCKER_PLATFORM,
         choices=DOCKER_PLATFORMS,
-        name="HARNESS_DOCKER_PLATFORM",
     )
     verify_tests = _parse_choice(
-        env.get("HARNESS_VERIFY_TESTS"),
+        env,
+        "VERIFY_TESTS",
         default=DEFAULT_VERIFY_TESTS,
         choices=VERIFY_TESTS_MODES,
-        name="HARNESS_VERIFY_TESTS",
     )
     max_verify_retries = _parse_positive_int(
-        env.get("HARNESS_MAX_VERIFY_RETRIES"),
+        env,
+        "MAX_VERIFY_RETRIES",
         default=DEFAULT_MAX_VERIFY_RETRIES,
-        name="HARNESS_MAX_VERIFY_RETRIES",
     )
     max_task_seconds = _parse_positive_int(
-        env.get("HARNESS_MAX_TASK_SECONDS"),
+        env,
+        "MAX_TASK_SECONDS",
         default=DEFAULT_MAX_TASK_SECONDS,
-        name="HARNESS_MAX_TASK_SECONDS",
     )
 
     task_store = _parse_choice(
-        env.get("HARNESS_TASK_STORE"),
+        env,
+        "TASK_STORE",
         default=DEFAULT_TASK_STORE,
         choices=TASK_STORE_BACKENDS,
-        name="HARNESS_TASK_STORE",
     )
     task_ttl_seconds = _parse_nonnegative_int(
-        env.get("HARNESS_TASK_TTL_SECONDS"),
+        env,
+        "TASK_TTL_SECONDS",
         default=DEFAULT_TASK_TTL_SECONDS,
-        name="HARNESS_TASK_TTL_SECONDS",
     )
-    task_store_sqlite_path = (
-        _clean(env.get("HARNESS_TASK_STORE_SQLITE_PATH")) or DEFAULT_TASK_STORE_SQLITE_PATH
-    )
-    task_store_mysql_host = (
-        _clean(env.get("HARNESS_TASK_STORE_MYSQL_HOST")) or DEFAULT_TASK_STORE_MYSQL_HOST
-    )
+    task_store_sqlite_path = _get(env, "TASK_STORE_SQLITE_PATH") or DEFAULT_TASK_STORE_SQLITE_PATH
+    task_store_mysql_host = _get(env, "TASK_STORE_MYSQL_HOST") or DEFAULT_TASK_STORE_MYSQL_HOST
     task_store_mysql_port = _parse_positive_int(
-        env.get("HARNESS_TASK_STORE_MYSQL_PORT"),
+        env,
+        "TASK_STORE_MYSQL_PORT",
         default=DEFAULT_TASK_STORE_MYSQL_PORT,
-        name="HARNESS_TASK_STORE_MYSQL_PORT",
     )
-    task_store_mysql_user = (
-        _clean(env.get("HARNESS_TASK_STORE_MYSQL_USER")) or DEFAULT_TASK_STORE_MYSQL_USER
-    )
-    task_store_mysql_password = _clean(env.get("HARNESS_TASK_STORE_MYSQL_PASSWORD"))
+    task_store_mysql_user = _get(env, "TASK_STORE_MYSQL_USER") or DEFAULT_TASK_STORE_MYSQL_USER
+    task_store_mysql_password = _get(env, "TASK_STORE_MYSQL_PASSWORD")
     task_store_mysql_database = (
-        _clean(env.get("HARNESS_TASK_STORE_MYSQL_DATABASE")) or DEFAULT_TASK_STORE_MYSQL_DATABASE
+        _get(env, "TASK_STORE_MYSQL_DATABASE") or DEFAULT_TASK_STORE_MYSQL_DATABASE
     )
     task_store_postgres_host = (
-        _clean(env.get("HARNESS_TASK_STORE_POSTGRES_HOST")) or DEFAULT_TASK_STORE_POSTGRES_HOST
+        _get(env, "TASK_STORE_POSTGRES_HOST") or DEFAULT_TASK_STORE_POSTGRES_HOST
     )
     task_store_postgres_port = _parse_positive_int(
-        env.get("HARNESS_TASK_STORE_POSTGRES_PORT"),
+        env,
+        "TASK_STORE_POSTGRES_PORT",
         default=DEFAULT_TASK_STORE_POSTGRES_PORT,
-        name="HARNESS_TASK_STORE_POSTGRES_PORT",
     )
     task_store_postgres_user = (
-        _clean(env.get("HARNESS_TASK_STORE_POSTGRES_USER")) or DEFAULT_TASK_STORE_POSTGRES_USER
+        _get(env, "TASK_STORE_POSTGRES_USER") or DEFAULT_TASK_STORE_POSTGRES_USER
     )
-    task_store_postgres_password = _clean(env.get("HARNESS_TASK_STORE_POSTGRES_PASSWORD"))
+    task_store_postgres_password = _get(env, "TASK_STORE_POSTGRES_PASSWORD")
     task_store_postgres_database = (
-        _clean(env.get("HARNESS_TASK_STORE_POSTGRES_DATABASE"))
-        or DEFAULT_TASK_STORE_POSTGRES_DATABASE
+        _get(env, "TASK_STORE_POSTGRES_DATABASE") or DEFAULT_TASK_STORE_POSTGRES_DATABASE
     )
-    task_store_redis_host = (
-        _clean(env.get("HARNESS_TASK_STORE_REDIS_HOST")) or DEFAULT_TASK_STORE_REDIS_HOST
-    )
+    task_store_redis_host = _get(env, "TASK_STORE_REDIS_HOST") or DEFAULT_TASK_STORE_REDIS_HOST
     task_store_redis_port = _parse_positive_int(
-        env.get("HARNESS_TASK_STORE_REDIS_PORT"),
+        env,
+        "TASK_STORE_REDIS_PORT",
         default=DEFAULT_TASK_STORE_REDIS_PORT,
-        name="HARNESS_TASK_STORE_REDIS_PORT",
     )
     task_store_redis_db = _parse_nonnegative_int(
-        env.get("HARNESS_TASK_STORE_REDIS_DB"),
+        env,
+        "TASK_STORE_REDIS_DB",
         default=DEFAULT_TASK_STORE_REDIS_DB,
-        name="HARNESS_TASK_STORE_REDIS_DB",
     )
-    task_store_redis_password = _clean(env.get("HARNESS_TASK_STORE_REDIS_PASSWORD"))
+    task_store_redis_password = _get(env, "TASK_STORE_REDIS_PASSWORD")
     task_store_redis_use_tls = _parse_bool(
-        env.get("HARNESS_TASK_STORE_REDIS_USE_TLS"),
+        env,
+        "TASK_STORE_REDIS_USE_TLS",
         default=False,
-        name="HARNESS_TASK_STORE_REDIS_USE_TLS",
     )
     interactive = _parse_bool(
-        env.get("HARNESS_INTERACTIVE"),
+        env,
+        "INTERACTIVE",
         default=False,
-        name="HARNESS_INTERACTIVE",
     )
     model_selection = _parse_choice(
-        env.get("HARNESS_MODEL_SELECTION"),
+        env,
+        "MODEL_SELECTION",
         default=DEFAULT_MODEL_SELECTION,
         choices=MODEL_SELECTION_MODES,
-        name="HARNESS_MODEL_SELECTION",
     )
-    models_file = _clean(env.get("HARNESS_MODELS_FILE")) or DEFAULT_MODELS_FILE
-    artifacts_dir = _clean(env.get("HARNESS_ARTIFACTS_DIR")) or ""
+    models_file = _get(env, "MODELS_FILE") or DEFAULT_MODELS_FILE
+    artifacts_dir = _get(env, "ARTIFACTS_DIR") or ""
 
     return Config(
         model=model,
@@ -531,6 +562,6 @@ def resolve_project_dir(projects_dir: str, project: str) -> str:
     resolved_root = os.path.realpath(projects_root)
     resolved_project_dir = os.path.realpath(project_dir)
     if not Path(resolved_project_dir).is_relative_to(Path(resolved_root)):
-        raise ConfigError(f"Project path escapes HARNESS_PROJECTS_DIR: {project!r}")
+        raise ConfigError(f"Project path escapes CERTO_PROJECTS_DIR: {project!r}")
 
     return project_dir

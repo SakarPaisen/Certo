@@ -67,7 +67,7 @@ _README_SUFFIX = (
 # ("To create in one go, run: create-vite <DIRECTORY> --no-interactive
 # --template <TEMPLATE>"). The agent didn't notice nothing was created and
 # just re-ran the identical command, repeating this (200K+ tokens, $0.35+)
-# until the user killed the process by hand. `HARNESS_EXECUTION=local` uses a
+# until the user killed the process by hand. `CERTO_EXECUTION=local` uses a
 # subprocess-based terminal, not a real PTY (tmux isn't installed — see
 # MANUAL.md "Known limitations"), so an interactive prompt can't be answered
 # even in principle; this is a tool-usage habit to fix regardless of PTY
@@ -151,7 +151,7 @@ def build_agent(cfg: Config, *, usage_id: str = "harness") -> Agent:
     # (see model_selection.py) passes a distinct usage_id per catalog
     # candidate so the SDK's LLM registry never confuses one candidate's
     # config for another's when runner.py later calls conversation.switch_llm.
-    # HARNESS_INTERACTIVE=yes (cfg.interactive) drops _AUTONOMOUS_SUFFIX so
+    # CERTO_INTERACTIVE=yes (cfg.interactive) drops _AUTONOMOUS_SUFFIX so
     # the agent may pause/ask instead of being told to always push forward
     # — the terminal-loop half that answers a question when it does is
     # runner.py's stream_task interactive checkpoint, not anything here.
@@ -188,7 +188,7 @@ def build_agent(cfg: Config, *, usage_id: str = "harness") -> Agent:
     agent = Agent(
         llm=build_llm(cfg, usage_id=usage_id), tools=build_tools(), agent_context=agent_context
     )
-    # HARNESS_CONFIRM_MODE == "always" should attach a confirmation policy that
+    # CERTO_CONFIRM_MODE == "always" should attach a confirmation policy that
     # pauses before each tool call. The confirmation-policy API is not yet
     # verified against this SDK version (see CLAUDE.md) — /verify-sdk before
     # wiring it up.

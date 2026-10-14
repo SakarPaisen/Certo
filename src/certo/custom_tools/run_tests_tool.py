@@ -122,7 +122,7 @@ def detect_project(working_dir: str) -> ProjectDetection:
 
     If `working_dir` itself matches (depth 0), that's authoritative and
     returned immediately — the caller already told us this exact directory
-    is the project (e.g. `HARNESS_WORKSPACE`/`--project`), so there is
+    is the project (e.g. `CERTO_WORKSPACE`/`--project`), so there is
     nothing to disambiguate even if deeper subdirectories also happen to
     contain manifests (a project's own vendored dependency, a nested
     example, etc.).
@@ -993,7 +993,7 @@ def discover_verification_plan(detection: ProjectDetection) -> list[CheckSpec]:
                 unavailable_reason=(
                     "Multiple candidate projects were found with no single "
                     f"obvious root — verification is ambiguous: {candidates}. "
-                    "Point HARNESS_WORKSPACE/--project at the specific "
+                    "Point CERTO_WORKSPACE/--project at the specific "
                     "project to verify instead of the shared parent directory."
                 ),
             )

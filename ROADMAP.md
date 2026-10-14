@@ -40,9 +40,9 @@ decisions log below for *why* a given design was chosen.
   through: rejects an absolute/`..`-containing name outright, then rejects a
   symlink-resolved (`os.path.realpath`) path that escapes `projects_dir` —
   closes a real path-escape bug (`os.path.join` silently discards the first
-  arg when the second is absolute). `max_task_seconds` (`HARNESS_MAX_TASK_SECONDS`,
+  arg when the second is absolute). `max_task_seconds` (`CERTO_MAX_TASK_SECONDS`,
   default `1800`) is the task-level wall-clock budget `runner.py` enforces
-  across every phase. `interactive` (`HARNESS_INTERACTIVE`) opts into the
+  across every phase. `interactive` (`CERTO_INTERACTIVE`) opts into the
   initial-run interactive checkpoint and drops `_AUTONOMOUS_SUFFIX`.
 - **`acceptance.py`** — optional, caller-supplied machine-checkable
   acceptance criteria, scoped to `file_exists`/`file_contains` only (no
@@ -72,23 +72,23 @@ decisions log below for *why* a given design was chosen.
   `conversation.state.execution_status` for `STUCK`/`ERROR` before verifying
   and after every retry. `_enforce_task_tracker_completion()` runs first: if
   the most recent `task_tracker` observation shows unresolved items, resends
-  a follow-up and retries (bounded by `HARNESS_MAX_VERIFY_RETRIES`); an
+  a follow-up and retries (bounded by `CERTO_MAX_VERIFY_RETRIES`); an
   unresolved list becomes a terminal `"incomplete"` state, short-circuiting
   verification entirely (an unused or already-`done` tracker is not a
-  violation). `HARNESS_CONFIRM_MODE=always` is wired via
+  violation). `CERTO_CONFIRM_MODE=always` is wired via
   `_run_with_confirmation()`, wrapping every `conversation.run()` call site
   and returning `"ok"`/`"confirmation_required"`/`"budget_exhausted"`; no
   `on_confirm` handler (server mode) rejects the pending action once and
-  stops rather than auto-approving or hanging. `HARNESS_MAX_TASK_SECONDS` is
-  checked before every `.run()` call across all three call sites. `HARNESS_INTERACTIVE`
+  stops rather than auto-approving or hanging. `CERTO_MAX_TASK_SECONDS` is
+  checked before every `.run()` call across all three call sites. `CERTO_INTERACTIVE`
   wires an `OnAwaitingInput` checkpoint around the *initial* run only (`cli.py`
   supplies a terminal handler, `server.py` doesn't); the deadline is paused,
-  not spent, while waiting on a human reply. `HARNESS_MODEL_SELECTION=auto`
+  not spent, while waiting on a human reply. `CERTO_MODEL_SELECTION=auto`
   wires a `ModelChain` (see `model_selection.py`) with automatic fallback on
   a `ConversationRunError` wrapping the SDK's own `LLMError` hierarchy;
   `write_model_decisions()`/artifact-writing both run in a `finally` block
   around the whole task so they still fire when every candidate fails.
-  `HARNESS_ARTIFACTS_DIR` mints a `run_id` (or uses the caller's, e.g.
+  `CERTO_ARTIFACTS_DIR` mints a `run_id` (or uses the caller's, e.g.
   `server.py`'s `TaskRecord.id`) and writes `metadata.json`/`transcript.json`/
   `metrics.json` via `artifacts.py`.
 - **`custom_tools/run_tests_tool.py`** — language-neutral verification in
@@ -129,10 +129,10 @@ decisions log below for *why* a given design was chosen.
   unset field so a keyless local model can't inherit a stale API key.
   `write_model_decisions()` rewrites `MODEL_DECISIONS.md` from the full list
   every time (never appends).
-- **`artifacts.py`** — pure file-writing for `HARNESS_ARTIFACTS_DIR`:
+- **`artifacts.py`** — pure file-writing for `CERTO_ARTIFACTS_DIR`:
   `<artifacts_dir>/<project-or-"_unscoped">/<run_id>/`, own path-containment
   check. No SDK dependency. A sibling top-level directory (mirrors
-  `HARNESS_PROJECTS_DIR`'s shape), not nested inside a project.
+  `CERTO_PROJECTS_DIR`'s shape), not nested inside a project.
 - **`run_summary.py`** — pure: `summarize_run(duration, {usage_id:
   Metrics.get()})` → `RunSummary` (wall-clock time, models that actually
   made calls, tokens, cost; zero cost with nonzero tokens = "unknown",
@@ -159,11 +159,11 @@ decisions log below for *why* a given design was chosen.
   REST/WS API only — not `/v1/chat/completions`, which never surfaces
   `verification_state` at all. `DELETE /tasks/{id}` and
   `DELETE /tasks?project=NAME` back the task-store persistence feature.
-- **`task_store.py`** — pluggable persistence (`HARNESS_TASK_STORE`:
+- **`task_store.py`** — pluggable persistence (`CERTO_TASK_STORE`:
   `memory`/`redis`/`sqlite`/`mysql`/`postgres`), one `TaskStore` ABC.
   `sqlite`/`mysql`/`postgres` share one `SQLTaskStore` via SQLAlchemy Core.
   `redis` uses native per-key `EX` expiration instead of a purge sweep.
-  `HARNESS_TASK_TTL_SECONDS` (default `0` = forever) governs retention;
+  `CERTO_TASK_TTL_SECONDS` (default `0` = forever) governs retention;
   `server.py` runs a 60s sweep only when a TTL is configured.
   `build_task_store(cfg)` is the one factory both `server.py` and
   `admin_cli.py` use.
@@ -186,14 +186,14 @@ decisions log below for *why* a given design was chosen.
 - **`third_party_skills.py`** + `certo-admin skills
   install|list|enable|disable|update|remove|sync` — local-only,
   license-aware third-party `SKILL.md` skills. Files live in gitignored
-  `HARNESS_THIRD_PARTY_SKILLS_DIR`, one level deep. Provenance lives in a
-  JSON lockfile (`HARNESS_THIRD_PARTY_SKILLS_LOCK`: repo, path, commit SHA,
+  `CERTO_THIRD_PARTY_SKILLS_DIR`, one level deep. Provenance lives in a
+  JSON lockfile (`CERTO_THIRD_PARTY_SKILLS_LOCK`: repo, path, commit SHA,
   license id or `unknown`, URLs, `sha256-` integrity, enabled/acknowledged
   flags, never content). `build_agent()` appends
   `load_enabled_skills()` after the first-party catalog. That call
   re-checks enabled, license acknowledgement, hash and name collision,
   since `AgentContext` raises on duplicate names. `config.py` rejects a
-  third-party dir that overlaps `HARNESS_SKILLS_DIR`, because the
+  third-party dir that overlaps `CERTO_SKILLS_DIR`, because the
   first-party `rglob("*.md")` would load downloaded files regardless of
   enablement.
 
@@ -244,8 +244,8 @@ rule 2):
   third-party skills. First-party skills are trusted and left as-is.
 - `find_skill_md_directories()` only checks direct children of a skills dir
   (`SKILL.md` one level deep), while `find_regular_md_files()` `rglob`s.
-  So any `.md` under `HARNESS_SKILLS_DIR` loads as a legacy skill.
-- `HARNESS_MAX_ITERATIONS` was parsed but never wired to `Conversation` until
+  So any `.md` under `CERTO_SKILLS_DIR` loads as a legacy skill.
+- `CERTO_MAX_ITERATIONS` was parsed but never wired to `Conversation` until
   caught while adding the verification retry loop — **closed**, with a
   regression test asserting `Conversation(max_iteration_per_run=...)` is
   actually called (confirmed it fails without the fix).
@@ -282,7 +282,7 @@ for full transcripts if a fix needs revisiting:
    indistinguishable from a real `finish` (confirmed by reading
    `response_dispatch.py`). Confirmed live twice (asked for confirmation
    instead of building; declared 1-of-6 tracker items "done"). Fix:
-   `_AUTONOMOUS_SUFFIX`. `HARNESS_INTERACTIVE=yes` is the opt-in escape
+   `_AUTONOMOUS_SUFFIX`. `CERTO_INTERACTIVE=yes` is the opt-in escape
    hatch. **Status: fix applied, not re-verified live since.**
 2. **Agent runs an interactive CLI tool, the prompt silently auto-cancels
    with no TTY, agent doesn't notice and re-runs the identical command** —
@@ -350,7 +350,7 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   contracts). 1MB read cap on `file_contains`. New `"acceptance_failed"`
   state applied once at the end of `stream_task`, not retried, not on
   `/v1/chat/completions` (no field for it there).
-- **Global task budget: wall-clock (`HARNESS_MAX_TASK_SECONDS`), not
+- **Global task budget: wall-clock (`CERTO_MAX_TASK_SECONDS`), not
   iteration counting.** The SDK resets its iteration counter on every
   `conversation.run()` call (confirmed in source) and exposes no way to
   read back consumed iterations; event-counting is provably inexact (a
@@ -372,7 +372,7 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   symlink escaping `projects_dir` (verified live with a real symlink).
   Deliberately doesn't defend against a TOCTOU race (no realistic threat
   here).
-- **`HARNESS_CONFIRM_MODE=always`**: mechanics (`AlwaysConfirm`,
+- **`CERTO_CONFIRM_MODE=always`**: mechanics (`AlwaysConfirm`,
   `get_unmatched_actions`, `reject_pending_actions`) verified against SDK
   source before wiring. `_run_with_confirmation()` wraps all three
   `conversation.run()` call sites. No handler (server mode) rejects once
@@ -426,7 +426,7 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   which a "please verify" prompt cannot fix; only re-running the code can.
   Reuses the SDK's `send_message()`-then-`run()` re-entry (confirmed this
   resets `FINISHED`/`STUCK` back to `IDLE`) so retries keep prior context.
-  Bounded by `HARNESS_MAX_VERIFY_RETRIES` (default `2`).
+  Bounded by `CERTO_MAX_VERIFY_RETRIES` (default `2`).
 - **Five SDLC skills were downloaded, not authored**, from
   `addyosmani/agent-skills`, per explicit instruction to source real
   content — each renamed (dir + frontmatter) to satisfy the SDK's
@@ -519,15 +519,15 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   already told the harness what the project is. Resolves to the same
   synthetic `"unavailable"` shape already used for `"unknown"` — no
   `runner.py`/`CompletionContract` changes needed.
-- **Interactive mode (`HARNESS_INTERACTIVE`): checkpoint wraps only the
+- **Interactive mode (`CERTO_INTERACTIVE`): checkpoint wraps only the
   initial run**, not the task_tracker/verify retry loops — the smallest
   change covering the two failure modes already on record, without the
   real design question of how a human reply should interleave with the
-  harness's own automated retry follow-ups. `HARNESS_MAX_TASK_SECONDS` is
+  harness's own automated retry follow-ups. `CERTO_MAX_TASK_SECONDS` is
   paused (not spent) while blocked on a human reply. No new suffix added —
   only `_AUTONOMOUS_SUFFIX` is dropped when interactive. Has no effect
   without a caller-supplied callback (`server.py` never supplies one).
-- **Deterministic auto model selection (`HARNESS_MODEL_SELECTION=auto`)**:
+- **Deterministic auto model selection (`CERTO_MODEL_SELECTION=auto`)**:
   deterministic weighted scoring, not an LLM router — no extra model call,
   consistent with the earlier skills decision. One static ranked list
   computed once per task, walked forward under failure, never re-scored
@@ -545,9 +545,9 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   failures itself). `write_model_decisions()` runs in the whole task's
   `finally` block after a live-caught bug: an exhausted fallback chain
   previously raised before the file was ever written.
-- **Per-run artifacts directory (`HARNESS_ARTIFACTS_DIR`): a separate
+- **Per-run artifacts directory (`CERTO_ARTIFACTS_DIR`): a separate
   sibling top-level directory**, not nested inside each project — mirrors
-  `HARNESS_PROJECTS_DIR`'s shape. `conversation.conversation_stats`/
+  `CERTO_PROJECTS_DIR`'s shape. `conversation.conversation_stats`/
   `usage_to_metrics` (confirmed in SDK source) gives a full per-model
   cost/token breakdown for free, since model-selection candidates already
   have distinct `usage_id`s. `MODEL_DECISIONS.md` stays put (not moved
@@ -568,7 +568,7 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   python-web/testing skills are authored for this project.
 - **Project renamed ARICode → Certo, deep and final** (supersedes the
   earlier `coding-agent-harness` → ARICode rename, which deliberately
-  changed branding only and kept `import certo`/`HARNESS_*`/
+  changed branding only and kept `import certo`/`CERTO_*`/
   `certo-admin`). This one renames the brand (docs, `pyproject.toml`
   name, `server.py` title/`owned_by`, Docker image tag
   `certo/agent-server:local`) and links (GitHub redirects the old repo URL).
@@ -579,6 +579,11 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   `python -m certo`, Docker `--import-modules certo.custom_tools` with
   `OH_EXTRA_PYTHON_PATH=/certo_src`); no import shim for `harness` — the
   package was never published, so nothing outside this repo imports it.
+  Env vars `HARNESS_*` → `CERTO_*`, all read through `config._read()`:
+  a non-blank `CERTO_` value wins, else a non-blank `HARNESS_` value is used
+  with one `logging` warning per variable per process. Blank = unset on
+  both sides, so blank `CERTO_` lines from a fresh `.env.example` can't
+  mask an old setting. Error messages quote the variable actually read.
 - **Live entrypoint-ordering/smoke-run test built its own throwaway
   `tmp_path` fixture, not `projects/hanoi/` or anything under `projects/`**
   — that directory is user-managed runtime state the harness must stay
@@ -609,7 +614,7 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
 - **Run summary uses per-`usage_id` metrics, not the SDK's combined
   metrics** — the combined entry's model is `"default"`; each per-usage
   entry carries the real model name. Always computed (not gated on
-  `HARNESS_ARTIFACTS_DIR`), and read defensively in the `finally` so a
+  `CERTO_ARTIFACTS_DIR`), and read defensively in the `finally` so a
   metrics failure can't mask the run's own outcome or exception.
 - **`check-llm` lives in `certo-admin`, not the `certo` CLI** — `certo`
   requires a task positional, while `certo-admin` is already the

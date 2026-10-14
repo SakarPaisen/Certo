@@ -1,13 +1,13 @@
 """Local-only, license-aware management of third-party AgentSkills.
 
 Kept deliberately separate from the tracked first-party catalog
-(`skills.py` / `HARNESS_SKILLS_DIR`):
+(`skills.py` / `CERTO_SKILLS_DIR`):
 
-- Downloaded files live in `HARNESS_THIRD_PARTY_SKILLS_DIR` (gitignored),
+- Downloaded files live in `CERTO_THIRD_PARTY_SKILLS_DIR` (gitignored),
   one `SKILL.md` directory per skill, exactly one level deep — the only
   depth the SDK's `find_skill_md_directories()` detects.
 - Provenance and enablement live in a JSON lockfile
-  (`HARNESS_THIRD_PARTY_SKILLS_LOCK`): upstream repo, skill path, immutable
+  (`CERTO_THIRD_PARTY_SKILLS_LOCK`): upstream repo, skill path, immutable
   commit, detected license, source/license URLs, and a content hash. Never
   skill content itself.
 - Installed is not enabled. Only entries explicitly enabled — and, when the

@@ -59,10 +59,10 @@ logger = logging.getLogger(__name__)
 # task_tracker list still showing unfinished work after automated follow-up
 # (see `_enforce_task_tracker_completion` — distinct from every check above
 # since it's caught before project verification even runs); an action that
-# needed HARNESS_CONFIRM_MODE=always approval with no handler available to
+# needed CERTO_CONFIRM_MODE=always approval with no handler available to
 # answer it (see `_run_with_confirmation` — caught before task_tracker or
 # project verification, same reasoning as `incomplete`); the shared,
-# task-level wall-clock budget (`HARNESS_MAX_TASK_SECONDS`) running out
+# task-level wall-clock budget (`CERTO_MAX_TASK_SECONDS`) running out
 # across the initial run and every retry phase combined — distinct from a
 # single `conversation.run()` call hitting its own `max_iteration_per_run`
 # (which resets on every call and so cannot bound a whole task on its own,
@@ -307,7 +307,7 @@ def _build_completion_contract(
         )
     if skipped:
         limitations.append(
-            "Automated verification was skipped (HARNESS_VERIFY_TESTS=never); "
+            "Automated verification was skipped (CERTO_VERIFY_TESTS=never); "
             "completion was not independently checked."
         )
     if run is not None:
@@ -332,7 +332,7 @@ def _emit_notice(emit: Callable[[Message], None], text: str) -> None:
     emit(Message(role="assistant", content=[TextContent(text=text)]))
 
 
-# A caller-supplied decision function for HARNESS_CONFIRM_MODE=always:
+# A caller-supplied decision function for CERTO_CONFIRM_MODE=always:
 # given the agent's pending (not-yet-executed) actions, return True to
 # approve them and let the run continue, False to reject them. `cli.py`
 # supplies a real terminal-prompting implementation; server.py supplies
@@ -340,7 +340,7 @@ def _emit_notice(emit: Callable[[Message], None], text: str) -> None:
 # happens when no callback is given.
 ConfirmCallback = Callable[[Sequence[ActionEvent]], bool]
 
-# A caller-supplied handler for HARNESS_INTERACTIVE=yes: given the narrative
+# A caller-supplied handler for CERTO_INTERACTIVE=yes: given the narrative
 # text produced since the last checkpoint, return the human's reply (sent
 # back to the agent) or a falsy value to end the interactive loop and let
 # the task proceed to task_tracker/verification as usual. `cli.py` supplies
@@ -392,7 +392,7 @@ def _confirmation_required_contract(task: str) -> CompletionContract:
         limitations=[
             (
                 "The agent proposed an action that required confirmation "
-                "(HARNESS_CONFIRM_MODE=always), but no interactive approval "
+                "(CERTO_CONFIRM_MODE=always), but no interactive approval "
                 "handler was available to answer it, so the run was stopped "
                 "before task_tracker or project verification could run."
             )
@@ -408,7 +408,7 @@ def _budget_exhausted_contract(task: str, cfg: Config) -> CompletionContract:
         limitations=[
             (
                 "The task's shared wall-clock budget "
-                f"(HARNESS_MAX_TASK_SECONDS={cfg.max_task_seconds}) ran out before "
+                f"(CERTO_MAX_TASK_SECONDS={cfg.max_task_seconds}) ran out before "
                 "the task reached a normal finish, so its own completion claim, if "
                 "any, was not verified."
             )
@@ -538,10 +538,10 @@ def _run_with_confirmation(
 ) -> str:
     """Drive `conversation.run()` to completion, resolving every
     `AlwaysConfirm` pause along the way instead of leaving it unhandled —
-    the actual wiring `HARNESS_CONFIRM_MODE=always` previously lacked (it
+    the actual wiring `CERTO_CONFIRM_MODE=always` previously lacked (it
     was parsed/validated in `config.py` but never attached to a real
     `ConfirmationPolicyBase`; see ROADMAP.md) — and enforcing the shared,
-    task-level `HARNESS_MAX_TASK_SECONDS` wall-clock budget before every
+    task-level `CERTO_MAX_TASK_SECONDS` wall-clock budget before every
     single `.run()` call it makes, not just the first. A drop-in
     replacement for a bare `conversation.run()` call: when
     `cfg.confirm_mode != "always"` and the budget isn't exhausted, it just
@@ -557,7 +557,7 @@ def _run_with_confirmation(
     proceeding to task_tracker/project verification against a run that
     never actually continued (or never started another retry). Never
     silently approves a pending action (defeats the safety gate
-    `HARNESS_CONFIRM_MODE=always` exists for), never silently lets a run
+    `CERTO_CONFIRM_MODE=always` exists for), never silently lets a run
     keep going past its budget, and never loops forever with nobody able
     to answer a confirmation.
 
@@ -565,7 +565,7 @@ def _run_with_confirmation(
     fresh `max_iteration_per_run` budget from the SDK — confirmed by
     reading `local_conversation.py`: `iteration` is a local variable reset
     to `0` at the top of every `run()` call, not persisted across calls —
-    so `HARNESS_MAX_ITERATIONS` alone cannot bound how long one task runs
+    so `CERTO_MAX_ITERATIONS` alone cannot bound how long one task runs
     in total across the initial run and every retry phase combined (see
     ROADMAP.md's decisions log for the exact multiplication and why a
     wall-clock budget was chosen over reverse-engineering the SDK's
@@ -598,7 +598,7 @@ def _run_with_confirmation(
             _emit_notice(
                 emit,
                 "Harness: the task's shared wall-clock budget "
-                f"(HARNESS_MAX_TASK_SECONDS={cfg.max_task_seconds}) ran out while "
+                f"(CERTO_MAX_TASK_SECONDS={cfg.max_task_seconds}) ran out while "
                 "waiting on a confirm-mode approval. Stopping.",
             )
             return _RUN_BUDGET_EXHAUSTED
@@ -1035,7 +1035,7 @@ def stream_task(
     when both `cfg.model_selection == "auto"` and `cfg.interactive` are
     true — see model_selection.py's `ModelChain` for the deterministic
     scoring/fallback-chain design. `run_id` names this run's subfolder under
-    `HARNESS_ARTIFACTS_DIR` (see `artifacts.py`) — `server.py` passes its
+    `CERTO_ARTIFACTS_DIR` (see `artifacts.py`) — `server.py` passes its
     own `TaskRecord.id` so a task's artifacts folder matches `GET
     /tasks/{id}`; every other caller gets one minted automatically when
     `cfg.artifacts_dir` is set. Has no effect at all when it's unset.
@@ -1044,7 +1044,7 @@ def stream_task(
     calling this. `Config` has no field for the name itself (only the
     already-resolved workspace path), so a caller that knows it passes it
     again here, purely to bucket this run's artifacts folder the same way
-    `HARNESS_PROJECTS_DIR` is bucketed.
+    `CERTO_PROJECTS_DIR` is bucketed.
     """
     # Total running time covers the whole task, model selection and
     # verification included (and any interactive waits — it is wall clock).
@@ -1063,7 +1063,7 @@ def stream_task(
             all_messages.append(message)
             emit(message)
 
-    # HARNESS_MODEL_SELECTION=auto: pick the best-fit catalog candidate for
+    # CERTO_MODEL_SELECTION=auto: pick the best-fit catalog candidate for
     # this task before the Agent/Conversation is even built. The rest of
     # this function keeps using `cfg` unchanged (workspace, execution,
     # confirm_mode, verify_tests, ...) — only the Agent's own LLM is built
@@ -1092,7 +1092,7 @@ def stream_task(
             agent=build_agent(agent_cfg, usage_id=agent_usage_id),
             callbacks=[on_event],
             workspace=workspace,
-            # Previously unset (SDK default 500), so HARNESS_MAX_ITERATIONS
+            # Previously unset (SDK default 500), so CERTO_MAX_ITERATIONS
             # was parsed/validated but silently had no effect — found while
             # bounding the verify-and-retry loop above, which reuses the same
             # conversation.run() and needed this to actually mean something.
@@ -1105,7 +1105,7 @@ def stream_task(
             # _run_with_confirmation resolves each pause via on_confirm.
             conversation.set_confirmation_policy(AlwaysConfirm())
         # A shared, task-level wall-clock budget spanning every phase below —
-        # HARNESS_MAX_ITERATIONS alone only bounds a single conversation.run()
+        # CERTO_MAX_ITERATIONS alone only bounds a single conversation.run()
         # call, and runner.py can call that up to three times per task (this
         # initial run, then up to max_verify_retries more in each of the two
         # retry loops below), each getting its own fresh iteration budget
@@ -1113,7 +1113,7 @@ def stream_task(
         # ROADMAP.md's decisions log for the exact multiplication this closes.
         deadline = time.monotonic() + cfg.max_task_seconds
 
-        # HARNESS_ARTIFACTS_DIR: mint a run id up front (server.py passes its
+        # CERTO_ARTIFACTS_DIR: mint a run id up front (server.py passes its
         # own TaskRecord.id instead, so a task's folder matches GET
         # /tasks/{id}) and record wall-clock start — a no-op when unset.
         if cfg.artifacts_dir:
@@ -1208,7 +1208,7 @@ def _run_stream_task_phases(
     run_result = _run_with_confirmation(conversation, cfg, emit, on_confirm, deadline, model_chain)
     outcome = _outcome_for_run_result(run_result, task, cfg)
 
-    # HARNESS_INTERACTIVE=yes, initial run only (see stream_task's
+    # CERTO_INTERACTIVE=yes, initial run only (see stream_task's
     # docstring and ROADMAP.md's decisions log): the SDK can't tell a
     # genuine clarifying question apart from real completion — both set
     # execution_status = FINISHED identically (see agent.py's

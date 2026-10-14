@@ -327,7 +327,7 @@ def test_build_task_store_sqlite_returns_sql_store(tmp_path):
 def test_build_task_store_rejects_an_unknown_backend():
     cfg = _cfg(task_store="memory")
     object.__setattr__(cfg, "task_store", "oracle")  # bypass Config's own validation
-    with pytest.raises(ValueError, match="Unsupported HARNESS_TASK_STORE"):
+    with pytest.raises(ValueError, match="Unsupported CERTO_TASK_STORE"):
         build_task_store(cfg)
 
 

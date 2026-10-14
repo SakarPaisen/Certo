@@ -36,7 +36,7 @@ def _config_available() -> bool:
 
 @pytest.mark.skipif(not _config_available(), reason="No LLM_MODEL/LLM_API_KEY configured in .env")
 def test_run_task_creates_a_file(tmp_path, monkeypatch):
-    monkeypatch.setenv("HARNESS_WORKSPACE", str(tmp_path))
+    monkeypatch.setenv("CERTO_WORKSPACE", str(tmp_path))
 
     from certo.runner import run_task
 
@@ -65,8 +65,8 @@ def test_run_task_catches_entrypoint_ordering_bug_live(tmp_path, monkeypatch):
     or referencing anything under the repo's own `projects/` directory —
     that's user-managed runtime state, not a harness test fixture.
     """
-    monkeypatch.setenv("HARNESS_WORKSPACE", str(tmp_path))
-    monkeypatch.setenv("HARNESS_VERIFY_TESTS", "always")
+    monkeypatch.setenv("CERTO_WORKSPACE", str(tmp_path))
+    monkeypatch.setenv("CERTO_VERIFY_TESTS", "always")
 
     from certo.runner import run_task
 
@@ -255,7 +255,7 @@ class _ConfirmConversation:
 _FAKE_PENDING = [SimpleNamespace(tool_name="terminal", action="echo hi")]
 
 
-# --- HARNESS_CONFIRM_MODE=always wiring (_run_with_confirmation) -----------
+# --- CERTO_CONFIRM_MODE=always wiring (_run_with_confirmation) -----------
 
 
 def test_run_with_confirmation_is_a_noop_when_confirm_mode_is_never():
@@ -375,7 +375,7 @@ def test_stream_task_short_circuits_when_confirmation_required_with_no_handler(m
     assert tracker_calls["count"] == 0  # never reached task_tracker enforcement
 
 
-# --- HARNESS_INTERACTIVE=yes: initial-run interactive checkpoint -----------
+# --- CERTO_INTERACTIVE=yes: initial-run interactive checkpoint -----------
 
 
 class _ManualClock:
@@ -464,7 +464,7 @@ def test_interactive_loop_ends_immediately_on_enter_and_proceeds_normally(monkey
 
 
 def test_interactive_without_a_callback_never_loops(monkeypatch):
-    # HARNESS_INTERACTIVE=yes with no on_awaiting_input (e.g. server.py,
+    # CERTO_INTERACTIVE=yes with no on_awaiting_input (e.g. server.py,
     # which never supplies one) must behave like a single ordinary run —
     # regression guard for the documented server-mode gotcha.
     conversation = _FakeConversation(statuses_after_run=[ConversationExecutionStatus.FINISHED])
@@ -514,7 +514,7 @@ def test_interactive_loop_does_not_trigger_on_a_stuck_status(monkeypatch):
 
 def test_interactive_wait_time_is_excluded_from_the_task_budget(monkeypatch):
     # A human can take arbitrarily long to reply without the shared
-    # HARNESS_MAX_TASK_SECONDS budget being spent on that wait — only actual
+    # CERTO_MAX_TASK_SECONDS budget being spent on that wait — only actual
     # agent run time should count. Proven by simulating a "wait" many times
     # longer than the whole configured budget and confirming the task still
     # completes normally instead of reporting budget_exhausted.
@@ -546,9 +546,9 @@ def test_interactive_wait_time_is_excluded_from_the_task_budget(monkeypatch):
     assert outcome.verification_state == "verified"
 
 
-# --- HARNESS_MAX_TASK_SECONDS: shared task-level budget ---------------------
+# --- CERTO_MAX_TASK_SECONDS: shared task-level budget ---------------------
 #
-# Regression coverage for the gap logged in ROADMAP.md: HARNESS_MAX_ITERATIONS
+# Regression coverage for the gap logged in ROADMAP.md: CERTO_MAX_ITERATIONS
 # only bounds a single conversation.run() call, but runner.py can call
 # .run() up to three times per task (the initial run, then up to
 # max_verify_retries more in each of the two retry loops), each getting its
@@ -1507,11 +1507,11 @@ class _RecordingConversation:
 
 
 def test_stream_task_wires_max_iterations_to_conversation(monkeypatch):
-    # Regression guard: HARNESS_MAX_ITERATIONS was parsed/validated by
+    # Regression guard: CERTO_MAX_ITERATIONS was parsed/validated by
     # config.py from Milestone 1 onward but never actually passed to
     # Conversation(...), so every run silently used the SDK's own default
     # (500) regardless of .env — contrary to docs/SPEC.md section 12's
-    # acceptance criterion ("HARNESS_MAX_ITERATIONS reliably bounds runaway
+    # acceptance criterion ("CERTO_MAX_ITERATIONS reliably bounds runaway
     # loops"). Found only by reading runner.py directly, not by any test —
     # this asserts the kwarg is actually threaded through, so a future
     # regression (e.g. an SDK upgrade renaming/removing the kwarg) fails
@@ -1721,7 +1721,7 @@ def test_stream_task_acceptance_check_failure_downgrades_a_real_verified_run(mon
     assert outcome.verification_state == "acceptance_failed"
 
 
-# --- HARNESS_MODEL_SELECTION=auto -------------------------------------------
+# --- CERTO_MODEL_SELECTION=auto -------------------------------------------
 
 
 class _FakeMetrics:
@@ -2070,7 +2070,7 @@ def test_quality_failure_escalates_during_verify_retry(monkeypatch, tmp_path):
     assert outcome.verification_state == "verified"
 
 
-# --- HARNESS_ARTIFACTS_DIR ---------------------------------------------
+# --- CERTO_ARTIFACTS_DIR ---------------------------------------------
 
 
 def test_artifacts_dir_unset_writes_nothing(monkeypatch, tmp_path):

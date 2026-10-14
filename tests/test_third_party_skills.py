@@ -462,8 +462,8 @@ def test_config_defaults_and_overlap_rejection(tmp_path):
             {
                 "LLM_MODEL": "openai/gpt-4o",
                 "LLM_API_KEY": "k",
-                "HARNESS_SKILLS_DIR": str(tmp_path / "skills"),
-                "HARNESS_THIRD_PARTY_SKILLS_DIR": str(tmp_path / "skills" / "third_party"),
+                "CERTO_SKILLS_DIR": str(tmp_path / "skills"),
+                "CERTO_THIRD_PARTY_SKILLS_DIR": str(tmp_path / "skills" / "third_party"),
             }
         )
 

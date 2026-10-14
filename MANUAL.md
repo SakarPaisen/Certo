@@ -46,7 +46,7 @@ uv pip install -e ".[dev]"        # certo + openhands-sdk/openhands-tools + pyte
 uv run pytest -q                  # should pass with no network/keys required
 ```
 
-Only needed for `HARNESS_EXECUTION=docker`:
+Only needed for `CERTO_EXECUTION=docker`:
 
 ```bash
 uv pip install -e ".[sandbox]"    # adds openhands-workspace, openhands-agent-server
@@ -67,35 +67,44 @@ All configuration is env vars, loaded from `.env` by `src/certo/config.py`
 (`load_config()`). `.env` is git-ignored; `.env.example` is the checked-in
 template with every variable documented inline.
 
+Every policy variable is named `CERTO_*`. **Deprecated fallback (one
+release):** the pre-rename `HARNESS_*` spelling of the same variable (e.g.
+`HARNESS_EXECUTION` for `CERTO_EXECUTION`) is still read. If only the old
+name has a value, it's used and one deprecation warning naming the new
+variable is logged per process. If both have a value, `CERTO_*` wins. A
+blank value counts as unset, so a blank `CERTO_` line copied from
+`.env.example` doesn't hide an old `HARNESS_` setting. `LLM_*` variables
+are unchanged.
+
 | Variable | Default | Meaning |
 |---|---|---|
 | `LLM_MODEL` | *(required)* | LiteLLM-style model id, e.g. `anthropic/claude-sonnet-4-5-20250929`, `openai/gpt-4o`, `ollama/llama3`. The **only** thing you change to switch provider. |
 | `LLM_API_KEY` | *(required unless `LLM_BASE_URL` set)* | Key for whichever provider `LLM_MODEL` selects. |
 | `LLM_BASE_URL` | *(empty)* | Only for local/self-hosted models (e.g. `http://localhost:11434`). Leave the line with no value and no trailing text — see [Troubleshooting](#troubleshooting). |
 | `LLM_REASONING_EFFORT` | *(empty — SDK default `high` applies)* | Provider-neutral reasoning effort, passed straight through to the SDK's `LLM.reasoning_effort` (LiteLLM translates it per-provider). Common values: `none` \| `minimal` \| `low` \| `medium` \| `high` \| `xhigh` \| `max` — not validated against a fixed list, since the SDK accepts forward-compatible provider values too. |
-| `HARNESS_WORKSPACE` | `.` | Working directory the agent operates in when `--project` is not used. |
-| `HARNESS_MAX_ITERATIONS` | `50` | Safety cap on the agent loop. |
-| `HARNESS_CONFIRM_MODE` | `never` | `never` \| `always` (pause before each tool call for approval — see [Confirmation mode](#confirmation-mode)). |
-| `HARNESS_EXECUTION` | `local` | `local` \| `docker` — see [Execution modes](#execution-modes). |
-| `HARNESS_PROJECTS_DIR` | `./projects` | Root folder for generated projects; `--project NAME` resolves to `HARNESS_PROJECTS_DIR/NAME`. |
-| `HARNESS_SKILLS_DIR` | `./skills` | Shared skill catalog loaded into every agent's `AgentContext` — see [Skills](#skills). |
-| `HARNESS_THIRD_PARTY_SKILLS_DIR` | `./third_party_skills` | Local-only (gitignored) directory for third-party skills installed with `certo-admin skills install`. Must not overlap `HARNESS_SKILLS_DIR`. See [Third-party skills](#third-party-skills-certo-admin-skills). |
-| `HARNESS_THIRD_PARTY_SKILLS_LOCK` | `./third_party_skills.lock.json` | Lockfile recording each third-party skill's provenance, license, content hash, and enabled state (never its content). |
-| `HARNESS_DOCKER_IMAGE` | `certo/agent-server:local` | Image used for `HARNESS_EXECUTION=docker`. Built automatically on first use. |
-| `HARNESS_DOCKER_PLATFORM` | auto-detected from host arch | `linux/amd64` \| `linux/arm64`. Leave blank to auto-detect (arm64 on Apple Silicon, amd64 otherwise). |
-| `HARNESS_VERIFY_TESTS` | `always` | `always` \| `never` — after the agent finishes, re-run the project's own tests and, if they fail, send the real failure back and let the agent retry. See [Test verification](#test-verification). |
-| `HARNESS_MAX_VERIFY_RETRIES` | `2` | How many automated fix-and-retry cycles `HARNESS_VERIFY_TESTS=always` allows before giving up. |
-| `HARNESS_MAX_TASK_SECONDS` | `1800` | Shared wall-clock budget (seconds) for one whole task — the initial run plus every task_tracker/verification retry combined, not just a single `conversation.run()` call. See [Task budget](#task-budget). |
-| `HARNESS_INTERACTIVE` | `no` | Allow the agent to pause and ask instead of always pushing forward autonomously. Only meaningful with the CLI's `--interactive` flag — see [Interactive mode](#interactive-mode). |
-| `HARNESS_MODEL_SELECTION` | `manual` | `manual` \| `auto` — pick the best-fit model per task from a hand-curated catalog instead of always using `LLM_MODEL`. See [Automatic model selection](#automatic-model-selection). |
-| `HARNESS_MODELS_FILE` | `./models.yaml` | Path to the model catalog, only read when `HARNESS_MODEL_SELECTION=auto`. |
-| `HARNESS_ARTIFACTS_DIR` | *(empty — disabled)* | Per-run metadata/transcript/token-cost directory. See [Run artifacts](#run-artifacts). |
-| `HARNESS_TASK_STORE` | `memory` | `memory` \| `redis` \| `sqlite` \| `mysql` \| `postgres` — server-mode task registry backend, consulted only by `certo-server`/`certo-admin`. See [Task registry persistence](#task-registry-persistence). |
-| `HARNESS_TASK_TTL_SECONDS` | `0` | Seconds a completed/failed task record is kept before it's eligible for purge; `0` means keep forever. |
-| `HARNESS_TASK_STORE_SQLITE_PATH` | `./harness_tasks.db` | sqlite backend only. |
-| `HARNESS_TASK_STORE_MYSQL_HOST` / `_PORT` / `_USER` / `_PASSWORD` / `_DATABASE` | `localhost` / `3306` / `root` / *(empty)* / `harness` | mysql backend only. |
-| `HARNESS_TASK_STORE_POSTGRES_HOST` / `_PORT` / `_USER` / `_PASSWORD` / `_DATABASE` | `localhost` / `5432` / `postgres` / *(empty)* / `harness` | postgres backend only. |
-| `HARNESS_TASK_STORE_REDIS_HOST` / `_PORT` / `_DB` / `_PASSWORD` / `_USE_TLS` | `localhost` / `6379` / `0` / *(empty)* / `false` | redis backend only. |
+| `CERTO_WORKSPACE` | `.` | Working directory the agent operates in when `--project` is not used. |
+| `CERTO_MAX_ITERATIONS` | `50` | Safety cap on the agent loop. |
+| `CERTO_CONFIRM_MODE` | `never` | `never` \| `always` (pause before each tool call for approval — see [Confirmation mode](#confirmation-mode)). |
+| `CERTO_EXECUTION` | `local` | `local` \| `docker` — see [Execution modes](#execution-modes). |
+| `CERTO_PROJECTS_DIR` | `./projects` | Root folder for generated projects; `--project NAME` resolves to `CERTO_PROJECTS_DIR/NAME`. |
+| `CERTO_SKILLS_DIR` | `./skills` | Shared skill catalog loaded into every agent's `AgentContext` — see [Skills](#skills). |
+| `CERTO_THIRD_PARTY_SKILLS_DIR` | `./third_party_skills` | Local-only (gitignored) directory for third-party skills installed with `certo-admin skills install`. Must not overlap `CERTO_SKILLS_DIR`. See [Third-party skills](#third-party-skills-certo-admin-skills). |
+| `CERTO_THIRD_PARTY_SKILLS_LOCK` | `./third_party_skills.lock.json` | Lockfile recording each third-party skill's provenance, license, content hash, and enabled state (never its content). |
+| `CERTO_DOCKER_IMAGE` | `certo/agent-server:local` | Image used for `CERTO_EXECUTION=docker`. Built automatically on first use. |
+| `CERTO_DOCKER_PLATFORM` | auto-detected from host arch | `linux/amd64` \| `linux/arm64`. Leave blank to auto-detect (arm64 on Apple Silicon, amd64 otherwise). |
+| `CERTO_VERIFY_TESTS` | `always` | `always` \| `never` — after the agent finishes, re-run the project's own tests and, if they fail, send the real failure back and let the agent retry. See [Test verification](#test-verification). |
+| `CERTO_MAX_VERIFY_RETRIES` | `2` | How many automated fix-and-retry cycles `CERTO_VERIFY_TESTS=always` allows before giving up. |
+| `CERTO_MAX_TASK_SECONDS` | `1800` | Shared wall-clock budget (seconds) for one whole task — the initial run plus every task_tracker/verification retry combined, not just a single `conversation.run()` call. See [Task budget](#task-budget). |
+| `CERTO_INTERACTIVE` | `no` | Allow the agent to pause and ask instead of always pushing forward autonomously. Only meaningful with the CLI's `--interactive` flag — see [Interactive mode](#interactive-mode). |
+| `CERTO_MODEL_SELECTION` | `manual` | `manual` \| `auto` — pick the best-fit model per task from a hand-curated catalog instead of always using `LLM_MODEL`. See [Automatic model selection](#automatic-model-selection). |
+| `CERTO_MODELS_FILE` | `./models.yaml` | Path to the model catalog, only read when `CERTO_MODEL_SELECTION=auto`. |
+| `CERTO_ARTIFACTS_DIR` | *(empty — disabled)* | Per-run metadata/transcript/token-cost directory. See [Run artifacts](#run-artifacts). |
+| `CERTO_TASK_STORE` | `memory` | `memory` \| `redis` \| `sqlite` \| `mysql` \| `postgres` — server-mode task registry backend, consulted only by `certo-server`/`certo-admin`. See [Task registry persistence](#task-registry-persistence). |
+| `CERTO_TASK_TTL_SECONDS` | `0` | Seconds a completed/failed task record is kept before it's eligible for purge; `0` means keep forever. |
+| `CERTO_TASK_STORE_SQLITE_PATH` | `./harness_tasks.db` | sqlite backend only. |
+| `CERTO_TASK_STORE_MYSQL_HOST` / `_PORT` / `_USER` / `_PASSWORD` / `_DATABASE` | `localhost` / `3306` / `root` / *(empty)* / `harness` | mysql backend only. |
+| `CERTO_TASK_STORE_POSTGRES_HOST` / `_PORT` / `_USER` / `_PASSWORD` / `_DATABASE` | `localhost` / `5432` / `postgres` / *(empty)* / `harness` | postgres backend only. |
+| `CERTO_TASK_STORE_REDIS_HOST` / `_PORT` / `_DB` / `_PASSWORD` / `_USE_TLS` | `localhost` / `6379` / `0` / *(empty)* / `false` | redis backend only. |
 
 ## CLI reference
 
@@ -118,8 +127,8 @@ is installed via `uv pip install -e .`. The old command names `harness`,
   WS) does **not** do this resolution — it's CLI-only; API callers already
   have the content in hand or can fetch/read it themselves before the
   request.
-- `--execution {local,docker}` — overrides `HARNESS_EXECUTION` for this run only.
-- `--project NAME` — overrides the workspace to `HARNESS_PROJECTS_DIR/NAME`
+- `--execution {local,docker}` — overrides `CERTO_EXECUTION` for this run only.
+- `--project NAME` — overrides the workspace to `CERTO_PROJECTS_DIR/NAME`
   (created if missing). See [Projects](#projects-one-subfolder-per-generated-project).
 - `--agents-md TEXT` — writes `TEXT` as this project's `AGENTS.md`. Requires
   `--project`. See [Skills](#skills).
@@ -167,7 +176,7 @@ too).
 Examples:
 
 ```bash
-# Simplest form — uses HARNESS_WORKSPACE, whatever HARNESS_EXECUTION is set to
+# Simplest form — uses CERTO_WORKSPACE, whatever CERTO_EXECUTION is set to
 uv run python -m certo "Refactor utils.py to remove duplication, then run the tests."
 
 # A specific generated project, run locally
@@ -224,7 +233,7 @@ from real completion — both set the same `FINISHED` status — so without this
 instruction the harness would have no way to tell whether the agent actually
 finished or just stopped to ask something nobody could answer.
 
-`--interactive` (`HARNESS_INTERACTIVE=yes` in `.env`, or the CLI flag —
+`--interactive` (`CERTO_INTERACTIVE=yes` in `.env`, or the CLI flag —
 either way, off by default) turns that around for a human running the CLI:
 
 - The autonomous instruction is dropped, so the agent is free to pause and
@@ -236,7 +245,7 @@ either way, off by default) turns that around for a human running the CLI:
 - You can go back and forth as many times as you like — each reply
   continues the same conversation, keeping everything the agent has already
   done and learned.
-- Waiting for you to type doesn't spend the `HARNESS_MAX_TASK_SECONDS`
+- Waiting for you to type doesn't spend the `CERTO_MAX_TASK_SECONDS`
   budget — the clock only runs while the agent itself is actually working,
   not while a prompt is sitting at your terminal.
 
@@ -253,11 +262,11 @@ behavior predictable: the harness's own "keep re-checking and retrying
 automatically" loops are a different, already-established mechanism from a
 human being asked a question, and the two aren't mixed together.
 
-**Server mode doesn't support this.** `HARNESS_INTERACTIVE` is read from
+**Server mode doesn't support this.** `CERTO_INTERACTIVE` is read from
 `.env` regardless of interface, but only `cli.py` supplies the terminal
 prompt that actually answers a checkpoint — `server.py` never does (no
-terminal to prompt at, same as `HARNESS_CONFIRM_MODE=always`'s existing
-server-mode gotcha). Setting `HARNESS_INTERACTIVE=yes` for a server
+terminal to prompt at, same as `CERTO_CONFIRM_MODE=always`'s existing
+server-mode gotcha). Setting `CERTO_INTERACTIVE=yes` for a server
 deployment still drops the autonomous instruction from the prompt with
 nobody available to answer if the agent does ask something, which can leave
 a task less thoroughly finished than the default — leave this at `no` (the
@@ -267,7 +276,7 @@ default) for `certo-server`.
 
 By default the harness runs one, explicitly-configured model for the whole
 task (`LLM_MODEL`, or a per-request/`--model` override). `--auto-model`
-(`HARNESS_MODEL_SELECTION=auto` in `.env`, or the CLI flag — off by
+(`CERTO_MODEL_SELECTION=auto` in `.env`, or the CLI flag — off by
 default) picks instead from a hand-curated catalog of candidate models,
 scored by what the task looks like, with automatic fallback if the chosen
 one fails.
@@ -308,7 +317,7 @@ key, or you just don't want it in rotation right now); flip it back to
 `true` to bring it back. A deactivated entry is still schema-validated and
 still counted for duplicate-name checks, but never scored, ranked, or used
 as a fallback. If every model in the catalog is deactivated,
-`HARNESS_MODEL_SELECTION=auto` fails with a clear error rather than
+`CERTO_MODEL_SELECTION=auto` fails with a clear error rather than
 silently picking nothing.
 
 **On every axis, higher = more desirable — including `cost`.** A model's
@@ -360,7 +369,7 @@ before its `Verification: ...` line.
 
 ### Docker
 
-The initial pick works under `HARNESS_EXECUTION=docker` — it's just which
+The initial pick works under `CERTO_EXECUTION=docker` — it's just which
 catalog entry builds the one model used for the whole run. Mid-task
 fallback (either failure type above) is **local-execution only**: the SDK
 method this needs (`conversation.switch_llm`) exists on `LocalConversation`
@@ -374,7 +383,7 @@ normally, it doesn't fall back to the next model.
 ### End-of-run summary (always on)
 
 Every CLI run ends with a summary after the verification result, whether or
-not `HARNESS_ARTIFACTS_DIR` is set:
+not `CERTO_ARTIFACTS_DIR` is set:
 
 ```
 Run summary:
@@ -404,18 +413,18 @@ callers.
 
 ### Artifacts directory
 
-`HARNESS_ARTIFACTS_DIR` (blank by default — disabled) writes a durable,
+`CERTO_ARTIFACTS_DIR` (blank by default — disabled) writes a durable,
 git-ignorable record of how each task run actually went: metadata, the
 full message transcript, and real token/cost metrics. It's a separate,
-sibling top-level directory — mirroring `HARNESS_PROJECTS_DIR`'s own
+sibling top-level directory — mirroring `CERTO_PROJECTS_DIR`'s own
 shape — not a folder nested inside any one project, so harness telemetry
 never ends up inside a project's own (possibly-committed) directory tree.
 
 ```bash
-HARNESS_ARTIFACTS_DIR=./artifacts uv run certo "..." --project my-api
+CERTO_ARTIFACTS_DIR=./artifacts uv run certo "..." --project my-api
 ```
 
-Layout: `<HARNESS_ARTIFACTS_DIR>/<project-or-_unscoped>/<run-id>/`, one
+Layout: `<CERTO_ARTIFACTS_DIR>/<project-or-_unscoped>/<run-id>/`, one
 subfolder per task invocation (a project run many times over its life gets
 one subfolder per run, never overwritten). `_unscoped` is used when no
 `--project`/`project` was given. `run-id` is minted automatically — the
@@ -560,7 +569,7 @@ only changes the specific "nothing could be checked" case. The `WS
 `{"type": "result", ...}` in the same situation.
 
 **Persistence is pluggable, in-memory by default:** the default
-`HARNESS_TASK_STORE=memory` is byte-for-byte the original behavior — the
+`CERTO_TASK_STORE=memory` is byte-for-byte the original behavior — the
 task registry lives in the server process's memory, lost on restart, not
 shared across multiple server processes. A deployment that needs
 persistence across restarts, sharing across workers, a retention limit, or
@@ -692,7 +701,7 @@ successfully).
 ## Task registry persistence
 
 Server mode's task registry (everything `GET /tasks/{id}` returns) is
-pluggable via `HARNESS_TASK_STORE`, one of `memory` (default) | `redis` |
+pluggable via `CERTO_TASK_STORE`, one of `memory` (default) | `redis` |
 `sqlite` | `mysql` | `postgres`. Switching backend is purely a config
 change — `server.py`'s request-handling code is identical either way, and
 `memory` remains byte-for-byte the original in-process behavior, so
@@ -701,7 +710,7 @@ enabling this feature is never a silent change for an existing deployment.
 | Backend | Extra to install | Notes |
 |---|---|---|
 | `memory` (default) | none | Unbounded unless a TTL is set; lost on restart; not shared across processes. |
-| `sqlite` | `uv pip install -e ".[store-sqlite]"` | One local file (`HARNESS_TASK_STORE_SQLITE_PATH`); survives restarts, single-process only (sqlite's own concurrent-writer limits apply). |
+| `sqlite` | `uv pip install -e ".[store-sqlite]"` | One local file (`CERTO_TASK_STORE_SQLITE_PATH`); survives restarts, single-process only (sqlite's own concurrent-writer limits apply). |
 | `mysql` | `uv pip install -e ".[store-mysql]"` | Shared across multiple `certo-server` processes/workers. |
 | `postgres` | `uv pip install -e ".[store-postgres]"` | Same as mysql. |
 | `redis` | `uv pip install -e ".[store-redis]"` | Shared across processes; TTL uses Redis's own native per-key expiration (`EX`) instead of a periodic sweep. |
@@ -710,7 +719,7 @@ sqlite/mysql/postgres all share one implementation (SQLAlchemy Core,
 parameterized by connection URL) — one `harness_tasks` table, identical
 query logic on all three dialects.
 
-**Retention (`HARNESS_TASK_TTL_SECONDS`, default `0` = keep forever):** once
+**Retention (`CERTO_TASK_TTL_SECONDS`, default `0` = keep forever):** once
 set to a positive number of seconds, a *terminal* (`completed`/`failed`)
 task record older than that is eligible for removal — a `pending`/`running`
 task is never purged regardless of TTL. For `memory`/`sqlite`/`mysql`/
@@ -732,7 +741,7 @@ uv run certo-admin delete-project my-api
 
 ### `certo-admin` — task store maintenance CLI
 
-Talks directly to whatever backend `HARNESS_TASK_STORE` selects (via the
+Talks directly to whatever backend `CERTO_TASK_STORE` selects (via the
 same `build_task_store(load_config())` `server.py` uses) — no running
 server required, just the same `.env`.
 
@@ -774,7 +783,7 @@ from `.env`/`LLM_API_KEY` (there's no `--api-key` flag, so it never lands in
 shell history) and is scrubbed from any error text before printing. A
 successful check costs one very small request.
 
-`purge` uses `HARNESS_TASK_TTL_SECONDS` from `.env` by default; pass
+`purge` uses `CERTO_TASK_TTL_SECONDS` from `.env` by default; pass
 `--ttl-seconds` to override it for one run. It refuses to run (exit `1`,
 no records touched) when the effective TTL is `0` — "keep forever" is a
 real setting, not "unset", so `purge` never silently deletes everything
@@ -782,14 +791,14 @@ just because no TTL happens to be configured.
 
 ## Projects: one subfolder per generated project
 
-`--project NAME` puts the agent's workspace at `HARNESS_PROJECTS_DIR/NAME`
+`--project NAME` puts the agent's workspace at `CERTO_PROJECTS_DIR/NAME`
 (default `./projects/NAME`), creating the directory if it doesn't exist yet.
 Re-running with the same `--project NAME` reuses the same folder, so a
 project accumulates across multiple task invocations; a different name gets
 its own separate folder. `projects/` is git-ignored — nothing generated there
 is committed to this repo automatically.
 
-Omitting `--project` falls back to plain `HARNESS_WORKSPACE` (no per-project
+Omitting `--project` falls back to plain `CERTO_WORKSPACE` (no per-project
 folder) — this is what the e2e smoke test (`tests/test_runner.py`) uses, and
 is fine for one-off tasks that don't need to be revisited.
 
@@ -799,12 +808,12 @@ agent (`os.path.abspath` in `cli.py`) — this matters because the agent's
 against the workspace itself (see [Known limitations](#known-limitations)).
 
 `NAME` must be a relative path with no `..` segment, and its resolved,
-symlink-followed location must stay inside `HARNESS_PROJECTS_DIR` — both
+symlink-followed location must stay inside `CERTO_PROJECTS_DIR` — both
 `--project` and `POST /tasks`'s `project` field go through the same check
 (`config.py`'s `resolve_project_dir()`) before the directory is created or
 used. An absolute name (`--project /etc/cron.d`), a `..`-traversal attempt,
 or a project name that resolves through an existing symlink to somewhere
-outside `HARNESS_PROJECTS_DIR` is rejected with a clear error instead of
+outside `CERTO_PROJECTS_DIR` is rejected with a clear error instead of
 silently redirecting the agent's entire workspace — including its terminal
 and file-editor tools — to an arbitrary path on the host.
 
@@ -831,7 +840,7 @@ alternatives that were considered.
 
 ### Shared skill catalog (`skills/`)
 
-`HARNESS_SKILLS_DIR` (default `./skills`) is a library of **reusable**
+`CERTO_SKILLS_DIR` (default `./skills`) is a library of **reusable**
 knowledge — conventions worth writing once and applying to *any* project
 where they're relevant, not facts about one specific project. Every skill is
 loaded into every agent's `AgentContext` (`build_agent()` in `agent.py`); the
@@ -924,12 +933,12 @@ Upstream `SKILL.md` skills can be installed locally without committing their
 contents to this repo. They're kept separate from the first-party catalog
 above:
 
-- **Files** go in `HARNESS_THIRD_PARTY_SKILLS_DIR` (default
+- **Files** go in `CERTO_THIRD_PARTY_SKILLS_DIR` (default
   `./third_party_skills/`, gitignored), one directory per skill, exactly one
   level deep — the only depth at which the SDK detects `SKILL.md`
   directories. The SDK's git clone cache for these lives in `.cache/` inside
   the same directory.
-- **The lockfile** (`HARNESS_THIRD_PARTY_SKILLS_LOCK`, default
+- **The lockfile** (`CERTO_THIRD_PARTY_SKILLS_LOCK`, default
   `./third_party_skills.lock.json`, *not* gitignored — commit it if you want
   teammates to reproduce your set) records, per skill: upstream repository,
   skill path, the requested ref and the resolved 40-character commit,
@@ -994,7 +1003,7 @@ started), and inline ``!`command` `` snippets — which the SDK's
 invoked — are escaped on load so they show up as literal text. An enabled
 skill's *instructions* can still ask the agent to run its bundled scripts
 with the agent's normal tools. Read a skill before enabling it, and
-consider `HARNESS_CONFIRM_MODE=always` if you're unsure about one.
+consider `CERTO_CONFIRM_MODE=always` if you're unsure about one.
 
 ### Lifecycle skills (`skills/lifecycle/`)
 
@@ -1061,7 +1070,7 @@ file with no frontmatter required, so it applies to this task and every
 future task against the same project directory, with zero extra wiring.
 `--agents-md`/`agents_md` **requires** `--project`/`project` — supplying it
 without a named project is rejected (`400` / CLI exit 1) rather than silently
-writing into whatever `HARNESS_WORKSPACE` happens to be, which could be this
+writing into whatever `CERTO_WORKSPACE` happens to be, which could be this
 repo's own working directory.
 
 **Status:** both mechanisms verified live — a task containing "pytest"
@@ -1073,11 +1082,11 @@ call wrote `AGENTS.md` to the project folder and a subsequent task's
 
 ## Execution modes
 
-`HARNESS_EXECUTION` (or `--execution`) selects where the agent's tools
+`CERTO_EXECUTION` (or `--execution`) selects where the agent's tools
 actually run. The dispatch lives entirely in `src/certo/workspace.py`
 (`build_workspace(cfg)`) — this is the one place execution backends are
 chosen, so a future backend (ECS, EC2, ...) is one new branch there plus one
-new `HARNESS_EXECUTION` value, not changes to `agent.py`, `runner.py`, or
+new `CERTO_EXECUTION` value, not changes to `agent.py`, `runner.py`, or
 `cli.py`. Only `local` and `docker` exist today.
 
 ### `local`
@@ -1211,7 +1220,7 @@ live in `src/certo/custom_tools/`:
      no single obvious root, e.g. sibling `frontend/package.json` and
      `backend/pyproject.toml` — this resolves to `"ambiguous"` rather than
      silently verifying whichever one a directory walk happens to visit
-     first; point `HARNESS_WORKSPACE`/`--project` at the specific project to
+     first; point `CERTO_WORKSPACE`/`--project` at the specific project to
      resolve it.
   2. **Verification-plan discovery** (`discover_verification_plan()`) — pure
      (file reads + `shutil.which` lookups, no subprocess execution): given a
@@ -1341,7 +1350,7 @@ confirmed live twice, in two different ways:
    surfaced through the built-in task-tracking tool instead of the project's
    own tests.
 
-`HARNESS_VERIFY_TESTS=always` (the default) is the harness's own safety net
+`CERTO_VERIFY_TESTS=always` (the default) is the harness's own safety net
 against all three: after every run, `runner.py` first checks the agent's own
 `task_tracker` list (see "Task-tracker completion" below), then re-runs the
 project's own verification itself — via `run_tests_tool.run_full_verification()`,
@@ -1355,12 +1364,12 @@ event — see [CLI reference](#cli-reference) / [Server mode](#server-mode-httpw
 |---|---|
 | `verified` | The project's primary check actually ran and passed. A configured secondary check (lint/typecheck/`go vet`/`cargo check`/`cargo clippy`/etc.) that couldn't run because its tool isn't installed doesn't block this — it's recorded as a limitation instead, not a failure. |
 | `inconclusive` | Nothing runnable confirmed the software works — either the specific "pytest collected zero tests" signal (exit code `5`; kept silent/non-blocking, same as before — a project can legitimately have no tests yet), or a genuine "couldn't check anything" case (a required tool isn't installed, the project type itself is unknown, or the workspace contains multiple candidate projects with no single obvious root — see the table in [Custom tools](#custom-tools)), which **is** surfaced with a visible harness notice so it isn't mistaken for a confirmed pass. For an unknown project type the notice lists the files that *were* found and the manifests it looked for, so "no check applied" isn't mistaken for "no code was produced" (a genuinely empty workspace says so explicitly). A standalone HTML/JavaScript page with no `package.json` lands here: open it in a browser, or add a `package.json` with a `test` script to make it verifiable. Never returned as `verified` — see the point above about not treating "no tests found" as proof of correctness. |
-| `retry_exhausted` | A real failure (primary or any configured secondary check) was found and sent back to the agent to fix, but it was still failing — with the failure actually changing between attempts (see `no_progress` below for when it doesn't) — after `HARNESS_MAX_VERIFY_RETRIES` attempts. The harness appends its own message saying so plainly, rather than letting the agent's last (possibly optimistic) message stand as the final word. |
+| `retry_exhausted` | A real failure (primary or any configured secondary check) was found and sent back to the agent to fix, but it was still failing — with the failure actually changing between attempts (see `no_progress` below for when it doesn't) — after `CERTO_MAX_VERIFY_RETRIES` attempts. The harness appends its own message saying so plainly, rather than letting the agent's last (possibly optimistic) message stand as the final word. |
 | `no_progress` | A fix attempt was sent back to the agent, but the *very next* verification pass came back with the exact same failing check, same exit code, and the same output (only a run-duration footer, like pytest's `in 3.85s`, is allowed to differ) — meaning that specific attempt provably changed nothing observable. Stops immediately, before exhausting the rest of the retry budget, rather than spending it on further attempts already shown not to help. Confirmed live: an agent edited a comparison operator to "fix" a failing test twice in a row while its own explanatory messages degraded into fluent-sounding but empty prose (see ROADMAP.md's decisions log) — both edits were no-ops for that specific failure (a different code branch handled it), and pytest's output was identical before and after. This is a cheaper, more reliable signal than trying to judge whether the agent's own reasoning text still makes sense — it doesn't read the agent's prose at all, only the verification output. |
 | `timed_out` | A check exceeded its timeout (300s) and was killed — retried the same as a real failure (usually an infinite loop or a hang the agent introduced, worth one more attempt to fix), but kept as its own terminal state rather than folded into `retry_exhausted` if it's still timing out after the retry budget: a persistent hang is a different problem from a wrong answer, worth telling apart at a glance. (Two identical timeouts in a row are `no_progress`, not this — same rule as any other check.) |
-| `incomplete` | The agent's own `task_tracker` list still had an item marked `todo`/`in_progress` after `HARNESS_MAX_VERIFY_RETRIES` automated follow-ups — see "Task-tracker completion" below. Project verification is skipped entirely in this case: a task the agent's own tracking says isn't finished can't be meaningfully "verified" by running its tests. |
-| `confirmation_required` | `HARNESS_CONFIRM_MODE=always` paused before a tool call, but no interactive approval handler was available to answer it (e.g. server mode, or any caller that didn't supply one) — see [Confirmation mode](#confirmation-mode) below. The harness rejects the pending action once and stops rather than silently approving it or waiting indefinitely; task_tracker and project verification are both skipped, since the run never actually continued. |
-| `budget_exhausted` | The task's shared, wall-clock `HARNESS_MAX_TASK_SECONDS` budget ran out — spanning the initial run and every task_tracker/verification retry combined, not just one `conversation.run()` call. See [Task budget](#task-budget) below. |
+| `incomplete` | The agent's own `task_tracker` list still had an item marked `todo`/`in_progress` after `CERTO_MAX_VERIFY_RETRIES` automated follow-ups — see "Task-tracker completion" below. Project verification is skipped entirely in this case: a task the agent's own tracking says isn't finished can't be meaningfully "verified" by running its tests. |
+| `confirmation_required` | `CERTO_CONFIRM_MODE=always` paused before a tool call, but no interactive approval handler was available to answer it (e.g. server mode, or any caller that didn't supply one) — see [Confirmation mode](#confirmation-mode) below. The harness rejects the pending action once and stops rather than silently approving it or waiting indefinitely; task_tracker and project verification are both skipped, since the run never actually continued. |
+| `budget_exhausted` | The task's shared, wall-clock `CERTO_MAX_TASK_SECONDS` budget ran out — spanning the initial run and every task_tracker/verification retry combined, not just one `conversation.run()` call. See [Task budget](#task-budget) below. |
 | `stuck` | The conversation's own `execution_status` (the SDK's stuck-loop/error detection) ended in `stuck` or `error` rather than a normal finish — verification isn't even attempted against a run that never reached a coherent stopping point. Checked before the initial verification pass and again after every retry, and before/during the task-tracker, confirmation, and budget checks too. |
 
 (A tenth value, `failed`, exists only as the momentary signal inside the
@@ -1374,7 +1383,7 @@ after the agent's first run: it looks at the most recently observed task
 list and,
 if any item is still `todo`/`in_progress`, sends the agent a follow-up
 listing exactly which ones and re-runs it, bounded by the same
-`HARNESS_MAX_VERIFY_RETRIES` budget used for test-fix retries. If the agent
+`CERTO_MAX_VERIFY_RETRIES` budget used for test-fix retries. If the agent
 never used `task_tracker` at all, or its list is already fully `done`,
 nothing happens — the tool's own guidance says trivial tasks don't need it,
 so an unused tracker is not treated as incomplete work. This runs *before*
@@ -1400,9 +1409,9 @@ a harness-computed record of what the task was actually judged against, not
 another prompt fed back to the model: `verification_checks` lists the exact
 commands run (e.g. `["pytest -q", "ruff check .", "go test ./..."]`), and
 `limitations` lists anything that couldn't be confirmed (an unavailable
-secondary check, a stuck run, `HARNESS_VERIFY_TESTS=never`, etc.).
+secondary check, a stuck run, `CERTO_VERIFY_TESTS=never`, etc.).
 
-Set `HARNESS_VERIFY_TESTS=never` to skip verification entirely — e.g. while
+Set `CERTO_VERIFY_TESTS=never` to skip verification entirely — e.g. while
 iterating quickly and you'd rather review failures yourself. The result is
 always `inconclusive` in that case (with a limitation noting verification
 was skipped), never `verified` — skipping the check is not the same as
@@ -1410,13 +1419,13 @@ confirming the work.
 
 ## Confirmation mode
 
-`HARNESS_CONFIRM_MODE=always` pauses the agent before every tool call and
+`CERTO_CONFIRM_MODE=always` pauses the agent before every tool call and
 requires explicit approval before it runs — the SDK's `AlwaysConfirm`
 confirmation policy, attached in `runner.py`. In the CLI, this means an
 interactive prompt at the terminal:
 
 ```
---- Confirmation required (HARNESS_CONFIRM_MODE=always) ---
+--- Confirmation required (CERTO_CONFIRM_MODE=always) ---
   terminal: command='rm -rf build/' is_input=False timeout=None reset=False kind='TerminalAction'
 Approve? [y/N]
 ```
@@ -1427,34 +1436,34 @@ the same as if a human had said "no, don't do that." Approving lets exactly
 that one action run; the agent is paused again before its next tool call.
 
 **Server mode has no way to answer this prompt** (there's no terminal to
-read from), so if `HARNESS_CONFIRM_MODE=always` is set and the agent
+read from), so if `CERTO_CONFIRM_MODE=always` is set and the agent
 proposes any tool call, the harness rejects that one action automatically
 and stops the task immediately with `verification_state:
 "confirmation_required"` — it does not silently approve the action (that
 would defeat the whole point of confirm mode) and does not hang waiting for
-an answer nobody can give. In practice, `HARNESS_CONFIRM_MODE=always` is a
+an answer nobody can give. In practice, `CERTO_CONFIRM_MODE=always` is a
 CLI-only feature today; leave it at the default `never` for server-mode
 deployments.
 
-`--confirm-mode` is not a CLI flag — this is purely a `.env`/`HARNESS_CONFIRM_MODE`
+`--confirm-mode` is not a CLI flag — this is purely a `.env`/`CERTO_CONFIRM_MODE`
 setting, consistent with `confirm_mode` not being part of the per-request
 LLM override set (`--model`/`--api-key`/`--base-url`/`--reasoning-effort`).
 
 ## Task budget
 
-`HARNESS_MAX_ITERATIONS` bounds a single `conversation.run()` call, but
+`CERTO_MAX_ITERATIONS` bounds a single `conversation.run()` call, but
 `runner.py` can call `.run()` up to three times for one task: the initial
-run, then up to `HARNESS_MAX_VERIFY_RETRIES` more inside
+run, then up to `CERTO_MAX_VERIFY_RETRIES` more inside
 `_enforce_task_tracker_completion`'s retry loop, then up to
-`HARNESS_MAX_VERIFY_RETRIES` more again inside `_verify_and_report`'s retry
+`CERTO_MAX_VERIFY_RETRIES` more again inside `_verify_and_report`'s retry
 loop — and each call gets its own fresh iteration budget from the SDK, not
 a shared one. Worst case, a single task could spend roughly
-`HARNESS_MAX_ITERATIONS × (1 + 2 × HARNESS_MAX_VERIFY_RETRIES)` iterations,
+`CERTO_MAX_ITERATIONS × (1 + 2 × CERTO_MAX_VERIFY_RETRIES)` iterations,
 well beyond what the configured cap on its own suggests.
 
-`HARNESS_MAX_TASK_SECONDS` (default `1800`, i.e. 30 minutes) closes that
+`CERTO_MAX_TASK_SECONDS` (default `1800`, i.e. 30 minutes) closes that
 gap with a shared, task-level wall-clock budget spanning every phase
-combined — not a replacement for `HARNESS_MAX_ITERATIONS` (kept as a
+combined — not a replacement for `CERTO_MAX_ITERATIONS` (kept as a
 secondary, per-call guard), a complementary one. It's checked before every
 single `conversation.run()` call the harness makes for a task, including
 each confirm-mode approve/reject round-trip — not just once at the start —
@@ -1466,7 +1475,7 @@ are both skipped if the budget ran out before reaching them, the same way
 
 This is a wall-clock budget, not a hard interrupt mid-`conversation.run()`
 call — a check only happens *between* calls, the same checkpoint-based
-model `HARNESS_MAX_VERIFY_RETRIES` already uses. A single very slow
+model `CERTO_MAX_VERIFY_RETRIES` already uses. A single very slow
 iteration (a huge context, a slow LLM response) can still push the actual
 elapsed time somewhat past the configured value before the next checkpoint
 catches it; this bounds runaway *retry multiplication*, not sub-second
@@ -1503,7 +1512,7 @@ A caller supplies a JSON array of check objects:
   cannot escape it: an absolute path or a `..` segment is rejected
   outright, and the resolved, symlink-followed location is checked against
   the workspace the same way `resolve_project_dir()` protects
-  `HARNESS_PROJECTS_DIR` (see [Projects](#projects-one-subfolder-per-generated-project)).
+  `CERTO_PROJECTS_DIR` (see [Projects](#projects-one-subfolder-per-generated-project)).
   Without this, an unauthenticated caller (server mode has no
   authentication) could otherwise ask "does `/etc/passwd` contain `root`"
   and learn about arbitrary host files.
@@ -1542,7 +1551,7 @@ uv run pytest -q
   inside `projects_dir`, an absolute name/`..`-traversal/empty-or-dot name
   is rejected, and a real symlink (created on disk with `tmp_path`, not
   simulated) that resolves outside `projects_dir` is caught while one that
-  resolves back inside it is allowed. Also covers `HARNESS_MAX_TASK_SECONDS`
+  resolves back inside it is allowed. Also covers `CERTO_MAX_TASK_SECONDS`
   parsing (default, a custom value, and rejecting non-positive/non-integer
   values).
 - `tests/test_acceptance.py` — pure filesystem checks, no SDK, no network.
@@ -1588,7 +1597,7 @@ uv run pytest -q
   confirming `cli.main` only passes it to `run_task` when
   `confirm_mode == "always"`, a regression test confirming `--project
   ../escaped` is rejected with a configuration error rather than creating
-  a directory outside `HARNESS_PROJECTS_DIR`, `--require-verification`
+  a directory outside `CERTO_PROJECTS_DIR`, `--require-verification`
   (default off, an unknown project type/missing tool/no-tests-collected
   case all become exit `1` when passed, other verification states and the
   default-off case are unaffected), a regression test confirming
@@ -1652,7 +1661,7 @@ uv run pytest -q
   confirmation short-circuits task_tracker/project verification entirely.
   Confirmed live (both the approve and reject paths) via the real CLI
   against an isolated workspace, piping `y`/`n` into
-  `_confirm_pending_actions`'s `input()` prompt. `HARNESS_MAX_TASK_SECONDS`
+  `_confirm_pending_actions`'s `input()` prompt. `CERTO_MAX_TASK_SECONDS`
   coverage: `_run_with_confirmation` reports `budget_exhausted` before its
   first `.run()` call when the deadline has already passed, and again mid
   confirm-loop (a mocked, increasing `time.monotonic()` sequence simulates
@@ -1660,7 +1669,7 @@ uv run pytest -q
   `_enforce_task_tracker_completion` each report it both at entry and
   mid-retry; and a `stream_task`-level integration test confirms an
   already-exhausted budget short-circuits task_tracker/project verification
-  entirely. Confirmed live via the real CLI (`HARNESS_MAX_TASK_SECONDS=1`
+  entirely. Confirmed live via the real CLI (`CERTO_MAX_TASK_SECONDS=1`
   against a trivial task) that the task still completes its work but is
   correctly reported as `budget_exhausted` with exit code `1`, and that a
   normal task under the default budget is unaffected. `acceptance_checks`
@@ -1736,7 +1745,7 @@ uv run pytest -q
   depending on what's actually in the image (a missing tool is reported as
   a limitation, not a false failure). Making this fully generic (detect any
   project's actual test runner, install its dependencies) is unscoped. The
-  `HARNESS_VERIFY_TESTS` safety net runs against the local, bind-mounted
+  `CERTO_VERIFY_TESTS` safety net runs against the local, bind-mounted
   project directory using the harness's own installed toolchains (this
   works even under `docker` execution, since `workspace.py` bind-mounts the
   project directory onto the host either way) — a project of an unknown
@@ -1778,7 +1787,7 @@ uv run pytest -q
 - **Provider-swap live proof (spec Milestone 3) hasn't been run** — see
   [Switching LLM provider / model](#switching-llm-provider--model).
 - **Server mode's task registry is in-memory, per-process, and unbounded
-  only by default (`HARNESS_TASK_STORE=memory`).** A `redis`/`sqlite`/
+  only by default (`CERTO_TASK_STORE=memory`).** A `redis`/`sqlite`/
   `mysql`/`postgres` backend, a TTL-based purge, and on-demand delete-by-
   project/delete-by-id (REST and `certo-admin` CLI) are all available —
   see [Task registry persistence](#task-registry-persistence). Still true
@@ -1835,14 +1844,14 @@ with nothing else on it if you're not using a local model.
 `local` execution** — the model guessed a container-style absolute path
 (e.g. `/HELLO.txt`) that doesn't exist as a real, writable directory on your
 host. Use `--project NAME` so the workspace is a real absolute path under
-`HARNESS_PROJECTS_DIR`, and/or phrase the task with an explicit absolute path.
+`CERTO_PROJECTS_DIR`, and/or phrase the task with an explicit absolute path.
 
-**"HARNESS_EXECUTION=docker requires the 'sandbox' extra"** — run
+**"CERTO_EXECUTION=docker requires the 'sandbox' extra"** — run
 `uv pip install -e ".[sandbox]"`.
 
 **Docker execution hangs or fails to become healthy** — confirm Docker
 Desktop/daemon is actually running (`docker ps`), and that
-`HARNESS_DOCKER_PLATFORM` matches your host (leave it blank to auto-detect;
+`CERTO_DOCKER_PLATFORM` matches your host (leave it blank to auto-detect;
 forcing the wrong platform runs the image under emulation, which is slow, or
 may fail outright).
 

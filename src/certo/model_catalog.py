@@ -1,4 +1,4 @@
-"""Pure data model, parsing, and scoring for `HARNESS_MODEL_SELECTION=auto`'s
+"""Pure data model, parsing, and scoring for `CERTO_MODEL_SELECTION=auto`'s
 model catalog (`models.yaml`) — no SDK imports, no side effects beyond
 reading the one file, fully unit-testable without a `Conversation`.
 
@@ -172,7 +172,7 @@ def load_model_catalog(path: str) -> ModelCatalog:
     file_path = Path(path)
     if not file_path.is_file():
         raise ModelCatalogError(
-            f"HARNESS_MODEL_SELECTION=auto requires a model catalog at {path!r}, "
+            f"CERTO_MODEL_SELECTION=auto requires a model catalog at {path!r}, "
             "but no such file exists. Copy models.yaml.example to models.yaml "
             "and fill in your models."
         )
@@ -250,6 +250,6 @@ def rank_candidates(catalog: ModelCatalog, weights: dict[str, float]) -> list[Mo
     if not active:
         raise ModelCatalogError(
             "Every model in the catalog has 'activated: false' — set at "
-            "least one to 'true' before using HARNESS_MODEL_SELECTION=auto."
+            "least one to 'true' before using CERTO_MODEL_SELECTION=auto."
         )
     return sorted(active, key=lambda entry: score_entry(entry, weights), reverse=True)

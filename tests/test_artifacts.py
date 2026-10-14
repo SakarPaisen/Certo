@@ -66,7 +66,7 @@ def test_resolve_run_artifacts_dir_rejects_a_symlink_escape(tmp_path):
     root.mkdir()
     (root / "escaped").symlink_to(outside)
 
-    with pytest.raises(ConfigError, match="escapes HARNESS_ARTIFACTS_DIR"):
+    with pytest.raises(ConfigError, match="escapes CERTO_ARTIFACTS_DIR"):
         resolve_run_artifacts_dir(str(root), "escaped", "run-1")
 
 

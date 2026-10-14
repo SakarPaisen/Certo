@@ -300,7 +300,7 @@ def test_ambiguous_candidates_are_reported_regardless_of_directory_listing_order
 
 
 def test_explicit_root_with_its_own_manifest_is_not_ambiguous(tmp_path):
-    # The workspace root itself is the intended project (e.g. HARNESS_WORKSPACE
+    # The workspace root itself is the intended project (e.g. CERTO_WORKSPACE
     # /--project already points at it) — a nested manifest elsewhere (a
     # vendored dependency, an example) must not turn this into "ambiguous".
     (tmp_path / "pyproject.toml").write_text("[project]\nname = 'fixture'\n")
