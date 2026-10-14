@@ -11,10 +11,10 @@ from pathlib import Path
 
 import pytest
 
-from harness import cli
-from harness.config import Config, ConfigError
-from harness.run_summary import ModelUsage, RunSummary
-from harness.runner import CompletionContract, TaskOutcome, TaskResult
+from certo import cli
+from certo.config import Config, ConfigError
+from certo.run_summary import ModelUsage, RunSummary
+from certo.runner import CompletionContract, TaskOutcome, TaskResult
 
 
 def _fake_result(messages=(), verification_state="verified", limitations=()):
@@ -1078,7 +1078,7 @@ def test_auto_model_only_passes_the_prompt_when_also_interactive(monkeypatch):
 
 
 def test_prompt_for_model_choice_accepts_the_recommendation_on_enter(monkeypatch, capsys):
-    from harness.model_catalog import ModelCatalogEntry
+    from certo.model_catalog import ModelCatalogEntry
 
     candidates = [
         ModelCatalogEntry(name="cheap", model="a", ratings={"cost": 5}, description="Fast."),
@@ -1096,7 +1096,7 @@ def test_prompt_for_model_choice_accepts_the_recommendation_on_enter(monkeypatch
 
 
 def test_prompt_for_model_choice_accepts_a_typed_index(monkeypatch):
-    from harness.model_catalog import ModelCatalogEntry
+    from certo.model_catalog import ModelCatalogEntry
 
     candidates = [
         ModelCatalogEntry(name="cheap", model="a", ratings={}),
@@ -1110,7 +1110,7 @@ def test_prompt_for_model_choice_accepts_a_typed_index(monkeypatch):
 
 
 def test_prompt_for_model_choice_falls_back_to_recommended_on_invalid_input(monkeypatch):
-    from harness.model_catalog import ModelCatalogEntry
+    from certo.model_catalog import ModelCatalogEntry
 
     candidates = [ModelCatalogEntry(name="only", model="a", ratings={})]
     monkeypatch.setattr("builtins.input", lambda _prompt: "not a number")
@@ -1119,7 +1119,7 @@ def test_prompt_for_model_choice_falls_back_to_recommended_on_invalid_input(monk
 
 
 def test_prompt_for_model_choice_falls_back_to_recommended_on_out_of_range_index(monkeypatch):
-    from harness.model_catalog import ModelCatalogEntry
+    from certo.model_catalog import ModelCatalogEntry
 
     candidates = [ModelCatalogEntry(name="only", model="a", ratings={})]
     monkeypatch.setattr("builtins.input", lambda _prompt: "99")

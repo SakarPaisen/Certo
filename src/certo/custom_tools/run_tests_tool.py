@@ -350,7 +350,7 @@ class RunTestsTool(ToolDefinition[RunTestsAction, RunTestsObservation]):
 # Registering at import time (not inside build_run_tests_tool) means importing
 # this module is enough to make the tool available — which is what lets a
 # containerized agent-server register it via `--import-modules
-# harness.custom_tools` (see docker/agent-server.Dockerfile), not just the
+# certo.custom_tools` (see docker/agent-server.Dockerfile), not just the
 # local process that calls build_run_tests_tool() directly.
 register_tool(RunTestsTool.name, RunTestsTool)
 

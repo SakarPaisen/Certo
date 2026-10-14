@@ -1,4 +1,4 @@
-"""Enables `python -m harness "<task>"`."""
+"""Enables `python -m certo "<task>"`."""
 
 from .cli import main
 

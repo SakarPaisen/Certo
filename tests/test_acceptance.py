@@ -1,10 +1,10 @@
-"""Tests for harness.acceptance — pure filesystem checks, no SDK, no network."""
+"""Tests for certo.acceptance — pure filesystem checks, no SDK, no network."""
 
 from __future__ import annotations
 
 import pytest
 
-from harness.acceptance import (
+from certo.acceptance import (
     AcceptanceCheck,
     AcceptanceCheckError,
     evaluate_acceptance_check,
@@ -153,7 +153,7 @@ def test_file_contains_fails_when_file_absent(tmp_path):
 
 
 def test_file_contains_caps_read_size_and_notes_truncation(tmp_path, monkeypatch):
-    monkeypatch.setattr("harness.acceptance._MAX_FILE_READ_BYTES", 10)
+    monkeypatch.setattr("certo.acceptance._MAX_FILE_READ_BYTES", 10)
     (tmp_path / "big.txt").write_text("a" * 5 + "NEEDLE" + "b" * 20)
     check = AcceptanceCheck(kind="file_contains", path="big.txt", contains="NEEDLE")
 

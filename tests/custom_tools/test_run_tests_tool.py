@@ -15,7 +15,7 @@ import sys
 
 import pytest
 
-from harness.custom_tools.run_tests_tool import (
+from certo.custom_tools.run_tests_tool import (
     CheckOutcome,
     CheckSpec,
     ProjectDetection,

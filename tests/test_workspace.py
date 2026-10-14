@@ -8,8 +8,8 @@ import subprocess
 
 import pytest
 
-from harness import workspace as workspace_mod
-from harness.config import Config
+from certo import workspace as workspace_mod
+from certo.config import Config
 
 pytest.importorskip("openhands.workspace")
 

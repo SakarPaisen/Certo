@@ -13,10 +13,10 @@ from pathlib import Path
 import pytest
 from openhands.sdk.skills.fetch import SkillFetchError
 
-from harness import admin_cli
-from harness import third_party_skills as tps
-from harness.agent import build_agent
-from harness.config import Config, ConfigError, load_config
+from certo import admin_cli
+from certo import third_party_skills as tps
+from certo.agent import build_agent
+from certo.config import Config, ConfigError, load_config
 
 SHA = "a" * 40
 SHA2 = "b" * 40

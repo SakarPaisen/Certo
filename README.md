@@ -103,14 +103,14 @@ uv run pytest -q       # runs with no API key needed — nothing here calls a re
 ## Run it
 
 ```bash
-uv run python -m harness "Refactor utils.py to remove duplication, then run the tests."
+uv run python -m certo "Refactor utils.py to remove duplication, then run the tests."
 
 # A named project, in its own subfolder under ./projects/, run in Docker
-uv run python -m harness "Scaffold a FastAPI service with a /health endpoint." \
+uv run python -m certo "Scaffold a FastAPI service with a /health endpoint." \
   --project my-api --execution docker
 
 # Let Certo pick the best-fit model from your models.yaml catalog
-uv run python -m harness "Fix the failing test in payments.py" --auto-model
+uv run python -m certo "Fix the failing test in payments.py" --auto-model
 ```
 
 `uv pip install -e .` also installs `certo`, `certo-server`, and
@@ -169,8 +169,8 @@ docs/KICKOFF.md      # how to drive the build
 .claude/             # permissions + slash commands
 docker/              # agent-server.Dockerfile (docker execution image)
 skills/              # shared skill catalog, loaded into every agent (see MANUAL.md)
-src/harness/         # the harness package, incl. server.py (server mode)
-tests/               # mirrors src/harness/
+src/certo/           # the certo package, incl. server.py (server mode)
+tests/               # mirrors src/certo/
 projects/            # generated software, one subfolder per --project (git-ignored)
 ```
 

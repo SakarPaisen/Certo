@@ -1,10 +1,10 @@
-"""Tests for harness.agent. No network: build_agent() only constructs SDK
+"""Tests for certo.agent. No network: build_agent() only constructs SDK
 objects, it never calls the LLM.
 """
 
 from __future__ import annotations
 
-from harness.agent import (
+from certo.agent import (
     _AUTONOMOUS_SUFFIX,
     _LIFECYCLE_SKILLS_SUFFIX,
     _NONINTERACTIVE_TOOLING_SUFFIX,
@@ -12,7 +12,7 @@ from harness.agent import (
     _VERIFY_BEFORE_FINISH_SUFFIX,
     build_agent,
 )
-from harness.config import Config
+from certo.config import Config
 
 
 def _cfg(**overrides) -> Config:

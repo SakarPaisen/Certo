@@ -110,7 +110,7 @@ decisions log below for *why* a given design was chosen.
   Python/Node contract and reuses stages 1–3 for Go/Rust/Java. Java is
   detection-only in this dev environment and the Docker image (neither ships
   a Maven/Gradle toolchain).
-- **`cli.py`** — `python -m harness "<task>" [--execution] [--project]
+- **`cli.py`** — `python -m certo "<task>" [--execution] [--project]
   [--agents-md] [--model] [--api-key] [--base-url] [--reasoning-effort]
   [--interactive] [--require-verification] [--acceptance-checks]
   [--auto-model]`. `task` resolves via `resolve_task_source()` (http(s) URL,
@@ -568,13 +568,17 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   python-web/testing skills are authored for this project.
 - **Project renamed ARICode → Certo, deep and final** (supersedes the
   earlier `coding-agent-harness` → ARICode rename, which deliberately
-  changed branding only and kept `import harness`/`HARNESS_*`/
+  changed branding only and kept `import certo`/`HARNESS_*`/
   `certo-admin`). This one renames the brand (docs, `pyproject.toml`
   name, `server.py` title/`owned_by`, Docker image tag
   `certo/agent-server:local`) and links (GitHub redirects the old repo URL).
   Console scripts are `certo`/`certo-server`/`certo-admin`; the old
   `harness*` names stay as aliases to the same entry points (no deprecation
   date — they cost nothing and keep shell history working).
+  The package moved `src/harness/` → `src/certo/` (`import certo`,
+  `python -m certo`, Docker `--import-modules certo.custom_tools` with
+  `OH_EXTRA_PYTHON_PATH=/certo_src`); no import shim for `harness` — the
+  package was never published, so nothing outside this repo imports it.
 - **Live entrypoint-ordering/smoke-run test built its own throwaway
   `tmp_path` fixture, not `projects/hanoi/` or anything under `projects/`**
   — that directory is user-managed runtime state the harness must stay

@@ -8,10 +8,10 @@ import json
 
 import pytest
 
-from harness.acceptance import AcceptanceCheck, AcceptanceCheckResult
-from harness.artifacts import resolve_run_artifacts_dir, write_run_artifacts
-from harness.config import ConfigError
-from harness.runner import CompletionContract, TaskOutcome
+from certo.acceptance import AcceptanceCheck, AcceptanceCheckResult
+from certo.artifacts import resolve_run_artifacts_dir, write_run_artifacts
+from certo.config import ConfigError
+from certo.runner import CompletionContract, TaskOutcome
 
 _CONTRACT = CompletionContract(
     goal="do the thing",

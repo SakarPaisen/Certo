@@ -61,7 +61,7 @@ certo/
 ├── .claude/
 │   ├── settings.json
 │   └── commands/          # /next-milestone, /verify-sdk, /add-tool
-└── src/harness/
+└── src/certo/
     ├── __init__.py
     ├── config.py          # load HARNESS_* env into a Config dataclass
     ├── llm.py             # build the LLM via LLM.load_from_env (+ validation)
@@ -71,7 +71,7 @@ certo/
     ├── custom_tools/
     │   ├── __init__.py
     │   └── example_tool.py
-    └── cli.py             # `python -m harness "<task>"`
+    └── cli.py             # `python -m certo "<task>"`
 ```
 Tests mirror this under `tests/`.
 
@@ -244,7 +244,7 @@ indexer/searcher, a project-specific linter, a deploy/PR trigger.
 3. Prove provider-swap: change only `LLM_MODEL`, re-run against a second provider
    (and a local model via `LLM_BASE_URL` if available).
 4. Custom-tool template + one real custom tool + its test.
-5. CLI (`python -m harness "<task>"`), README, execution-mode flag.
+5. CLI (`python -m certo "<task>"`), README, execution-mode flag.
 6. (Optional) Docker execution, microagents/skills, server mode.
 
 ## 12. Acceptance criteria

@@ -57,7 +57,7 @@ drift findings and corrected patterns. Re-verify SDK behavior after upgrades.
 - `openhands-sdk` + `openhands-tools` — a **matched set**: always install/upgrade
   both in one command at the same version, or imports break.
 - `python-dotenv` (config), `pytest` (tests), `ruff` (lint/format).
-- Package uses a `src/` layout; code lives in `src/harness/`.
+- Package uses a `src/` layout; code lives in `src/certo/`.
 
 ## Environment
 
@@ -80,7 +80,7 @@ than reaching for `--break-system-packages` or `sudo`.
 uv pip install -e ".[dev]"
 
 # Run the harness
-uv run python -m harness "your task here"
+uv run python -m certo "your task here"
 
 # Test / lint
 uv run pytest -q
@@ -103,7 +103,7 @@ keep `openhands-sdk`/`openhands-tools` pinned to the same version.
 
 ## Testing rules
 
-- `tests/` mirrors `src/harness/`.
+- `tests/` mirrors `src/certo/`.
 - Tool executors are tested directly (no LLM).
 - Any end-to-end test that needs a real API key must **skip cleanly when the key
   is absent**, so CI passes without secrets.

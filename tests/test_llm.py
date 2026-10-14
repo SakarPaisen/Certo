@@ -1,4 +1,4 @@
-"""Tests for harness.llm.build_llm — no network, no real API key needed.
+"""Tests for certo.llm.build_llm — no network, no real API key needed.
 
 Focus: cfg.reasoning_effort's conditional pass-through. The SDK's own
 `LLM.reasoning_effort` field defaults to "high"; build_llm must only pass the
@@ -7,8 +7,8 @@ it's not (see build_llm's docstring comment for why `reasoning_effort=None`
 explicitly would be different from omitting it).
 """
 
-from harness.config import load_config
-from harness.llm import build_llm
+from certo.config import load_config
+from certo.llm import build_llm
 
 
 def _base_env(**overrides: str) -> dict[str, str]:

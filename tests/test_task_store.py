@@ -1,4 +1,4 @@
-"""Tests for harness.task_store.
+"""Tests for certo.task_store.
 
 `MemoryTaskStore` and `SQLTaskStore` (via a real sqlite temp file — no
 external service needed, matches `mysql`/`postgres` byte-for-byte since
@@ -26,7 +26,7 @@ import time
 
 import pytest
 
-from harness.task_store import (
+from certo.task_store import (
     MemoryTaskStore,
     SQLTaskStore,
     TaskRecord,
@@ -36,7 +36,7 @@ from harness.task_store import (
 
 
 def _cfg(**overrides):
-    from harness.config import Config
+    from certo.config import Config
 
     base = {
         "model": "openai/gpt-4o",
@@ -353,7 +353,7 @@ def redis_store():
         stderr=subprocess.DEVNULL,
     )
     try:
-        from harness.task_store import RedisTaskStore
+        from certo.task_store import RedisTaskStore
 
         store = None
         for _ in range(50):
@@ -419,7 +419,7 @@ def test_redis_store_purge_expired_is_a_documented_noop(redis_store):
 
 @_requires_redis_server
 def test_redis_store_sets_native_ttl_only_for_terminal_status(redis_store):
-    from harness.task_store import RedisTaskStore
+    from certo.task_store import RedisTaskStore
 
     ttl_store = RedisTaskStore(
         host=redis_store._redis.connection_pool.connection_kwargs["host"],
@@ -444,7 +444,7 @@ def test_redis_store_sets_native_ttl_only_for_terminal_status(redis_store):
 
 @_requires_redis_server
 def test_redis_store_expires_a_completed_record_via_native_ttl(redis_store):
-    from harness.task_store import RedisTaskStore
+    from certo.task_store import RedisTaskStore
 
     ttl_store = RedisTaskStore(
         host=redis_store._redis.connection_pool.connection_kwargs["host"],

@@ -63,7 +63,7 @@ install/upgrade both together at the same version (see `pyproject.toml`).
 
 ## Configuration reference
 
-All configuration is env vars, loaded from `.env` by `src/harness/config.py`
+All configuration is env vars, loaded from `.env` by `src/certo/config.py`
 (`load_config()`). `.env` is git-ignored; `.env.example` is the checked-in
 template with every variable documented inline.
 
@@ -100,7 +100,7 @@ template with every variable documented inline.
 ## CLI reference
 
 ```bash
-uv run python -m harness "<task>" [--execution {local,docker}] [--project NAME] \
+uv run python -m certo "<task>" [--execution {local,docker}] [--project NAME] \
     [--agents-md TEXT] [--model MODEL] [--api-key KEY] [--base-url URL] \
     [--reasoning-effort LEVEL] [--interactive] [--auto-model] \
     [--require-verification] [--acceptance-checks JSON_OR_FILE]
@@ -168,30 +168,30 @@ Examples:
 
 ```bash
 # Simplest form — uses HARNESS_WORKSPACE, whatever HARNESS_EXECUTION is set to
-uv run python -m harness "Refactor utils.py to remove duplication, then run the tests."
+uv run python -m certo "Refactor utils.py to remove duplication, then run the tests."
 
 # A specific generated project, run locally
-uv run python -m harness "Scaffold a FastAPI service with a /health endpoint." --project my-api
+uv run python -m certo "Scaffold a FastAPI service with a /health endpoint." --project my-api
 
 # Same project, containerized
-uv run python -m harness "Add a /version endpoint." --project my-api --execution docker
+uv run python -m certo "Add a /version endpoint." --project my-api --execution docker
 
 # Task text from a local file
-uv run python -m harness ./tasks/build-the-thing.md --project my-api
+uv run python -m certo ./tasks/build-the-thing.md --project my-api
 
 # Task text fetched from a URL
-uv run python -m harness https://example.com/tasks/build-the-thing.md --project my-api
+uv run python -m certo https://example.com/tasks/build-the-thing.md --project my-api
 
 # Compare two models on the exact same task, without touching .env
-uv run python -m harness "Add input validation to the signup form." --project my-api \
+uv run python -m certo "Add input validation to the signup form." --project my-api \
     --model anthropic/claude-sonnet-4-5-20250929
-uv run python -m harness "Add input validation to the signup form." --project my-api \
+uv run python -m certo "Add input validation to the signup form." --project my-api \
     --model openai/gpt-4o --api-key "$OPENAI_API_KEY"
 
 # Compare reasoning-effort levels on the same model, without touching .env
-uv run python -m harness "Fix the race condition in the queue worker." --project my-api \
+uv run python -m certo "Fix the race condition in the queue worker." --project my-api \
     --reasoning-effort low
-uv run python -m harness "Fix the race condition in the queue worker." --project my-api \
+uv run python -m certo "Fix the race condition in the queue worker." --project my-api \
     --reasoning-effort xhigh
 ```
 
@@ -453,7 +453,7 @@ selection's mid-task fallback.
 
 ## Server mode (HTTP/WebSocket)
 
-`src/harness/server.py` exposes the same `run_task`/`stream_task` machinery
+`src/certo/server.py` exposes the same `run_task`/`stream_task` machinery
 the CLI uses as an HTTP/WebSocket API, so an IDE plugin, dashboard, or script
 can drive the harness over the network instead of shelling out to the CLI.
 It's a thin interface on top of the existing agent loop — not a second
@@ -461,12 +461,12 @@ implementation of it (same golden rule as `cli.py`: config, custom tools, an
 interface, and policy are ours; the SDK owns the loop).
 
 Requires the `server` extra (`uv pip install -e ".[server]"`); importing
-`harness.server` without it raises a clear `RuntimeError` rather than an
+`certo.server` without it raises a clear `RuntimeError` rather than an
 import failure.
 
 ```bash
 uv run certo-server --host 127.0.0.1 --port 8000
-# or: uv run python -m harness.server --port 8000
+# or: uv run python -m certo.server --port 8000
 ```
 
 ### `GET /health`
@@ -825,7 +825,7 @@ Two distinct mechanisms — don't conflate them. "Microagents" in spec section
 9's wording is the old OpenHands term for what the SDK now calls **Skills**
 (unified with the cross-platform [agentskills.io](https://agentskills.io/specification)
 spec — the same shape of idea as the Claude Code skills used to build this
-project, by design). See `src/harness/skills.py` for the implementation and
+project, by design). See `src/certo/skills.py` for the implementation and
 `ROADMAP.md`'s decisions log for why this shape was chosen over the
 alternatives that were considered.
 
@@ -1047,7 +1047,7 @@ by a task, not a human editing files in a project's subfolder between runs,
 the caller supplies this content as a parameter and the harness writes it:
 
 ```bash
-uv run python -m harness "..." --project my-api --agents-md "This project uses FastAPI + Poetry."
+uv run python -m certo "..." --project my-api --agents-md "This project uses FastAPI + Poetry."
 ```
 
 ```bash
@@ -1074,7 +1074,7 @@ call wrote `AGENTS.md` to the project folder and a subsequent task's
 ## Execution modes
 
 `HARNESS_EXECUTION` (or `--execution`) selects where the agent's tools
-actually run. The dispatch lives entirely in `src/harness/workspace.py`
+actually run. The dispatch lives entirely in `src/certo/workspace.py`
 (`build_workspace(cfg)`) — this is the one place execution backends are
 chosen, so a future backend (ECS, EC2, ...) is one new branch there plus one
 new `HARNESS_EXECUTION` value, not changes to `agent.py`, `runner.py`, or
@@ -1093,7 +1093,7 @@ The agent loop and its tools run inside a container instead of this process.
   (`uv pip install -e ".[sandbox]"`).
 - Built from `docker/agent-server.Dockerfile`, which layers our custom tool
   source onto the published `ghcr.io/openhands/agent-server` image.
-- `src/harness/workspace.py` builds the image automatically the first time
+- `src/certo/workspace.py` builds the image automatically the first time
   it's needed (`docker build ...`, logged to stdout) and reuses it after
   that. Rebuild manually after changing any custom tool:
 
@@ -1118,12 +1118,12 @@ inside the container's own separate agent-server process, which never
 otherwise imports our custom tool code — it only knows the SDK's built-in
 tools out of the box. `docker/agent-server.Dockerfile` solves this by:
 
-1. Copying `src/harness/custom_tools/` into the image.
+1. Copying `src/certo/custom_tools/` into the image.
 2. Setting `OH_EXTRA_PYTHON_PATH` so that code is importable (a plain
    `PYTHONPATH` doesn't work here — the container's entrypoint is a
    PyInstaller-frozen binary that doesn't honor it, which is exactly what
    `OH_EXTRA_PYTHON_PATH` + the SDK's `--import-modules` flag exist for).
-3. Overriding `ENTRYPOINT` to pass `--import-modules harness.custom_tools`,
+3. Overriding `ENTRYPOINT` to pass `--import-modules certo.custom_tools`,
    so the container imports (and thereby registers) every tool in that
    package at startup.
 
@@ -1166,7 +1166,7 @@ translates it per-provider). Leave it unset to use the SDK's own default
 
 Any subset may be given; an omitted field keeps `.env`'s value for that one
 setting (e.g. passing only `--model` keeps the configured `LLM_API_KEY`). This
-is `harness.config.override_llm()` under the hood — it returns a modified
+is `certo.config.override_llm()` under the hood — it returns a modified
 copy of the resolved `Config`, `.env` itself is never touched, so the override
 applies to that one run only. This is additive to, not a replacement for, the
 `.env`-only invariant above: with no override given, behavior is unchanged.
@@ -1185,7 +1185,7 @@ implementation gap.
 ## Custom tools
 
 Custom tools follow the SDK's Action / Observation / Executor pattern and
-live in `src/harness/custom_tools/`:
+live in `src/certo/custom_tools/`:
 
 - `custom_tools/example_tool.py` — template, not wired into the agent.
 - `custom_tools/run_tests_tool.py` — real tool (`run_tests`): verifies the
@@ -1310,7 +1310,7 @@ To add a new one (in Claude Code: `/add-tool <description>`; see
    YourTool)` **at module level**, not just inside a factory function — this
    is what makes the tool self-register on import, which both `local`
    execution and the Docker image's `--import-modules` mechanism depend on.
-2. Register it in `build_tools()` (`src/harness/tools.py`) so the agent
+2. Register it in `build_tools()` (`src/certo/tools.py`) so the agent
    picks it up under `local` execution.
 3. Import it from `custom_tools/__init__.py` (add `from . import
    <name>_tool`) so it's also registered under `docker` execution, then

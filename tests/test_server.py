@@ -15,9 +15,9 @@ pytest.importorskip("fastapi")
 
 from fastapi.testclient import TestClient
 
-from harness import server
-from harness.config import Config, ConfigError
-from harness.runner import CompletionContract, TaskOutcome
+from certo import server
+from certo.config import Config, ConfigError
+from certo.runner import CompletionContract, TaskOutcome
 
 
 def _fake_outcome(verification_state: str = "verified", limitations=()) -> TaskOutcome:
@@ -523,7 +523,7 @@ def test_create_task_without_acceptance_checks_passes_none(monkeypatch):
 
 
 def test_get_task_exposes_acceptance_results(monkeypatch):
-    from harness.acceptance import AcceptanceCheck, AcceptanceCheckResult
+    from certo.acceptance import AcceptanceCheck, AcceptanceCheckResult
 
     def _fake_stream_task(task, cfg=None, on_message=None, acceptance_checks=None, **_kwargs):
         contract = CompletionContract(
@@ -578,7 +578,7 @@ def test_get_task_acceptance_results_is_none_when_not_supplied(monkeypatch):
 
 
 def test_stream_task_result_event_includes_acceptance_results(monkeypatch):
-    from harness.acceptance import AcceptanceCheck, AcceptanceCheckResult
+    from certo.acceptance import AcceptanceCheck, AcceptanceCheckResult
 
     def _fake_stream_task(task, cfg=None, on_message=None, acceptance_checks=None, **_kwargs):
         contract = CompletionContract(

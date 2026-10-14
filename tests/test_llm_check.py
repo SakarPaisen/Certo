@@ -15,8 +15,8 @@ from openhands.sdk.llm.exceptions.types import (
     LLMContextWindowTooSmallError,
 )
 
-from harness import admin_cli, llm_check
-from harness.config import Config
+from certo import admin_cli, llm_check
+from certo.config import Config
 
 SECRET = "sk-super-secret-value"
 

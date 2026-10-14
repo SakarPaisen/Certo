@@ -16,9 +16,9 @@ from __future__ import annotations
 
 import pytest
 
-from harness import admin_cli
-from harness.config import Config
-from harness.task_store import TaskRecord, build_task_store
+from certo import admin_cli
+from certo.config import Config
+from certo.task_store import TaskRecord, build_task_store
 
 pytest.importorskip("sqlalchemy")
 

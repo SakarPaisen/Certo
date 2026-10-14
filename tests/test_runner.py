@@ -20,10 +20,10 @@ from openhands.sdk import ConversationExecutionStatus
 from openhands.sdk.event import ObservationEvent
 from openhands.tools.task_tracker import TaskTrackerObservation, TaskTrackerTool
 
-from harness import runner
-from harness.acceptance import AcceptanceCheck
-from harness.config import Config, ConfigError, load_config
-from harness.custom_tools.run_tests_tool import CheckOutcome, VerificationRun
+from certo import runner
+from certo.acceptance import AcceptanceCheck
+from certo.config import Config, ConfigError, load_config
+from certo.custom_tools.run_tests_tool import CheckOutcome, VerificationRun
 
 
 def _config_available() -> bool:
@@ -38,7 +38,7 @@ def _config_available() -> bool:
 def test_run_task_creates_a_file(tmp_path, monkeypatch):
     monkeypatch.setenv("HARNESS_WORKSPACE", str(tmp_path))
 
-    from harness.runner import run_task
+    from certo.runner import run_task
 
     target = tmp_path / "HELLO.txt"
     messages = run_task(
@@ -68,7 +68,7 @@ def test_run_task_catches_entrypoint_ordering_bug_live(tmp_path, monkeypatch):
     monkeypatch.setenv("HARNESS_WORKSPACE", str(tmp_path))
     monkeypatch.setenv("HARNESS_VERIFY_TESTS", "always")
 
-    from harness.runner import run_task
+    from certo.runner import run_task
 
     # Same bug shape as test_run_tests_tool.py's
     # test_full_verification_catches_the_live_ordering_bug_even_though_pytest_passes:

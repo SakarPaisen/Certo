@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from harness.model_catalog import (
+from certo.model_catalog import (
     ModelCatalog,
     ModelCatalogEntry,
     ModelCatalogError,

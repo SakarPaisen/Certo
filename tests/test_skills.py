@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from harness.skills import load_skill_catalog, write_project_context
+from certo.skills import load_skill_catalog, write_project_context
 
 _REAL_SKILLS_DIR = Path(__file__).resolve().parent.parent / "skills"
 

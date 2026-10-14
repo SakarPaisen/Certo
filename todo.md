@@ -2,7 +2,7 @@
 
 Feature backlog for the harness, classified by priority. Derived from
 `ROADMAP.md`'s existing backlog/known-limitations, plus a review of the
-current codebase (`src/harness/`, `skills/`, `tests/`). This file is a
+current codebase (`src/certo/`, `skills/`, `tests/`). This file is a
 planning aid, not a replacement for `ROADMAP.md` — once a feature here is
 scoped or built, move its record there per `CLAUDE.md`'s maintenance rule.
 
@@ -119,7 +119,7 @@ regression test confirmed to fail against the unfixed code. See
 `ROADMAP.md` decisions log and `MANUAL.md` "Task budget".
 
 ### 9. ~~Add machine-checkable acceptance criteria~~ — DONE (scoped down)
-Added `src/harness/acceptance.py`: opt-in, caller-supplied acceptance
+Added `src/certo/acceptance.py`: opt-in, caller-supplied acceptance
 checks, evaluated by the harness after the run and folded into a new
 `TaskOutcome.acceptance_results` field. Deliberately scoped to
 `file_exists`/`file_contains` only — no "run a command" kind, exactly the

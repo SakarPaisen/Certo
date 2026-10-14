@@ -1,4 +1,4 @@
-"""CLI entry point: `python -m harness "<task>"` (also installed as `certo`)."""
+"""CLI entry point: `python -m certo "<task>"` (also installed as `certo`)."""
 
 from __future__ import annotations
 

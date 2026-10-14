@@ -5,7 +5,7 @@ live run).
 
 from __future__ import annotations
 
-from harness.run_summary import RunSummary, format_duration, summarize_run
+from certo.run_summary import RunSummary, format_duration, summarize_run
 
 
 def _metrics(model, prompt, completion, cost, cache_read=0, reasoning=0):

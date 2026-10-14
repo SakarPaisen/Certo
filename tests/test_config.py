@@ -1,4 +1,4 @@
-"""Tests for harness.config — pure, no SDK, no network.
+"""Tests for certo.config — pure, no SDK, no network.
 
 Every test passes an explicit `env` dict so the real environment and .env file are
 never touched.
@@ -8,7 +8,7 @@ import os
 
 import pytest
 
-from harness.config import (
+from certo.config import (
     DEFAULT_CONFIRM_MODE,
     DEFAULT_DOCKER_IMAGE,
     DEFAULT_DOCKER_PLATFORM,

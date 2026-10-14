@@ -5,9 +5,9 @@ network, no real Conversation.
 
 from __future__ import annotations
 
-from harness.config import Config
-from harness.model_catalog import ModelCatalogEntry
-from harness.model_selection import ModelChain, llm_for_entry, write_model_decisions
+from certo.config import Config
+from certo.model_catalog import ModelCatalogEntry
+from certo.model_selection import ModelChain, llm_for_entry, write_model_decisions
 
 
 def _cfg(**overrides) -> Config:
