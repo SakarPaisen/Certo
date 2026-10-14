@@ -566,13 +566,12 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   not MIT as MANUAL.md had claimed (fixed in the same change). Scoped only
   to the 3 directories with their own `LICENSE.txt` — the lifecycle/git/
   python-web/testing skills are authored for this project.
-- **Project renamed `coding-agent-harness` → ARICode — branding only**
-  (repo name, `pyproject.toml` distribution name, Docker image tag
-  default, `server.py` title/`owned_by`, doc titles), the shallowest of
-  several scoped options. Deliberately unchanged: `import harness`,
-  `python -m harness`, every `HARNESS_*` env var, `harness-admin` — a
-  distribution name can differ from its import name, zero backward-compat
-  impact.
+- **Project renamed ARICode → Certo, deep and final** (supersedes the
+  earlier `coding-agent-harness` → ARICode rename, which deliberately
+  changed branding only and kept `import harness`/`HARNESS_*`/
+  `harness-admin`). This one renames the brand (docs, `pyproject.toml`
+  name, `server.py` title/`owned_by`, Docker image tag
+  `certo/agent-server:local`) and links (GitHub redirects the old repo URL).
 - **Live entrypoint-ordering/smoke-run test built its own throwaway
   `tmp_path` fixture, not `projects/hanoi/` or anything under `projects/`**
   — that directory is user-managed runtime state the harness must stay

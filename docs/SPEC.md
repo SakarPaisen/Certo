@@ -1,4 +1,4 @@
-# Build Spec — ARICode on the OpenHands SDK
+# Build Spec — Certo on the OpenHands SDK
 
 The canonical build plan for this repo. Claude Code implements it milestone by
 milestone (section 11). Project memory and guardrails are in ../CLAUDE.md.
@@ -49,7 +49,7 @@ execution mode). Switching provider = edit `LLM_MODEL` only.
 ## 5. Project structure
 
 ```
-aricode/
+certo/
 ├── CLAUDE.md
 ├── README.md
 ├── .gitignore

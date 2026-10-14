@@ -1,34 +1,34 @@
 ```
-   _____ __________.___  _________            .___      
-  /  _  \\______   \   | \_   ___ \  ____   __| _/____  
- /  /_\  \|       _/   | /    \  \/ /  _ \ / __ |/ __ \ 
-/    |    \    |   \   | \     \___(  <_> ) /_/ \  ___/ 
-\____|__  /____|_  /___|  \______  /\____/\____ |\___  >
-        \/       \/              \/            \/    \/ 
+_________                __
+\_   ___ \  ____________/  |_  ____
+/    \  \/_/ __ \_  __ \   __\/  _ \
+\     \___\  ___/|  | \/|  | (  <_> )
+ \______  /\___  >__|   |__|  \____/
+        \/     \/
 ```
 
-# ARICode — Agentic Routing Intelligence for autonomous software engineering agents.
+# Certo — autonomous software engineering agents that prove their work.
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)
 ![Built on OpenHands SDK](https://img.shields.io/badge/built%20on-OpenHands%20SDK-6f42c1.svg)
 
-Give ARICode a task. It plans, edits files, runs commands, and iterates in a
+Give Certo a task. It plans, edits files, runs commands, and iterates in a
 loop using the [OpenHands Software Agent SDK](https://docs.openhands.dev/sdk)
 — but unlike a bare agent loop, it doesn't take the agent's word for it:
-ARICode independently re-runs the project's own tests/build after the agent
+Certo independently re-runs the project's own tests/build after the agent
 finishes and only reports success once that's actually confirmed. Switch LLM
 provider or model with a one-line `.env` edit; no code change, ever.
 
 **See [`MANUAL.md`](MANUAL.md) for the full usage guide** — configuration
 reference, CLI flags, projects, execution modes, server mode, adding a
 custom tool, and known limitations/troubleshooting. This README is a
-quickstart and a tour of what makes ARICode worth using.
+quickstart and a tour of what makes Certo worth using.
 
-## Why ARICode
+## Why Certo
 
 - **It verifies, it doesn't just trust.** An agent calling `finish` is not
-  proof of success. ARICode re-runs the project's real checks itself —
+  proof of success. Certo re-runs the project's real checks itself —
   no LLM involved in the verification step — and distinguishes "verified,"
   "no tests to run yet," "a check kept failing," "a fix attempt changed
   nothing observable," and "the run never reached a coherent stopping
@@ -46,7 +46,7 @@ quickstart and a tour of what makes ARICode worth using.
   a code change, and never hardcoded anywhere in the source.
 - **Deterministic automatic model selection**, if you want it. Hand-curate
   a catalog of candidate models with cost/quality ratings in `models.yaml`,
-  and ARICode scores and ranks them per task (a debugging task weighted
+  and Certo scores and ranks them per task (a debugging task weighted
   toward reasoning, a scaffolding task weighted toward cost — no extra LLM
   call to decide), with automatic fallback to the next-best candidate on a
   provider failure. Toggle models on/off with a single `activated: false`
@@ -81,8 +81,8 @@ quickstart and a tour of what makes ARICode worth using.
 ## Install & setup
 
 ```bash
-git clone https://github.com/alessioricco/ARICode.git
-cd ARICode
+git clone https://github.com/alessioricco/certo.git
+cd certo
 
 cp .env.example .env          # then fill in LLM_MODEL and LLM_API_KEY
 uv pip install -e ".[dev]"    # installs openhands-sdk, openhands-tools, and dev tools
@@ -109,7 +109,7 @@ uv run python -m harness "Refactor utils.py to remove duplication, then run the 
 uv run python -m harness "Scaffold a FastAPI service with a /health endpoint." \
   --project my-api --execution docker
 
-# Let ARICode pick the best-fit model from your models.yaml catalog
+# Let Certo pick the best-fit model from your models.yaml catalog
 uv run python -m harness "Fix the failing test in payments.py" --auto-model
 ```
 
@@ -131,7 +131,7 @@ prefixes and the `LLM_BASE_URL` gotcha, and
 
 ## How it works, briefly
 
-ARICode builds config, custom tools, and policy **on top of** the OpenHands
+Certo builds config, custom tools, and policy **on top of** the OpenHands
 SDK — it doesn't reimplement the agent loop, tool protocol, or
 model-agnostic LLM routing (LiteLLM under the hood). The harness's own job
 is everything the SDK doesn't opinionate about: which model runs and when

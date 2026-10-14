@@ -189,7 +189,7 @@ def create_app():
         yield
         store.close()
 
-    app = FastAPI(title="ARICode", lifespan=_lifespan)
+    app = FastAPI(title="Certo", lifespan=_lifespan)
 
     if startup_cfg.task_ttl_seconds > 0:
 
@@ -399,7 +399,7 @@ def create_app():
         cfg = load_config()
         return {
             "object": "list",
-            "data": [{"id": cfg.model, "object": "model", "owned_by": "aricode"}],
+            "data": [{"id": cfg.model, "object": "model", "owned_by": "certo"}],
         }
 
     @app.post("/v1/chat/completions")
