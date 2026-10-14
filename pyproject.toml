@@ -1,8 +1,35 @@
 [project]
 name = "certo"
 version = "0.1.0"
-description = "Certo — model-agnostic coding agent harness built on the OpenHands SDK"
+description = "Model-agnostic coding agent that verifies its own work. Picks the best model per task and re-runs your tests before it says done."
+readme = "README.md"
 requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Alessio Ricco" }]
+keywords = [
+    "ai",
+    "agent",
+    "coding-agent",
+    "llm",
+    "openhands",
+    "litellm",
+    "verification",
+    "testing",
+    "developer-tools",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Testing",
+]
 dependencies = [
     # openhands-sdk and openhands-tools are a MATCHED SET: keep the two version
     # specifiers identical and upgrade them together, or imports will break.
@@ -21,6 +48,12 @@ dependencies = [
     # so no extra LLM-library dependency is needed for that.)
     "pyyaml>=6.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/alessioricco/certo"
+Repository = "https://github.com/alessioricco/certo"
+Issues = "https://github.com/alessioricco/certo/issues"
+Documentation = "https://github.com/alessioricco/certo/blob/main/MANUAL.md"
 
 [project.optional-dependencies]
 # sqlalchemy: tests/test_task_store.py exercises SQLTaskStore against real sqlite.
@@ -50,7 +83,8 @@ harness-server = "certo.server:main"
 harness-admin = "certo.admin_cli:main"
 
 [build-system]
-requires = ["hatchling"]
+# >=1.27 for PEP 639 `license`/`license-files`.
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
