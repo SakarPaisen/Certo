@@ -1321,3 +1321,40 @@ def test_installed_console_scripts_are_exactly_the_certo_commands():
 
 def test_parser_prog_is_certo():
     assert cli._build_parser().prog == "certo"
+
+
+# --- OpenHands SDK startup banner -----------------------------------------
+
+
+def _run_help(env_overrides: dict[str, str]) -> str:
+    """Run `python -m certo --help` in a fresh process (the banner prints on
+    the SDK's first import, which in this test process already happened)."""
+    import os
+    import subprocess
+    import sys
+
+    env = {k: v for k, v in os.environ.items() if k != "OPENHANDS_SUPPRESS_BANNER"}
+    env["PYTHONPATH"] = str(_REPO_ROOT / "src")
+    env.update(env_overrides)
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import certo.cli, sys; sys.argv=['certo','--help']; certo.cli.main()",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=True,
+    )
+    return proc.stdout + proc.stderr
+
+
+def test_sdk_banner_is_suppressed_by_default():
+    out = _run_help({})
+    assert "usage: certo" in out
+    assert "OpenHands SDK v" not in out
+
+
+def test_sdk_banner_shows_when_explicitly_enabled():
+    assert "OpenHands SDK v" in _run_help({"OPENHANDS_SUPPRESS_BANNER": "0"})

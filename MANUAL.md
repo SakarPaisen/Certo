@@ -140,6 +140,10 @@ installs exactly three commands: `certo`, `certo-server` and `certo-admin`.
 The pre-rename `harness`, `harness-server` and `harness-admin` aliases were
 removed before the first PyPI release; use the `certo*` names.)
 
+All three commands hide the OpenHands SDK's startup banner by setting
+`OPENHANDS_SUPPRESS_BANNER=1` unless you've already set it; export
+`OPENHANDS_SUPPRESS_BANNER=0` to see it again.
+
 - `task` (positional, required) — the instruction given to the agent, **or a
   reference to it**: an http(s) URL (fetched) or a path to an existing local
   file (read), checked in that order before falling back to literal text.
