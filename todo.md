@@ -318,7 +318,7 @@ backends, so an operator with a shared redis/sqlite/mysql/postgres store
 and no external record of what's in it has no way to discover what to
 clean up. Each backend would need a real (if backend-specific) listing
 query — sqlite/mysql/postgres via a plain `SELECT DISTINCT`, redis via a
-`SCAN` over `harness:task:*`/`harness:project:*` keys (memory is trivial).
+`SCAN` over `certo:task:*`/`certo:project:*` keys (memory is trivial).
 Worth doing since the whole feature's stated purpose (item #14) is
 letting a long-running deployment manage its own history.
 

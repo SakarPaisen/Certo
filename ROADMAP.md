@@ -584,6 +584,16 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   with one `logging` warning per variable per process. Blank = unset on
   both sides, so blank `CERTO_` lines from a fresh `.env.example` can't
   mask an old setting. Error messages quote the variable actually read.
+  Storage names: sqlite default `certo_tasks.db`, table `certo_tasks`,
+  Redis prefix `certo:`, mysql/postgres default DB `certo`, LLM `usage_id`
+  `certo`/`certo:<model>`, and agent-facing notices say `Certo …:`. Compat
+  reads exist only where a user may have data: legacy sqlite default file
+  (only when the path is the default), legacy table (used as-is, never
+  auto-renamed — that's the operator's call), legacy Redis keys (read
+  fallback, migrated on save). No fallback for the DB name: a wrong DB
+  fails loudly and the fix is one env var. `usage_id` changes are
+  unversioned, since they're only per-run telemetry keys. The
+  third-party skills lockfile never carried the old name.
 - **Live entrypoint-ordering/smoke-run test built its own throwaway
   `tmp_path` fixture, not `projects/hanoi/` or anything under `projects/`**
   — that directory is user-managed runtime state the harness must stay

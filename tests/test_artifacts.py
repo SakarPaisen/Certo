@@ -100,7 +100,7 @@ def _write(tmp_path, **overrides):
         outcome=_outcome(),
         error=None,
         combined_metrics={"accumulated_cost": 0.01},
-        per_model_metrics={"harness": {"accumulated_cost": 0.01}},
+        per_model_metrics={"certo": {"accumulated_cost": 0.01}},
     )
     kwargs.update(overrides)
     write_run_artifacts(**kwargs)
@@ -169,8 +169,8 @@ def test_metrics_json_has_combined_and_per_model(tmp_path):
         tmp_path,
         combined_metrics={"accumulated_cost": 0.05},
         per_model_metrics={
-            "harness:a": {"accumulated_cost": 0.02},
-            "harness:b": {"accumulated_cost": 0.03},
+            "certo:a": {"accumulated_cost": 0.02},
+            "certo:b": {"accumulated_cost": 0.03},
         },
     )
 
@@ -178,8 +178,8 @@ def test_metrics_json_has_combined_and_per_model(tmp_path):
 
     assert metrics["combined"] == {"accumulated_cost": 0.05}
     assert metrics["per_model"] == {
-        "harness:a": {"accumulated_cost": 0.02},
-        "harness:b": {"accumulated_cost": 0.03},
+        "certo:a": {"accumulated_cost": 0.02},
+        "certo:b": {"accumulated_cost": 0.03},
     }
 
 

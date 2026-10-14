@@ -14,7 +14,7 @@ from openhands.sdk import LLM
 from .config import Config
 
 
-def build_llm(cfg: Config, *, usage_id: str = "harness") -> LLM:
+def build_llm(cfg: Config, *, usage_id: str = "certo") -> LLM:
     # Only included when set: the SDK's own `reasoning_effort` field has a
     # real default ("high") on the pydantic model itself, and passing
     # `reasoning_effort=None` explicitly would override that default with an

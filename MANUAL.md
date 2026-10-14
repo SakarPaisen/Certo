@@ -101,9 +101,9 @@ are unchanged.
 | `CERTO_ARTIFACTS_DIR` | *(empty — disabled)* | Per-run metadata/transcript/token-cost directory. See [Run artifacts](#run-artifacts). |
 | `CERTO_TASK_STORE` | `memory` | `memory` \| `redis` \| `sqlite` \| `mysql` \| `postgres` — server-mode task registry backend, consulted only by `certo-server`/`certo-admin`. See [Task registry persistence](#task-registry-persistence). |
 | `CERTO_TASK_TTL_SECONDS` | `0` | Seconds a completed/failed task record is kept before it's eligible for purge; `0` means keep forever. |
-| `CERTO_TASK_STORE_SQLITE_PATH` | `./harness_tasks.db` | sqlite backend only. |
-| `CERTO_TASK_STORE_MYSQL_HOST` / `_PORT` / `_USER` / `_PASSWORD` / `_DATABASE` | `localhost` / `3306` / `root` / *(empty)* / `harness` | mysql backend only. |
-| `CERTO_TASK_STORE_POSTGRES_HOST` / `_PORT` / `_USER` / `_PASSWORD` / `_DATABASE` | `localhost` / `5432` / `postgres` / *(empty)* / `harness` | postgres backend only. |
+| `CERTO_TASK_STORE_SQLITE_PATH` | `./certo_tasks.db` | sqlite backend only. |
+| `CERTO_TASK_STORE_MYSQL_HOST` / `_PORT` / `_USER` / `_PASSWORD` / `_DATABASE` | `localhost` / `3306` / `root` / *(empty)* / `certo` | mysql backend only. |
+| `CERTO_TASK_STORE_POSTGRES_HOST` / `_PORT` / `_USER` / `_PASSWORD` / `_DATABASE` | `localhost` / `5432` / `postgres` / *(empty)* / `certo` | postgres backend only. |
 | `CERTO_TASK_STORE_REDIS_HOST` / `_PORT` / `_DB` / `_PASSWORD` / `_USE_TLS` | `localhost` / `6379` / `0` / *(empty)* / `false` | redis backend only. |
 
 ## CLI reference
@@ -452,7 +452,7 @@ Each run folder has three files:
   `per_model` breaks this down by which model actually ran each part of
   the task — meaningful when [Automatic model
   selection](#automatic-model-selection) used more than one candidate,
-  a single `"harness"` entry otherwise.
+  a single `"certo"` entry otherwise.
 
 **`MODEL_DECISIONS.md` is unaffected by this** — it still lives inside the
 project workspace, unchanged; this directory is for genuinely new data
@@ -716,8 +716,30 @@ enabling this feature is never a silent change for an existing deployment.
 | `redis` | `uv pip install -e ".[store-redis]"` | Shared across processes; TTL uses Redis's own native per-key expiration (`EX`) instead of a periodic sweep. |
 
 sqlite/mysql/postgres all share one implementation (SQLAlchemy Core,
-parameterized by connection URL) — one `harness_tasks` table, identical
+parameterized by connection URL) — one `certo_tasks` table, identical
 query logic on all three dialects.
+
+**Stores created before the Certo rename** keep working, with no
+migration step:
+
+- **sqlite file:** if `CERTO_TASK_STORE_SQLITE_PATH` is left at its
+  default and `./certo_tasks.db` doesn't exist but the old default
+  `./harness_tasks.db` does, the old file is opened (with a warning).
+  Rename the file when convenient. An explicitly configured path is
+  always used as given.
+- **SQL table:** if a database has the old `harness_tasks` table and no
+  `certo_tasks` table, the old table is used (with a warning). Nothing
+  is renamed automatically. When convenient, run
+  `ALTER TABLE harness_tasks RENAME TO certo_tasks`.
+- **mysql/postgres database name:** the default database changed from
+  `harness` to `certo`. There's no automatic fallback, because the
+  Certo can't tell a missing database from a misconfigured one. The
+  connection fails loudly. To keep an existing database, set
+  `CERTO_TASK_STORE_MYSQL_DATABASE=harness` (or the `_POSTGRES_` one).
+- **redis keys:** keys moved from `harness:task:<id>`/
+  `harness:project:<name>` to `certo:…`. Reads fall back to the old key,
+  deletes remove both, and saving a record moves it to the new key, so
+  old records migrate as they're touched.
 
 **Retention (`CERTO_TASK_TTL_SECONDS`, default `0` = keep forever):** once
 set to a positive number of seconds, a *terminal* (`completed`/`failed`)

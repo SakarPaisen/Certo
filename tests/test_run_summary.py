@@ -25,7 +25,7 @@ def _metrics(model, prompt, completion, cost, cache_read=0, reasoning=0):
 def test_single_model_totals_match_the_sdk_metrics():
     summary = summarize_run(
         242.6,
-        {"harness": _metrics("openai/gpt-5.6-luna", 774063, 27128, 0.0593, 725104, 7828)},
+        {"certo": _metrics("openai/gpt-5.6-luna", 774063, 27128, 0.0593, 725104, 7828)},
     )
 
     assert [m.model for m in summary.models] == ["openai/gpt-5.6-luna"]
@@ -39,10 +39,10 @@ def test_multiple_models_are_listed_merged_and_unused_candidates_dropped():
     summary = summarize_run(
         10,
         {
-            "harness:cheap": _metrics("openai/small", 100, 10, 0.01),
-            "harness:balanced": _metrics("anthropic/mid", 200, 20, 0.02),
-            "harness:again": _metrics("openai/small", 50, 5, 0.005),
-            "harness:never-called": {"accumulated_cost": 0.0, "accumulated_token_usage": None},
+            "certo:cheap": _metrics("openai/small", 100, 10, 0.01),
+            "certo:balanced": _metrics("anthropic/mid", 200, 20, 0.02),
+            "certo:again": _metrics("openai/small", 50, 5, 0.005),
+            "certo:never-called": {"accumulated_cost": 0.0, "accumulated_token_usage": None},
         },
     )
 
@@ -64,7 +64,7 @@ def test_model_name_falls_back_to_cost_entries_then_usage_id():
 
 
 def test_zero_cost_with_tokens_is_reported_as_unknown_not_free():
-    summary = summarize_run(5, {"harness": _metrics("ollama/llama3", 1000, 100, 0.0)})
+    summary = summarize_run(5, {"certo": _metrics("ollama/llama3", 1000, 100, 0.0)})
 
     assert not summary.cost_complete
     cost_line = next(line for line in summary.format_lines() if line.startswith("Total cost"))
@@ -73,7 +73,7 @@ def test_zero_cost_with_tokens_is_reported_as_unknown_not_free():
 
 def test_format_lines_cover_the_four_requested_measures():
     lines = summarize_run(
-        125, {"harness": _metrics("openai/gpt-4o", 1500, 500, 0.0123, cache_read=1000)}
+        125, {"certo": _metrics("openai/gpt-4o", 1500, 500, 0.0123, cache_read=1000)}
     ).format_lines()
 
     text = "\n".join(lines)

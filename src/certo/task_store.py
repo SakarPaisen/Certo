@@ -28,18 +28,29 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
+import os
 import threading
 import time
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from .config import Config
+from .config import DEFAULT_TASK_STORE_SQLITE_PATH, LEGACY_TASK_STORE_SQLITE_PATH, Config
+
+logger = logging.getLogger(__name__)
 
 # Statuses after which a record becomes eligible for TTL expiry — a
 # pending/running task is never purged regardless of TTL, since it's still
 # actively in use (see TaskStore.purge_expired).
 _TERMINAL_STATUSES = ("completed", "failed")
+
+# Storage names, plus the pre-rename names each backend still reads so an
+# existing store keeps working (see SQLTaskStore/RedisTaskStore).
+_TABLE_NAME = "certo_tasks"
+_LEGACY_TABLE_NAME = "harness_tasks"
+_REDIS_PREFIX = "certo"
+_LEGACY_REDIS_PREFIX = "harness"
 
 
 @dataclass
@@ -203,7 +214,7 @@ class SQLTaskStore(TaskStore):
         self._engine = sa.create_engine(url, future=True)
         self._metadata = sa.MetaData()
         self._table = sa.Table(
-            "harness_tasks",
+            self._resolve_table_name(sa),
             self._metadata,
             sa.Column("id", sa.String(64), primary_key=True),
             sa.Column("task", sa.Text, nullable=False),
@@ -218,6 +229,21 @@ class SQLTaskStore(TaskStore):
             sa.Column("acceptance_results", sa.Text, nullable=True),
         )
         self._metadata.create_all(self._engine)
+
+    def _resolve_table_name(self, sa: Any) -> str:
+        """`certo_tasks`, unless only the pre-rename `harness_tasks` table
+        exists — then keep using that one, so an existing store's history
+        stays visible. Never renamed automatically: that's the operator's
+        call (`ALTER TABLE harness_tasks RENAME TO certo_tasks`)."""
+        existing = set(sa.inspect(self._engine).get_table_names())
+        if _TABLE_NAME not in existing and _LEGACY_TABLE_NAME in existing:
+            logger.warning(
+                "Using legacy task-store table %r; rename it to %r when convenient.",
+                _LEGACY_TABLE_NAME,
+                _TABLE_NAME,
+            )
+            return _LEGACY_TABLE_NAME
+        return _TABLE_NAME
 
     def _row_to_record(self, row: Any) -> TaskRecord:
         return TaskRecord(
@@ -304,9 +330,14 @@ class SQLTaskStore(TaskStore):
 
 
 class RedisTaskStore(TaskStore):
-    """Each record is one JSON blob under `harness:task:<id>`, plus a
-    Redis SET per project (`harness:project:<project>`) so
+    """Each record is one JSON blob under `certo:task:<id>`, plus a
+    Redis SET per project (`certo:project:<project>`) so
     `delete_by_project` doesn't need a full `SCAN` of every key.
+
+    Keys written before the rename used a `harness:` prefix. Reads fall
+    back to the legacy key, deletes cover both, and `save()` moves a
+    record to the new prefix — so existing records stay reachable and
+    migrate as they're touched, with no bulk rewrite.
 
     TTL uses Redis's own native per-key expiration instead of a purge
     sweep: a write for a *terminal* (`completed`/`failed`) record sets
@@ -345,11 +376,11 @@ class RedisTaskStore(TaskStore):
         )
         self._ttl_seconds = ttl_seconds
 
-    def _task_key(self, task_id: str) -> str:
-        return f"harness:task:{task_id}"
+    def _task_key(self, task_id: str, prefix: str = _REDIS_PREFIX) -> str:
+        return f"{prefix}:task:{task_id}"
 
-    def _project_key(self, project: str) -> str:
-        return f"harness:project:{project}"
+    def _project_key(self, project: str, prefix: str = _REDIS_PREFIX) -> str:
+        return f"{prefix}:project:{project}"
 
     def save(self, record: TaskRecord) -> None:
         key = self._task_key(record.id)
@@ -360,34 +391,46 @@ class RedisTaskStore(TaskStore):
         else:
             pipe.set(key, payload)
             pipe.persist(key)
+        pipe.delete(self._task_key(record.id, _LEGACY_REDIS_PREFIX))
         if record.project:
             pipe.sadd(self._project_key(record.project), record.id)
+            pipe.srem(self._project_key(record.project, _LEGACY_REDIS_PREFIX), record.id)
         pipe.execute()
 
     def get(self, task_id: str) -> TaskRecord | None:
         raw = self._redis.get(self._task_key(task_id))
+        if raw is None:
+            raw = self._redis.get(self._task_key(task_id, _LEGACY_REDIS_PREFIX))
         if raw is None:
             return None
         return TaskRecord.from_json_dict(json.loads(raw))
 
     def delete(self, task_id: str) -> bool:
         record = self.get(task_id)
-        deleted = self._redis.delete(self._task_key(task_id)) > 0
+        deleted = (
+            self._redis.delete(
+                self._task_key(task_id), self._task_key(task_id, _LEGACY_REDIS_PREFIX)
+            )
+            > 0
+        )
         if deleted and record is not None and record.project:
-            self._redis.srem(self._project_key(record.project), task_id)
+            for prefix in (_REDIS_PREFIX, _LEGACY_REDIS_PREFIX):
+                self._redis.srem(self._project_key(record.project, prefix), task_id)
         return deleted
 
     def delete_by_project(self, project: str) -> int:
-        project_key = self._project_key(project)
-        task_ids = self._redis.smembers(project_key)
+        project_keys = [
+            self._project_key(project, p) for p in (_REDIS_PREFIX, _LEGACY_REDIS_PREFIX)
+        ]
+        task_ids = self._redis.sunion(project_keys)
         if not task_ids:
             return 0
         pipe = self._redis.pipeline()
         for task_id in task_ids:
-            pipe.delete(self._task_key(task_id))
-        pipe.delete(project_key)
+            pipe.delete(self._task_key(task_id), self._task_key(task_id, _LEGACY_REDIS_PREFIX))
+        pipe.delete(*project_keys)
         results = pipe.execute()
-        # One `delete` result per task_id, then the final project-set delete.
+        # One `delete` result per task_id, then the final project-sets delete.
         return sum(1 for r in results[:-1] if r)
 
     def purge_expired(self, ttl_seconds: int) -> int:
@@ -399,9 +442,28 @@ class RedisTaskStore(TaskStore):
         self._redis.close()
 
 
+def _resolve_sqlite_path(path: str) -> str:
+    """The configured path, except: when it's the default and only the
+    pre-rename default file exists, open that one instead, so an existing
+    local store keeps its history. An explicitly configured path is always
+    used as given."""
+    if (
+        path == DEFAULT_TASK_STORE_SQLITE_PATH
+        and not os.path.exists(path)
+        and os.path.exists(LEGACY_TASK_STORE_SQLITE_PATH)
+    ):
+        logger.warning(
+            "Using legacy task store %s; rename it to %s when convenient.",
+            LEGACY_TASK_STORE_SQLITE_PATH,
+            DEFAULT_TASK_STORE_SQLITE_PATH,
+        )
+        return LEGACY_TASK_STORE_SQLITE_PATH
+    return path
+
+
 def _build_sql_url(cfg: Config) -> str:
     if cfg.task_store == "sqlite":
-        return f"sqlite:///{cfg.task_store_sqlite_path}"
+        return f"sqlite:///{_resolve_sqlite_path(cfg.task_store_sqlite_path)}"
     if cfg.task_store == "mysql":
         auth = cfg.task_store_mysql_user
         if cfg.task_store_mysql_password:

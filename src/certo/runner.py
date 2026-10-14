@@ -519,12 +519,12 @@ def _run_conversation_once(
                 raise
             _emit_notice(
                 emit,
-                f"Harness: {failed_name} failed "
+                f"Certo: {failed_name} failed "
                 f"({type(exc.original_exception).__name__}) — switching to "
                 f"{next_entry.name} and retrying.",
             )
             conversation.switch_llm(
-                llm_for_entry(cfg, next_entry, usage_id=f"harness:{next_entry.name}")
+                llm_for_entry(cfg, next_entry, usage_id=f"certo:{next_entry.name}")
             )
 
 
@@ -584,20 +584,20 @@ def _run_with_confirmation(
             summary = "; ".join(_describe_pending_action(a) for a in pending)
             _emit_notice(
                 emit,
-                "Harness confirm-mode: the agent proposed an action that "
+                "Certo confirm-mode: the agent proposed an action that "
                 f"needs approval ({summary}), but no interactive approval "
                 "handler is available in this context. Stopping rather "
                 "than silently approving it or waiting on confirmations "
                 "nobody can answer.",
             )
             conversation.reject_pending_actions(
-                "Harness confirm-mode: no approval handler available; rejected automatically."
+                "Certo confirm-mode: no approval handler available; rejected automatically."
             )
             return _RUN_CONFIRMATION_REQUIRED
         if time.monotonic() >= deadline:
             _emit_notice(
                 emit,
-                "Harness: the task's shared wall-clock budget "
+                "Certo: the task's shared wall-clock budget "
                 f"(CERTO_MAX_TASK_SECONDS={cfg.max_task_seconds}) ran out while "
                 "waiting on a confirm-mode approval. Stopping.",
             )
@@ -605,7 +605,7 @@ def _run_with_confirmation(
         if on_confirm(pending):
             _run_conversation_once(conversation, cfg, emit, model_chain)
         else:
-            conversation.reject_pending_actions("Rejected by the user via harness confirm-mode.")
+            conversation.reject_pending_actions("Rejected by the user via Certo confirm-mode.")
             _run_conversation_once(conversation, cfg, emit, model_chain)
     return _RUN_OK
 
@@ -641,7 +641,7 @@ def _verify_and_report(
         contract = _build_completion_contract(task, None, skipped=False, aborted=True)
         _emit_notice(
             emit,
-            "Harness verification: the agent's run ended in a "
+            "Certo verification: the agent's run ended in a "
             f"'{status.value}' state before it reached a normal finish, so "
             "its own claims — if it made any — were not verified. This task "
             "needs manual attention.",
@@ -669,7 +669,7 @@ def _verify_and_report(
             problems = "; ".join(c.summary for c in run.failing + run.timed_out_checks)
             _emit_notice(
                 emit,
-                f"Harness verification: the project's checks are {problem_text} "
+                f"Certo verification: the project's checks are {problem_text} "
                 f"after {cfg.max_verify_retries} automated fix "
                 f"attempt(s) ({problems}). Giving up — this project needs "
                 "manual attention.",
@@ -692,11 +692,11 @@ def _verify_and_report(
             if next_entry is not None:
                 _emit_notice(
                     emit,
-                    f"Harness: escalating from {failed_name} to {next_entry.name} "
+                    f"Certo: escalating from {failed_name} to {next_entry.name} "
                     "after a failed verification retry.",
                 )
                 conversation.switch_llm(
-                    llm_for_entry(cfg, next_entry, usage_id=f"harness:{next_entry.name}")
+                    llm_for_entry(cfg, next_entry, usage_id=f"certo:{next_entry.name}")
                 )
         conversation.send_message(_verification_followup(run))
         run_result = _run_with_confirmation(
@@ -713,7 +713,7 @@ def _verify_and_report(
             contract = _build_completion_contract(task, run, skipped=False, aborted=True)
             _emit_notice(
                 emit,
-                "Harness verification: the agent got stuck "
+                "Certo verification: the agent got stuck "
                 f"(status '{retry_status.value}') while retrying, after "
                 f"{retries_used} fix attempt(s). This task needs manual "
                 "attention.",
@@ -736,7 +736,7 @@ def _verify_and_report(
             problems = "; ".join(c.summary for c in run.failing + run.timed_out_checks)
             _emit_notice(
                 emit,
-                "Harness verification: the fix attempt just made produced "
+                "Certo verification: the fix attempt just made produced "
                 f"no observable change — the same check ({problems}) is "
                 "still failing with identical output (ignoring timing). "
                 "Stopping early rather than spending the rest of the retry "
@@ -755,7 +755,7 @@ def _verify_and_report(
         summaries = "; ".join(c.summary for c in run.checks) or "no applicable check was found"
         _emit_notice(
             emit,
-            "Harness verification: no automated check applies to this "
+            "Certo verification: no automated check applies to this "
             f"project ({summaries}) The agent's own completion claim was not "
             "independently verified.",
         )
@@ -801,7 +801,7 @@ def _task_tracker_followup(pending: list) -> str:
         for item in pending
     )
     return (
-        "Harness check: your own task_tracker list still has the following "
+        "Certo check: your own task_tracker list still has the following "
         f"item(s) not marked done:\n\n{lines}\n\n"
         "If the task is genuinely complete, use task_tracker to mark each "
         "item done (or remove it if it no longer applies) before finishing "
@@ -868,7 +868,7 @@ def _enforce_task_tracker_completion(
         contract = _build_completion_contract(task, None, skipped=False, aborted=True)
         _emit_notice(
             emit,
-            "Harness check: the agent's run ended in a "
+            "Certo check: the agent's run ended in a "
             f"'{status.value}' state before its task_tracker completion "
             "could be checked. This task needs manual attention.",
         )
@@ -889,7 +889,7 @@ def _enforce_task_tracker_completion(
             summary = "; ".join(f"'{item.title}' ({item.status})" for item in pending)
             _emit_notice(
                 emit,
-                "Harness check: the agent's own task_tracker list still "
+                "Certo check: the agent's own task_tracker list still "
                 f"shows unfinished item(s) after {cfg.max_verify_retries} "
                 f"automated follow-up(s) ({summary}). Giving up — this "
                 "task needs manual attention.",
@@ -912,11 +912,11 @@ def _enforce_task_tracker_completion(
             if next_entry is not None:
                 _emit_notice(
                     emit,
-                    f"Harness: escalating from {failed_name} to {next_entry.name} "
+                    f"Certo: escalating from {failed_name} to {next_entry.name} "
                     "after an incomplete task_tracker follow-up.",
                 )
                 conversation.switch_llm(
-                    llm_for_entry(cfg, next_entry, usage_id=f"harness:{next_entry.name}")
+                    llm_for_entry(cfg, next_entry, usage_id=f"certo:{next_entry.name}")
                 )
         conversation.send_message(_task_tracker_followup(pending))
         run_result = _run_with_confirmation(
@@ -931,7 +931,7 @@ def _enforce_task_tracker_completion(
             contract = _build_completion_contract(task, None, skipped=False, aborted=True)
             _emit_notice(
                 emit,
-                "Harness check: the agent got stuck "
+                "Certo check: the agent got stuck "
                 f"(status '{retry_status.value}') while following up on its "
                 f"own incomplete task_tracker list, after {retries_used} "
                 "attempt(s). This task needs manual attention.",
@@ -992,7 +992,7 @@ def _apply_acceptance_checks(
         )
         _emit_notice(
             emit,
-            "Harness acceptance check: the project's own tests/build passed, "
+            "Certo acceptance check: the project's own tests/build passed, "
             f"but {len(failed_required)} required acceptance check(s) failed "
             f"({summary}). Not reporting this as verified.",
         )
@@ -1070,7 +1070,7 @@ def stream_task(
     # from a catalog entry's config (see model_selection.config_for_entry).
     model_chain: ModelChain | None = None
     agent_cfg = cfg
-    agent_usage_id = "harness"
+    agent_usage_id = "certo"
     if cfg.model_selection == "auto":
         catalog = load_model_catalog(cfg.models_file)
         profile = classify_task(task, catalog)
@@ -1085,7 +1085,7 @@ def stream_task(
         model_chain.record_initial(reason)
         entry = model_chain.current
         agent_cfg = config_for_entry(cfg, entry)
-        agent_usage_id = f"harness:{entry.name}"
+        agent_usage_id = f"certo:{entry.name}"
 
     with build_workspace(cfg) as workspace:
         conversation = Conversation(

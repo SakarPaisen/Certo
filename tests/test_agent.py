@@ -158,13 +158,13 @@ def test_interactive_mode_keeps_every_other_suffix():
 # --- usage_id passthrough (auto model selection) ----------------------------
 
 
-def test_build_agent_usage_id_defaults_to_harness():
+def test_build_agent_usage_id_defaults_to_certo():
     agent = build_agent(_cfg())
 
-    assert agent.llm.usage_id == "harness"
+    assert agent.llm.usage_id == "certo"
 
 
 def test_build_agent_usage_id_is_overridable():
-    agent = build_agent(_cfg(), usage_id="harness:deep-reasoner")
+    agent = build_agent(_cfg(), usage_id="certo:deep-reasoner")
 
-    assert agent.llm.usage_id == "harness:deep-reasoner"
+    assert agent.llm.usage_id == "certo:deep-reasoner"

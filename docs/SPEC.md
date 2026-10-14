@@ -95,7 +95,7 @@ def build_llm(cfg: Config) -> LLM:
     # Provider is encoded in cfg.model's prefix (LiteLLM convention:
     # "anthropic/...", "openai/gpt-4o", "gemini/...", "ollama/...").
     return LLM(
-        usage_id="harness",
+        usage_id="certo",
         model=cfg.model,
         base_url=cfg.base_url,
         api_key=SecretStr(cfg.api_key) if cfg.api_key else None,

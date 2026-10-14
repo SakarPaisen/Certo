@@ -309,7 +309,7 @@ def test_run_with_confirmation_rejects_then_continues(monkeypatch):
 
     assert result == "ok"
     assert conversation.run_calls == 2
-    assert conversation.rejected_reasons == ["Rejected by the user via harness confirm-mode."]
+    assert conversation.rejected_reasons == ["Rejected by the user via Certo confirm-mode."]
 
 
 def test_run_with_confirmation_stops_and_rejects_once_when_no_handler(monkeypatch):
@@ -1734,7 +1734,7 @@ class _FakeMetrics:
 
 class _FakeConversationStats:
     def __init__(self) -> None:
-        self.usage_to_metrics = {"harness": _FakeMetrics()}
+        self.usage_to_metrics = {"certo": _FakeMetrics()}
 
     def get_combined_metrics(self) -> _FakeMetrics:
         return _FakeMetrics(sum(m._cost for m in self.usage_to_metrics.values()))
@@ -1877,7 +1877,7 @@ def test_auto_mode_picks_the_best_fit_candidate_for_the_initial_run(monkeypatch,
     # (cheap and balanced tie at 7; cheap is declared first, wins the tie —
     # Python's sort is stable, ties keep their original relative order).
     assert captured_agent_cfg["cfg"].model == "openai/gpt-4o-mini"
-    assert captured_agent_cfg["usage_id"] == "harness:cheap"
+    assert captured_agent_cfg["usage_id"] == "certo:cheap"
     assert len(outcome.model_decisions) == 1
     assert outcome.model_decisions[0].kind == "initial"
     assert outcome.model_decisions[0].chosen == "cheap"
@@ -2104,7 +2104,7 @@ def test_artifacts_dir_set_writes_metadata_transcript_and_metrics(monkeypatch, t
     assert (run_dir / "transcript.json").exists()
     metrics = json.loads((run_dir / "metrics.json").read_text())
     assert metrics["combined"]["accumulated_cost"] == 0.01
-    assert "harness" in metrics["per_model"]
+    assert "certo" in metrics["per_model"]
 
 
 def test_artifacts_dir_uses_unscoped_bucket_with_no_project(monkeypatch, tmp_path):
@@ -2159,8 +2159,8 @@ def test_artifacts_are_written_even_when_the_task_raises(monkeypatch, tmp_path):
 def test_artifacts_metrics_include_per_model_breakdown_after_a_switch(monkeypatch, tmp_path):
     conversation = _SwitchableConversation([])
     conversation.conversation_stats.usage_to_metrics = {
-        "harness:cheap": _FakeMetrics(0.01),
-        "harness:balanced": _FakeMetrics(0.02),
+        "certo:cheap": _FakeMetrics(0.01),
+        "certo:balanced": _FakeMetrics(0.02),
     }
     _stub_stream_task_dependencies(monkeypatch, conversation, tmp_path)
     artifacts_dir = tmp_path / "artifacts"
@@ -2178,7 +2178,7 @@ def test_artifacts_metrics_include_per_model_breakdown_after_a_switch(monkeypatc
     run_dirs = list((artifacts_dir / "_unscoped").iterdir())
     metrics = json.loads((run_dirs[0] / "metrics.json").read_text())
     assert metrics["combined"]["accumulated_cost"] == 0.03
-    assert set(metrics["per_model"]) == {"harness:cheap", "harness:balanced"}
+    assert set(metrics["per_model"]) == {"certo:cheap", "certo:balanced"}
     metadata = json.loads((run_dirs[0] / "metadata.json").read_text())
     assert metrics["summary"] == metadata["run_summary"]
     assert round(metadata["run_summary"]["total_cost"], 6) == 0.03

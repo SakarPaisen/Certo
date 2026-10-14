@@ -145,7 +145,7 @@ _LIFECYCLE_SKILLS_SUFFIX = (
 )
 
 
-def build_agent(cfg: Config, *, usage_id: str = "harness") -> Agent:
+def build_agent(cfg: Config, *, usage_id: str = "certo") -> Agent:
     # usage_id is forwarded to build_llm() unchanged (default preserves the
     # single-model behavior everything used before). Auto model selection
     # (see model_selection.py) passes a distinct usage_id per catalog

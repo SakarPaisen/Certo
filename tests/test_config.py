@@ -390,22 +390,22 @@ def test_task_store_mysql_fields_default_and_override():
     assert cfg.task_store_mysql_port == DEFAULT_TASK_STORE_MYSQL_PORT
     assert cfg.task_store_mysql_user == "root"
     assert cfg.task_store_mysql_password is None
-    assert cfg.task_store_mysql_database == "harness"
+    assert cfg.task_store_mysql_database == "certo"
 
     cfg = load_config(
         _base_env(
             CERTO_TASK_STORE_MYSQL_HOST="db.internal",
             CERTO_TASK_STORE_MYSQL_PORT="3307",
-            CERTO_TASK_STORE_MYSQL_USER="harness_user",
+            CERTO_TASK_STORE_MYSQL_USER="certo_user",
             CERTO_TASK_STORE_MYSQL_PASSWORD="secret",
-            CERTO_TASK_STORE_MYSQL_DATABASE="harness_prod",
+            CERTO_TASK_STORE_MYSQL_DATABASE="certo_prod",
         )
     )
     assert cfg.task_store_mysql_host == "db.internal"
     assert cfg.task_store_mysql_port == 3307
-    assert cfg.task_store_mysql_user == "harness_user"
+    assert cfg.task_store_mysql_user == "certo_user"
     assert cfg.task_store_mysql_password == "secret"
-    assert cfg.task_store_mysql_database == "harness_prod"
+    assert cfg.task_store_mysql_database == "certo_prod"
 
 
 def test_invalid_task_store_mysql_port_raises():
@@ -419,22 +419,22 @@ def test_task_store_postgres_fields_default_and_override():
     assert cfg.task_store_postgres_port == DEFAULT_TASK_STORE_POSTGRES_PORT
     assert cfg.task_store_postgres_user == "postgres"
     assert cfg.task_store_postgres_password is None
-    assert cfg.task_store_postgres_database == "harness"
+    assert cfg.task_store_postgres_database == "certo"
 
     cfg = load_config(
         _base_env(
             CERTO_TASK_STORE_POSTGRES_HOST="pg.internal",
             CERTO_TASK_STORE_POSTGRES_PORT="5433",
-            CERTO_TASK_STORE_POSTGRES_USER="harness_user",
+            CERTO_TASK_STORE_POSTGRES_USER="certo_user",
             CERTO_TASK_STORE_POSTGRES_PASSWORD="secret",
-            CERTO_TASK_STORE_POSTGRES_DATABASE="harness_prod",
+            CERTO_TASK_STORE_POSTGRES_DATABASE="certo_prod",
         )
     )
     assert cfg.task_store_postgres_host == "pg.internal"
     assert cfg.task_store_postgres_port == 5433
-    assert cfg.task_store_postgres_user == "harness_user"
+    assert cfg.task_store_postgres_user == "certo_user"
     assert cfg.task_store_postgres_password == "secret"
-    assert cfg.task_store_postgres_database == "harness_prod"
+    assert cfg.task_store_postgres_database == "certo_prod"
 
 
 def test_task_store_redis_fields_default_and_override():

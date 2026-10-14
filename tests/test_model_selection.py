@@ -119,10 +119,10 @@ def test_llm_for_entry_uses_the_entrys_own_model_and_key():
         reasoning_effort="high",
     )
 
-    llm = llm_for_entry(cfg, entry, usage_id="harness:deep-reasoner")
+    llm = llm_for_entry(cfg, entry, usage_id="certo:deep-reasoner")
 
     assert llm.model == "anthropic/claude-opus-4"
-    assert llm.usage_id == "harness:deep-reasoner"
+    assert llm.usage_id == "certo:deep-reasoner"
     assert llm.reasoning_effort == "high"
 
 
@@ -135,10 +135,10 @@ def test_llm_for_entry_clears_api_key_for_a_keyless_entry():
     # here (the api_key-clearing behavior).
     cfg = _cfg(api_key="sk-anthropic-should-not-leak")
     entry = _entry(
-        "ollama-local", model="ollama/harness-test-model", base_url="http://localhost:11434"
+        "ollama-local", model="ollama/certo-test-model", base_url="http://localhost:11434"
     )
 
-    llm = llm_for_entry(cfg, entry, usage_id="harness:ollama-local")
+    llm = llm_for_entry(cfg, entry, usage_id="certo:ollama-local")
 
     assert llm.api_key is None
     assert llm.base_url == "http://localhost:11434"
@@ -148,7 +148,7 @@ def test_llm_for_entry_clears_base_url_when_entry_does_not_set_one():
     cfg = _cfg(base_url="http://leftover-from-a-previous-entry:11434")
     entry = _entry("hosted-model", model="openai/gpt-4o", api_key="sk-openai")
 
-    llm = llm_for_entry(cfg, entry, usage_id="harness:hosted-model")
+    llm = llm_for_entry(cfg, entry, usage_id="certo:hosted-model")
 
     assert llm.base_url is None
 

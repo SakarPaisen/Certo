@@ -1,4 +1,4 @@
-"""Configuration for the coding-agent harness.
+"""Configuration for Certo.
 
 Pure environment parsing — deliberately free of any OpenHands SDK import so it can
 be unit-tested with no network and no SDK installed. `llm.py` consumes the LLM_*
@@ -53,15 +53,17 @@ DEFAULT_TASK_STORE = "memory"
 # behavior exactly, so enabling a store backend alone never changes
 # retention; a TTL is something a caller opts into separately.
 DEFAULT_TASK_TTL_SECONDS = 0
-DEFAULT_TASK_STORE_SQLITE_PATH = "./harness_tasks.db"
+DEFAULT_TASK_STORE_SQLITE_PATH = "./certo_tasks.db"
+# Pre-rename default; task_store.py still opens it when only it exists.
+LEGACY_TASK_STORE_SQLITE_PATH = "./harness_tasks.db"
 DEFAULT_TASK_STORE_MYSQL_HOST = "localhost"
 DEFAULT_TASK_STORE_MYSQL_PORT = 3306
 DEFAULT_TASK_STORE_MYSQL_USER = "root"
-DEFAULT_TASK_STORE_MYSQL_DATABASE = "harness"
+DEFAULT_TASK_STORE_MYSQL_DATABASE = "certo"
 DEFAULT_TASK_STORE_POSTGRES_HOST = "localhost"
 DEFAULT_TASK_STORE_POSTGRES_PORT = 5432
 DEFAULT_TASK_STORE_POSTGRES_USER = "postgres"
-DEFAULT_TASK_STORE_POSTGRES_DATABASE = "harness"
+DEFAULT_TASK_STORE_POSTGRES_DATABASE = "certo"
 DEFAULT_TASK_STORE_REDIS_HOST = "localhost"
 DEFAULT_TASK_STORE_REDIS_PORT = 6379
 DEFAULT_TASK_STORE_REDIS_DB = 0
@@ -84,7 +86,7 @@ class Config:
     api_key: str | None
     base_url: str | None
 
-    # Harness policy (not the LLM's concern).
+    # Certo policy (not the LLM's concern).
     workspace: str
     max_iterations: int
     confirm_mode: str  # one of CONFIRM_MODES

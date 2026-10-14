@@ -268,37 +268,35 @@ def test_build_sql_url_mysql_without_password():
         task_store="mysql",
         task_store_mysql_host="db.internal",
         task_store_mysql_port=3307,
-        task_store_mysql_user="harness",
+        task_store_mysql_user="certo",
         task_store_mysql_password=None,
-        task_store_mysql_database="harness_prod",
+        task_store_mysql_database="certo_prod",
     )
-    assert _build_sql_url(cfg) == "mysql+pymysql://harness@db.internal:3307/harness_prod"
+    assert _build_sql_url(cfg) == "mysql+pymysql://certo@db.internal:3307/certo_prod"
 
 
 def test_build_sql_url_mysql_with_password():
     cfg = _cfg(
         task_store="mysql",
-        task_store_mysql_user="harness",
+        task_store_mysql_user="certo",
         task_store_mysql_password="secret",
         task_store_mysql_host="db.internal",
         task_store_mysql_port=3306,
-        task_store_mysql_database="harness_prod",
+        task_store_mysql_database="certo_prod",
     )
-    assert _build_sql_url(cfg) == "mysql+pymysql://harness:secret@db.internal:3306/harness_prod"
+    assert _build_sql_url(cfg) == "mysql+pymysql://certo:secret@db.internal:3306/certo_prod"
 
 
 def test_build_sql_url_postgres_with_password():
     cfg = _cfg(
         task_store="postgres",
-        task_store_postgres_user="harness",
+        task_store_postgres_user="certo",
         task_store_postgres_password="secret",
         task_store_postgres_host="pg.internal",
         task_store_postgres_port=5433,
-        task_store_postgres_database="harness_prod",
+        task_store_postgres_database="certo_prod",
     )
-    assert (
-        _build_sql_url(cfg) == "postgresql+psycopg2://harness:secret@pg.internal:5433/harness_prod"
-    )
+    assert _build_sql_url(cfg) == "postgresql+psycopg2://certo:secret@pg.internal:5433/certo_prod"
 
 
 def test_build_sql_url_rejects_a_non_sql_backend():
@@ -432,11 +430,11 @@ def test_redis_store_sets_native_ttl_only_for_terminal_status(redis_store):
     try:
         record = TaskRecord(id="t1", task="x", status="running")
         ttl_store.save(record)
-        assert ttl_store._redis.ttl("harness:task:t1") == -1  # no expiration while running
+        assert ttl_store._redis.ttl("certo:task:t1") == -1  # no expiration while running
 
         record.status = "completed"
         ttl_store.save(record)
-        ttl = ttl_store._redis.ttl("harness:task:t1")
+        ttl = ttl_store._redis.ttl("certo:task:t1")
         assert 0 < ttl <= 100
     finally:
         ttl_store.close()
@@ -461,3 +459,92 @@ def test_redis_store_expires_a_completed_record_via_native_ttl(redis_store):
         assert ttl_store.get("t1") is None
     finally:
         ttl_store.close()
+
+
+# --- Pre-rename (harness_*) storage names are still read --------------------
+
+
+def test_sql_store_new_database_uses_certo_tasks_table(tmp_path):
+    import sqlalchemy as sa
+
+    url = f"sqlite:///{tmp_path / 'tasks.db'}"
+    SQLTaskStore(url).close()
+    assert sa.inspect(sa.create_engine(url)).get_table_names() == ["certo_tasks"]
+
+
+def test_sql_store_keeps_using_an_existing_legacy_table(tmp_path):
+    import sqlalchemy as sa
+
+    url = f"sqlite:///{tmp_path / 'tasks.db'}"
+    store = SQLTaskStore(url)
+    store.save(TaskRecord(id="old", task="before the rename", project="p"))
+    store.close()
+    engine = sa.create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(sa.text("ALTER TABLE certo_tasks RENAME TO harness_tasks"))
+    engine.dispose()
+
+    store = SQLTaskStore(url)
+    try:
+        assert store.get("old").task == "before the rename"
+        store.save(TaskRecord(id="new", task="after"))
+        assert store.get("new") is not None
+    finally:
+        store.close()
+    assert sa.inspect(sa.create_engine(url)).get_table_names() == ["harness_tasks"]
+
+
+def test_default_sqlite_path_falls_back_to_legacy_file_when_only_it_exists(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    cfg = _cfg(task_store="sqlite", task_store_sqlite_path="./certo_tasks.db")
+
+    assert _build_sql_url(cfg) == "sqlite:///./certo_tasks.db"  # neither exists
+
+    (tmp_path / "harness_tasks.db").touch()
+    assert _build_sql_url(cfg) == "sqlite:///./harness_tasks.db"
+
+    (tmp_path / "certo_tasks.db").touch()
+    assert _build_sql_url(cfg) == "sqlite:///./certo_tasks.db"  # new one wins
+
+
+def test_explicit_sqlite_path_never_falls_back(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "harness_tasks.db").touch()
+    cfg = _cfg(task_store="sqlite", task_store_sqlite_path="./mine.db")
+    assert _build_sql_url(cfg) == "sqlite:///./mine.db"
+
+
+@_requires_redis_server
+def test_redis_store_reads_and_migrates_legacy_keys(redis_store):
+    import json
+
+    r = redis_store._redis
+    legacy = TaskRecord(id="old", task="before the rename", project="p")
+    r.set("harness:task:old", json.dumps(legacy.to_json_dict()))
+    r.sadd("harness:project:p", "old")
+
+    assert redis_store.get("old") == legacy
+
+    legacy.status = "completed"
+    redis_store.save(legacy)
+    assert r.exists("harness:task:old") == 0
+    assert r.exists("certo:task:old") == 1
+    assert r.smembers("harness:project:p") == set()
+    assert r.smembers("certo:project:p") == {"old"}
+
+
+@_requires_redis_server
+def test_redis_store_deletes_cover_legacy_keys(redis_store):
+    import json
+
+    r = redis_store._redis
+    for task_id in ("a", "b"):
+        rec = TaskRecord(id=task_id, task="x", project="p")
+        r.set(f"harness:task:{task_id}", json.dumps(rec.to_json_dict()))
+        r.sadd("harness:project:p", task_id)
+    redis_store.save(TaskRecord(id="c", task="x", project="p"))
+
+    assert redis_store.delete("a") is True
+    assert r.exists("harness:task:a") == 0
+    assert redis_store.delete_by_project("p") == 2
+    assert r.keys("*") == []
