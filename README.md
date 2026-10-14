@@ -22,13 +22,15 @@ With a local model (no API key):
 
 ```bash
 pip install certo
-ollama pull qwen2.5-coder
+ollama pull qwen3-coder:30b
 
-export LLM_MODEL=ollama/qwen2.5-coder
+export LLM_MODEL=ollama/qwen3-coder:30b
 export LLM_BASE_URL=http://localhost:11434
 
 certo "Build a CLI todo app in Python, with tests" --project todo
 ```
+
+`qwen3-coder:30b` needs roughly 20 GB of GPU or unified memory. With less, pull a smaller coder model such as `qwen2.5-coder:7b` and set `LLM_MODEL=ollama/qwen2.5-coder:7b`. Expect weaker results on multi-step tasks.
 
 With a cloud model, change two lines:
 
@@ -59,7 +61,8 @@ The exit code is nonzero for every failure state, so Certo works in scripts and 
 ## Features
 
 - **Independent verification.** Re-runs the project's real test, build, lint and typecheck commands after the agent finishes. It never invents a command the project doesn't configure.
-- **Works across languages.** Detects and verifies Python, Node/JS/TS, Go, Rust and Java (Maven/Gradle) projects.
+- **Works across languages.** Detects and verifies Python, Node/JS/TS, Go, Rust and Java (Maven/Gradle) projects. Each Python project gets its own virtual environment, used by both the agent and the checks.
+- **Verify without an agent.** `certo verify [PATH]` runs the same checks on any project, with no model needed.
 - **Any model, one setting.** Ollama, Anthropic, OpenAI, Gemini, DeepSeek or Moonshot. Switching is one environment variable.
 - **Picks the best model per task.** List your models with cost and quality ratings in `models.yaml` and Certo routes each task to the best fit, with fallback when a provider fails. No extra LLM call to decide. Add `--auto-model`.
 - **Hard limits.** An iteration cap, a wall-clock budget across all retries, and an optional approve-every-action mode.
@@ -82,6 +85,9 @@ certo ./tasks/spec.md --project my-api
 
 # Pause and ask you questions instead of guessing
 certo "Scaffold a FastAPI service" --project my-api --interactive
+
+# Check a project with Certo's verification only: no agent, no model
+certo verify ./projects/my-api
 ```
 
 ## How it works

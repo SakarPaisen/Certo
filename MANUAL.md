@@ -39,7 +39,7 @@ reference — how to actually run and configure the thing.
 
 ```bash
 pip install certo                 # or: uv tool install certo
-export LLM_MODEL=ollama/qwen2.5-coder
+export LLM_MODEL=ollama/qwen3-coder:30b    # ~20 GB; smaller: ollama/qwen2.5-coder:7b
 export LLM_BASE_URL=http://localhost:11434   # or: export LLM_API_KEY=...
 certo "Build a CLI todo app in Python, with tests" --project todo
 ```
