@@ -11,6 +11,7 @@ provider-agnostic: this test never hardcodes a model).
 from __future__ import annotations
 
 import json
+import os
 from contextlib import nullcontext
 from types import SimpleNamespace
 from typing import ClassVar
@@ -594,7 +595,7 @@ def test_run_with_confirmation_reports_budget_exhausted_mid_confirm_loop(monkeyp
 
 
 def test_verify_and_report_reports_budget_exhausted_at_entry(monkeypatch):
-    monkeypatch.setattr(runner, "_run_verification", lambda _dir: _run(_check(summary="3 passed")))
+    monkeypatch.setattr(runner, "_run_verification", lambda _dir, *_a: _run(_check(summary="3 passed")))
     conversation = _FakeConversation()
 
     outcome = runner._verify_and_report(
@@ -612,7 +613,7 @@ def test_verify_and_report_reports_budget_exhausted_mid_retry(monkeypatch):
     monkeypatch.setattr(
         runner,
         "_run_verification",
-        lambda _dir: _run(_check(status="failed", exit_code=1, summary="1 failed")),
+        lambda _dir, *_a: _run(_check(status="failed", exit_code=1, summary="1 failed")),
     )
     conversation = _FakeConversation()
     clock = iter([0.0, 100.0])
@@ -706,7 +707,7 @@ def test_verify_tests_never_mode_skips_entirely(monkeypatch):
     monkeypatch.setattr(
         runner,
         "_run_verification",
-        lambda _dir: calls.__setitem__("count", calls["count"] + 1) or _run(),
+        lambda _dir, *_a: calls.__setitem__("count", calls["count"] + 1) or _run(),
     )
 
     conversation = _FakeConversation()
@@ -726,7 +727,7 @@ def test_verify_tests_never_mode_skips_entirely(monkeypatch):
 
 
 def test_verify_tests_passes_on_first_check_reports_verified(monkeypatch):
-    monkeypatch.setattr(runner, "_run_verification", lambda _dir: _run(_check(summary="3 passed")))
+    monkeypatch.setattr(runner, "_run_verification", lambda _dir, *_a: _run(_check(summary="3 passed")))
 
     conversation = _FakeConversation()
     emitted = []
@@ -755,7 +756,7 @@ def test_no_tests_collected_is_inconclusive_not_verified_and_stays_silent(monkey
     monkeypatch.setattr(
         runner,
         "_run_verification",
-        lambda _dir: _run(_check(status="skipped", exit_code=5, summary="no tests ran")),
+        lambda _dir, *_a: _run(_check(status="skipped", exit_code=5, summary="no tests ran")),
     )
 
     conversation = _FakeConversation()
@@ -775,7 +776,7 @@ def test_no_runnable_check_is_inconclusive_and_visibly_flagged(monkeypatch):
     # that produced no checks at all (e.g. run_full_verification raised and
     # _run_verification swallowed it) is a genuine "we don't know" and must
     # be visible, not silently treated as fine.
-    monkeypatch.setattr(runner, "_run_verification", lambda _dir: _run())
+    monkeypatch.setattr(runner, "_run_verification", lambda _dir, *_a: _run())
 
     conversation = _FakeConversation()
     emitted = []
@@ -816,7 +817,7 @@ def test_verify_tests_retries_then_succeeds(monkeypatch):
             _run(_check(status="passed", summary="3 passed")),
         ]
     )
-    monkeypatch.setattr(runner, "_run_verification", lambda _dir: next(results))
+    monkeypatch.setattr(runner, "_run_verification", lambda _dir, *_a: next(results))
 
     conversation = _FakeConversation()
     emitted = []
@@ -861,7 +862,7 @@ def test_verify_tests_exhausts_retries_and_emits_giveup_notice(monkeypatch):
             ),
         ]
     )
-    monkeypatch.setattr(runner, "_run_verification", lambda _dir: next(results))
+    monkeypatch.setattr(runner, "_run_verification", lambda _dir, *_a: next(results))
 
     conversation = _FakeConversation()
     emitted = []
@@ -891,7 +892,7 @@ def test_stuck_before_verification_skips_checks_entirely(monkeypatch):
     monkeypatch.setattr(
         runner,
         "_run_verification",
-        lambda _dir: calls.__setitem__("count", calls["count"] + 1) or _run(),
+        lambda _dir, *_a: calls.__setitem__("count", calls["count"] + 1) or _run(),
     )
 
     conversation = _FakeConversation(initial_status=ConversationExecutionStatus.STUCK)
@@ -926,7 +927,7 @@ def test_agent_gets_stuck_mid_retry(monkeypatch):
     monkeypatch.setattr(
         runner,
         "_run_verification",
-        lambda _dir: _run(_check(status="failed", exit_code=1, summary="1 failed")),
+        lambda _dir, *_a: _run(_check(status="failed", exit_code=1, summary="1 failed")),
     )
 
     conversation = _FakeConversation(statuses_after_run=[ConversationExecutionStatus.STUCK])
@@ -1085,7 +1086,7 @@ def test_task_tracker_short_circuits_project_verification_when_still_incomplete(
     monkeypatch.setattr(
         runner,
         "_run_verification",
-        lambda _dir: (
+        lambda _dir, *_a: (
             verification_calls.__setitem__("count", verification_calls["count"] + 1)
             or _run(_check(summary="3 passed"))
         ),
@@ -1109,7 +1110,7 @@ def test_completion_contract_carries_the_goal_and_checks(monkeypatch):
     monkeypatch.setattr(
         runner,
         "_run_verification",
-        lambda _dir: _run(_check(command="pytest -q", summary="3 passed")),
+        lambda _dir, *_a: _run(_check(command="pytest -q", summary="3 passed")),
     )
 
     conversation = _FakeConversation()
@@ -1127,7 +1128,7 @@ def test_completion_contract_notes_limitations_from_skipped_checks(monkeypatch):
     monkeypatch.setattr(
         runner,
         "_run_verification",
-        lambda _dir: _run(
+        lambda _dir, *_a: _run(
             _check(summary="3 passed"),
             _check(
                 name="ruff",
@@ -1296,7 +1297,7 @@ def test_verification_run_state_timed_out_triggers_retry_and_terminal_timed_out(
             ),
         ]
     )
-    monkeypatch.setattr(runner, "_run_verification", lambda _dir: next(results))
+    monkeypatch.setattr(runner, "_run_verification", lambda _dir, *_a: next(results))
 
     conversation = _FakeConversation()
     emitted = []
@@ -1322,7 +1323,7 @@ def test_timed_out_check_recovers_on_retry_reports_verified(monkeypatch):
             _run(_check(name="cargo test", command="cargo test", status="passed")),
         ]
     )
-    monkeypatch.setattr(runner, "_run_verification", lambda _dir: next(results))
+    monkeypatch.setattr(runner, "_run_verification", lambda _dir, *_a: next(results))
 
     conversation = _FakeConversation()
     emitted = []
@@ -1349,7 +1350,7 @@ def test_no_progress_detected_when_fix_attempt_changes_nothing(monkeypatch):
     monkeypatch.setattr(
         runner,
         "_run_verification",
-        lambda _dir: _run(
+        lambda _dir, *_a: _run(
             _check(status="failed", exit_code=1, summary="1 failed", output="AssertionError: boom")
         ),
     )
@@ -1384,7 +1385,7 @@ def test_no_progress_ignores_timing_only_differences(monkeypatch):
             _run(_check(status="failed", exit_code=1, summary="1 failed in 3.83s", output="boom")),
         ]
     )
-    monkeypatch.setattr(runner, "_run_verification", lambda _dir: next(results))
+    monkeypatch.setattr(runner, "_run_verification", lambda _dir, *_a: next(results))
 
     conversation = _FakeConversation()
     emitted = []
@@ -1422,7 +1423,7 @@ def test_progress_with_a_genuinely_different_failure_does_not_trigger_no_progres
             ),
         ]
     )
-    monkeypatch.setattr(runner, "_run_verification", lambda _dir: next(results))
+    monkeypatch.setattr(runner, "_run_verification", lambda _dir, *_a: next(results))
 
     conversation = _FakeConversation()
     emitted = []
@@ -1441,7 +1442,7 @@ def test_no_progress_applies_to_repeated_identical_timeouts_too(monkeypatch):
     monkeypatch.setattr(
         runner,
         "_run_verification",
-        lambda _dir: _run(
+        lambda _dir, *_a: _run(
             _check(
                 name="cargo test",
                 command="cargo test",
@@ -1541,7 +1542,7 @@ def test_no_progress_check_does_not_apply_after_successful_recovery(monkeypatch)
             _run(_check(status="passed", summary="3 passed")),
         ]
     )
-    monkeypatch.setattr(runner, "_run_verification", lambda _dir: next(results))
+    monkeypatch.setattr(runner, "_run_verification", lambda _dir, *_a: next(results))
 
     conversation = _FakeConversation()
     emitted = []
@@ -2052,7 +2053,7 @@ def test_quality_failure_escalates_during_verify_retry(monkeypatch, tmp_path):
     failing = _run(_check(status="failed", summary="1 failed"))
     passing = _run(_check(status="passed", summary="1 passed"))
     results = iter([failing, passing])
-    monkeypatch.setattr(runner, "_run_verification", lambda _dir: next(results))
+    monkeypatch.setattr(runner, "_run_verification", lambda _dir, *_a: next(results))
 
     outcome = runner.stream_task(
         "do the thing",
@@ -2184,3 +2185,70 @@ def test_artifacts_metrics_include_per_model_breakdown_after_a_switch(monkeypatc
     assert round(metadata["run_summary"]["total_cost"], 6) == 0.03
     assert len(metadata["run_summary"]["models"]) == 2
     assert metadata["run_summary"]["duration_seconds"] >= 0
+
+
+# --- Project environment before the agent starts -----------------------------
+
+
+def _stub_for_env_tests(monkeypatch, captured):
+    conversation = _ConfirmConversation([ConversationExecutionStatus.FINISHED])
+    monkeypatch.setattr(runner, "Conversation", lambda **_kwargs: conversation)
+    monkeypatch.setattr(
+        runner, "build_agent", lambda cfg, **kw: captured.update(kw) or "fake-agent"
+    )
+    monkeypatch.setattr(runner, "build_workspace", lambda cfg: nullcontext(cfg.workspace))
+    monkeypatch.setattr(runner, "_enforce_task_tracker_completion", lambda *a, **kw: None)
+    monkeypatch.setattr(
+        runner,
+        "_verify_and_report",
+        lambda *a, **kw: runner.TaskOutcome(
+            verification_state="inconclusive",
+            completion_contract=runner.CompletionContract(
+                goal="", acceptance_criteria=[], verification_checks=[], limitations=[]
+            ),
+        ),
+    )
+
+
+def test_stream_task_gives_a_python_project_its_env_in_the_agents_terminal(
+    monkeypatch, tmp_path, project_venv
+):
+    venv = project_venv(tmp_path)
+    (tmp_path / "app.py").write_text("print('hi')\n")
+    captured: dict = {}
+    _stub_for_env_tests(monkeypatch, captured)
+
+    runner.stream_task("fix the bug", cfg=_cfg(workspace=str(tmp_path)))
+
+    assert captured["project_env"].host_dir == venv
+    assert captured["terminal_env"]["VIRTUAL_ENV"] == venv
+    assert captured["terminal_env"]["PATH"].startswith(os.path.join(venv, "bin"))
+
+
+def test_stream_task_creates_no_env_for_a_node_project(monkeypatch, tmp_path):
+    (tmp_path / "package.json").write_text('{"name": "x"}')
+    captured: dict = {}
+    _stub_for_env_tests(monkeypatch, captured)
+
+    runner.stream_task("Add a Python helper script", cfg=_cfg(workspace=str(tmp_path)))
+
+    assert captured["project_env"] is None
+    assert not (tmp_path / ".venv").exists()
+
+
+def test_stream_task_creates_an_env_for_an_empty_workspace_with_a_python_task(
+    monkeypatch, tmp_path
+):
+    captured: dict = {}
+    emitted: list = []
+    _stub_for_env_tests(monkeypatch, captured)
+
+    runner.stream_task(
+        "Create hello.py that prints hello, plus a pytest test for it",
+        cfg=_cfg(workspace=str(tmp_path)),
+        on_message=emitted.append,
+    )
+
+    assert captured["project_env"].host_dir == str(tmp_path / ".venv")
+    assert (tmp_path / ".venv").is_dir()
+    assert any("Created the project environment" in m.content[0].text for m in emitted)

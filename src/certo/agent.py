@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from openhands.sdk import Agent, AgentContext
 
 from .config import Config
 from .llm import build_llm
+from .project_env import ProjectEnv
 from .skills import load_first_party_skills
 from .third_party_skills import load_enabled_skills
 from .tools import build_tools
@@ -53,9 +56,26 @@ _README_SUFFIX = (
     "README.md with clear, concrete instructions for how to install its "
     "dependencies and actually run (or build) what you created — the exact "
     "commands, not general advice — so someone else can follow it without "
-    "guessing. Write or update this yourself as part of completing the task, "
-    "even if the task description didn't explicitly ask for one."
+    "guessing. If the project has its own virtual environment (e.g. `.venv`), "
+    "include the commands to create it and install the dependencies into it. "
+    "Write or update this yourself as part of completing the task, even if "
+    "the task description didn't explicitly ask for one."
 )
+
+
+# Added only when the project has its own environment (project_env.py). The
+# harness already points the terminal at it; this says so, so the agent
+# installs into it rather than reaching for some other interpreter — live,
+# an agent tried `<Certo's own python> -m pip install pytest`.
+def _project_env_suffix(env: ProjectEnv) -> str:
+    return (
+        f"This project has its own Python environment at {env.venv_dir}, and "
+        "your terminal already uses it: `python`, `pip` and `pytest` resolve "
+        "there. Install any dependency the project needs into it "
+        f"(`{env.install_hint}`), never into another interpreter, with "
+        "`--user`, or with `sudo`."
+    )
+
 
 # Same underlying pattern as _AUTONOMOUS_SUFFIX above — the agent acting as if
 # a human is present when none is — but at the tool-invocation level rather
@@ -145,7 +165,13 @@ _LIFECYCLE_SKILLS_SUFFIX = (
 )
 
 
-def build_agent(cfg: Config, *, usage_id: str = "certo") -> Agent:
+def build_agent(
+    cfg: Config,
+    *,
+    usage_id: str = "certo",
+    project_env: ProjectEnv | None = None,
+    terminal_env: Mapping[str, str] | None = None,
+) -> Agent:
     # usage_id is forwarded to build_llm() unchanged (default preserves the
     # single-model behavior everything used before). Auto model selection
     # (see model_selection.py) passes a distinct usage_id per catalog
@@ -167,6 +193,10 @@ def build_agent(cfg: Config, *, usage_id: str = "certo") -> Agent:
             _LIFECYCLE_SKILLS_SUFFIX,
         ]
     )
+    # project_env / terminal_env come from runner.py's environment setup:
+    # the terminal session's extra variables, and the one policy line above.
+    if project_env is not None:
+        suffixes.append(_project_env_suffix(project_env))
     first_party_skills = load_first_party_skills(cfg.skills_dir)
     # Third-party skills (third_party_skills.py) only when explicitly enabled
     # in the lockfile; a name already used by a first-party skill is skipped,
@@ -186,7 +216,9 @@ def build_agent(cfg: Config, *, usage_id: str = "certo") -> Agent:
         system_message_suffix="\n\n".join(suffixes),
     )
     agent = Agent(
-        llm=build_llm(cfg, usage_id=usage_id), tools=build_tools(), agent_context=agent_context
+        llm=build_llm(cfg, usage_id=usage_id),
+        tools=build_tools(terminal_env),
+        agent_context=agent_context,
     )
     # CERTO_CONFIRM_MODE == "always" should attach a confirmation policy that
     # pauses before each tool call. The confirmation-policy API is not yet

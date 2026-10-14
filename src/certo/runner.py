@@ -13,6 +13,7 @@ import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
+from typing import Any
 
 from openhands.sdk import (
     Conversation,
@@ -33,7 +34,12 @@ from .acceptance import AcceptanceCheck, AcceptanceCheckResult, evaluate_accepta
 from .agent import build_agent
 from .artifacts import write_run_artifacts
 from .config import Config, load_config
-from .custom_tools.run_tests_tool import CheckOutcome, VerificationRun, run_full_verification
+from .custom_tools.run_tests_tool import (
+    CheckOutcome,
+    VerificationRun,
+    detect_project,
+    run_full_verification,
+)
 from .model_catalog import classify_task, load_model_catalog, rank_candidates
 from .model_selection import (
     ModelChain,
@@ -42,6 +48,15 @@ from .model_selection import (
     config_for_entry,
     llm_for_entry,
     write_model_decisions,
+)
+from .project_env import (
+    CommandRunner,
+    LocalRunner,
+    ProjectEnv,
+    WorkspaceRunner,
+    ensure_project_env,
+    terminal_env,
+    wants_python_env,
 )
 from .run_summary import RunSummary, summarize_run
 from .workspace import build_workspace
@@ -169,17 +184,67 @@ class TaskResult(list):
         self.outcome = outcome
 
 
-def _run_verification(working_dir: str) -> VerificationRun:
+def _run_verification(working_dir: str, runner: CommandRunner | None = None) -> VerificationRun:
     """Run the project's full verification directly — no LLM/tool-call round
     trip. A verification-step glitch (a check hangs past its own timeout, or
     something else genuinely unexpected) must not abort an otherwise-
     successful task, so it's treated as inconclusive (no checks), not
-    re-raised.
+    re-raised. `runner` is where the checks run: the host, or the Docker
+    container (see `_command_runner`).
     """
     try:
-        return run_full_verification(working_dir)
+        return run_full_verification(working_dir, runner)
     except Exception:  # noqa: BLE001 - a verification glitch must not abort the task
         return VerificationRun(checks=[])
+
+
+def _emit_verification_notices(emit: Callable[[Message], None], run: VerificationRun) -> None:
+    for notice in run.notices:
+        _emit_notice(emit, f"Certo: {notice}")
+
+
+def _command_runner(cfg: Config, workspace: Any) -> CommandRunner:
+    """Where project commands run. Under `--execution docker` that's inside
+    the container, next to the agent's own terminal: a venv only works on
+    the OS that created it, so the agent and verification must share the
+    container's (see ROADMAP.md's decisions log)."""
+    if cfg.execution == "docker":
+        return WorkspaceRunner(
+            workspace,
+            host_root=os.path.abspath(cfg.workspace),
+            # DockerWorkspace's own default, matching workspace.py's bind mount.
+            exec_root=str(getattr(workspace, "working_dir", "/workspace")),
+        )
+    return LocalRunner()
+
+
+def _prepare_agent_env(
+    task: str, cfg: Config, runner: CommandRunner, emit: Callable[[Message], None]
+) -> ProjectEnv | None:
+    """Give a Python project (or an empty workspace whose task names Python)
+    its own environment before the agent starts, so the agent's terminal
+    and verification use the same one. Never fatal: a setup problem is
+    reported and the agent starts without it."""
+    workspace = os.path.abspath(cfg.workspace)
+    if not os.path.isdir(workspace):
+        return None
+    try:
+        detection = detect_project(workspace)
+        if not wants_python_env(task, detection.language, workspace):
+            return None
+        root = detection.root if detection.language == "python" else workspace
+        setup = ensure_project_env(root, runner, stop_at=workspace)
+    except Exception as exc:  # noqa: BLE001 - setup must never abort the task
+        _emit_notice(emit, f"Certo: could not prepare a project environment ({exc}).")
+        return None
+    for notice in setup.notices:
+        _emit_notice(emit, f"Certo: {notice}")
+    if setup.env is None:
+        _emit_notice(
+            emit,
+            f"Certo: the agent starts without a project environment: {setup.unavailable_reason}",
+        )
+    return setup.env
 
 
 def _is_clean_no_tests_collected(run: VerificationRun) -> bool:
@@ -618,6 +683,7 @@ def _verify_and_report(
     on_confirm: ConfirmCallback | None = None,
     deadline: float = float("inf"),
     model_chain: ModelChain | None = None,
+    runner: CommandRunner | None = None,
 ) -> TaskOutcome:
     """Post-hoc safety net for agent.py's `_VERIFY_BEFORE_FINISH_SUFFIX`: run
     the project's own checks ourselves instead of trusting the agent's
@@ -655,7 +721,8 @@ def _verify_and_report(
     working_dir = os.path.abspath(cfg.workspace)
     attempts_left = cfg.max_verify_retries
     retries_used = 0
-    run = _run_verification(working_dir)
+    run = _run_verification(working_dir, runner)
+    _emit_verification_notices(emit, run)
 
     while run.state in _RETRIABLE_STATES:
         if attempts_left <= 0:
@@ -724,7 +791,8 @@ def _verify_and_report(
                 checks=tuple(run.checks),
                 retries_used=retries_used,
             )
-        run = _run_verification(working_dir)
+        run = _run_verification(working_dir, runner)
+        _emit_verification_notices(emit, run)
 
         # A fix attempt that changes literally nothing observable is a
         # different, cheaper-to-detect problem than "still failing" — stop
@@ -1088,8 +1156,15 @@ def stream_task(
         agent_usage_id = f"certo:{entry.name}"
 
     with build_workspace(cfg) as workspace:
+        runner = _command_runner(cfg, workspace)
+        project_env = _prepare_agent_env(task, cfg, runner, emit)
         conversation = Conversation(
-            agent=build_agent(agent_cfg, usage_id=agent_usage_id),
+            agent=build_agent(
+                agent_cfg,
+                usage_id=agent_usage_id,
+                project_env=project_env,
+                terminal_env=terminal_env(project_env, runner),
+            ),
             callbacks=[on_event],
             workspace=workspace,
             # Previously unset (SDK default 500), so CERTO_MAX_ITERATIONS
@@ -1132,6 +1207,7 @@ def stream_task(
                 deadline,
                 model_chain,
                 checkpoint_buffer,
+                runner,
             )
         except BaseException as exc:  # recorded for artifacts.py, then always re-raised as-is
             captured_error = exc
@@ -1198,6 +1274,7 @@ def _run_stream_task_phases(
     deadline: float,
     model_chain: ModelChain | None,
     checkpoint_buffer: list[Message],
+    runner: CommandRunner | None = None,
 ) -> TaskOutcome:
     """The initial run, the interactive checkpoint loop, and the two
     autonomous retry phases — split out of `stream_task` purely so the
@@ -1243,7 +1320,7 @@ def _run_stream_task_phases(
         )
     if outcome is None:
         outcome = _verify_and_report(
-            conversation, cfg, emit, task, on_confirm, deadline, model_chain
+            conversation, cfg, emit, task, on_confirm, deadline, model_chain, runner
         )
     return outcome
 

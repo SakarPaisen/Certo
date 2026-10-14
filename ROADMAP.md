@@ -108,7 +108,13 @@ decisions log below for *why* a given design was chosen.
   AST-based check (recursive discovery, root always included) that a Python
   entry point's `if __name__ == "__main__":` guard is its last top-level
   statement. The agent-facing `run_tests` tool keeps its original rich
-  Python/Node contract and reuses stages 1–3 for Go/Rust/Java. Java is
+  Python/Node contract and reuses stages 1–3 for Go/Rust/Java. Python adds
+  a setup stage, `prepare_python_env()`: find or create the project
+  environment, probe which of pytest/ruff/mypy it can import, and install
+  pytest into it when tests exist but pytest doesn't. Planning stays
+  subprocess-free by reading that result. Every check runs through a
+  `CommandRunner` (`execute_check(..., runner=)`). `CheckSpec.env` holds
+  extra variables only, never a copy of `os.environ`. Java is
   detection-only in this dev environment and the Docker image (neither ships
   a Maven/Gradle toolchain).
 - **`cli.py`** — `python -m certo "<task>" [--execution] [--project]
@@ -145,6 +151,21 @@ decisions log below for *why* a given design was chosen.
   run), `num_retries=0` plus a short timeout, pass = non-empty text.
   Construction happens inside the try, since the SDK validates at build
   time. Errors are classified, with the API key scrubbed.
+- **`project_env.py`** — each Python project's own environment (stdlib
+  only, since the Docker image imports it next to `custom_tools`).
+  `ensure_project_env()` reuses a `uv.lock` project (through `uv run`), or a
+  working `.venv`/`venv`, searching up to the workspace root. Otherwise it
+  creates `.venv` with `uv venv --seed`, then plain `uv venv`, then
+  `python3 -m venv`; the base interpreter is never `sys.executable`.
+  `CREATED_MARKER` lets Certo rebuild only venvs it made. `LocalRunner`
+  (host subprocess, stdin closed, Certo's own `bin/` stripped from PATH)
+  and `WorkspaceRunner` (the Docker container via
+  `workspace.execute_command`, host↔`/workspace` path mapping) are the two
+  `CommandRunner`s. `terminal_env()` builds the agent terminal's extra
+  variables, and `wants_python_env()` decides about a workspace before the
+  agent starts. `runner.py`'s `_prepare_agent_env()` calls it, then passes
+  `project_env`/`terminal_env` to `build_agent()`. `tools.py` puts them in
+  the terminal `Tool`'s `params` (`env` plus `terminal_type="subprocess"`).
 - **`workspace.py`** — `build_workspace(cfg)` single dispatch point;
   `local` returns a path, `docker` returns a `DockerWorkspace`, both context
   managers.
@@ -267,6 +288,17 @@ rule 2):
   returning instances.
 - `get_default_tools()` lives at `openhands.tools.preset.default`, not
   re-exported from `openhands.tools.preset`.
+- **The terminal's extra environment is `Tool(name="terminal",
+  params={"env": {...}})`**, passed to `TerminalTool.create(conv_state,
+  env=...)` and merged over the inherited environment by
+  `build_terminal_env` (`openhands/tools/terminal/definition.py`, `env.py`,
+  `terminal/subprocess_terminal.py`). `sanitized_env` keeps `PATH` and
+  `VIRTUAL_ENV`. **Under tmux, `PATH` from `env` is ignored**: the pane
+  pool sets it as session environment, but a new window takes `PATH` from
+  the tmux client, Certo's own process. Confirmed live on macOS: a marker
+  added to Certo's own PATH appeared in the pane, the venv's `bin/` didn't.
+  Certo therefore forces `terminal_type="subprocess"` whenever it passes an
+  env.
 - `file_editor` requires absolute paths; does not resolve relative to the
   workspace.
 - The SDK's `LLM(...)` constructor raises `LLMContextWindowTooSmallError`
@@ -285,7 +317,7 @@ rule 2):
   assumption. Any future code reading `Message.role` to find "the answer"
   should exclude only `system`/`user`, not filter to `assistant`.
 
-**The "confident but wrong agent" family** — nine variants found live (plus
+**The "confident but wrong agent" family** — variants found live (plus
 one requested proactively), each root-caused and fixed; see `docs/ROADMAP.txt`
 for full transcripts if a fix needs revisiting:
 
@@ -348,6 +380,21 @@ for full transcripts if a fix needs revisiting:
    regression fixture; now also re-verified against a fresh live agent run
    end to end (`test_run_task_catches_entrypoint_ordering_bug_live`,
    `tests/test_runner.py`) — closes the "not yet re-verified live" caveat.**
+9. **The harness's own verification depended on the dev environment.**
+   Repro: Certo 0.1.0 from `uv tool install certo`, `ollama/qwen3-coder:30b`,
+   `certo "Create hello.py that prints hello, plus a pytest test for it"
+   --project smoke`. Verification ran pytest with Certo's own interpreter
+   (`~/.local/share/uv/tools/certo/bin/python`), which has no pytest. The
+   agent then ran `<that python> -m pip install pytest`, an attempt to
+   install into Certo's own environment that failed only because there was
+   no pip. It then hacked the code around the problem, and the run ended
+   `no_progress`. Invisible from the dev venv, where pytest is a dev
+   dependency. Fix: `project_env.py`, a per-project environment shared by
+   the agent's terminal and verification, with pytest installed into it
+   when tests need it, and nothing ever run with or installed into
+   `sys.executable`. **Status: applied. Unit-tested, and terminal
+   resolution checked against the real SDK terminal. Not yet re-run as a
+   full live task.**
 
 ## Decisions log (why, not just what)
 
@@ -689,6 +736,32 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   changes, never the provider. `tests/test_llm.py` asserts the wire request
   against a local fake Ollama that returns the real 400. The bug reproduces
   there with the old `build_llm`.
+- **A Python project gets its own environment, shared by the agent's
+  terminal and verification; Certo's own environment is never used.**
+  Verification used `sys.executable`, which only had pytest in the dev
+  venv (see "confident but wrong" #9). An existing environment is always
+  reused before one is created: `uv.lock` through `uv run`, then
+  `.venv`/`venv`. Only Certo-made venvs (marker file) are ever rebuilt; a
+  broken user venv makes pytest `unavailable`, never deleted. pytest is
+  auto-installed into the project environment only when test files exist,
+  and a failed install is `unavailable`, not `failed`: a missing runner is
+  a limitation, not a test failure. ruff/mypy are not auto-installed. They
+  count only when installed in the project environment, since one on PATH
+  says nothing about the project's own config. An empty workspace gets an
+  environment up front only if the task names Python: creating one for
+  every empty workspace would litter Node/Go projects.
+- **Under `--execution docker`, verification runs inside the container
+  (user's choice), not on the host.** A venv is tied to the OS that made
+  it (interpreter symlinks, binary format), and the agent installs
+  dependencies into the container's. Host-side verification could never
+  see them: it already used Certo's own host interpreter before this
+  change, so Docker verification of any project with dependencies was
+  broken. Rejected: a separate host venv (same blindness) and local-only
+  (leaves Docker broken). Detection/planning still read files on the host
+  via the bind mount; commands go through `WorkspaceRunner` →
+  `execute_command`. **Not run against a real container yet**: the Docker
+  daemon wasn't usable in the session that built it. Covered by fake-
+  workspace unit tests only.
 - **`check-llm` lives in `certo-admin`, not the `certo` CLI** — `certo`
   requires a task positional, while `certo-admin` is already the
   subcommand-based maintenance CLI. There's no `--api-key` flag, so a key

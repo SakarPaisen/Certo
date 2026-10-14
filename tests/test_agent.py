@@ -168,3 +168,45 @@ def test_build_agent_usage_id_is_overridable():
     agent = build_agent(_cfg(), usage_id="certo:deep-reasoner")
 
     assert agent.llm.usage_id == "certo:deep-reasoner"
+
+
+def _project_env():
+    from certo.project_env import ProjectEnv
+
+    return ProjectEnv(
+        kind="venv",
+        host_dir="/p/.venv",
+        venv_dir="/p/.venv",
+        python=("/p/.venv/bin/python",),
+        install_hint="python -m pip install <package>",
+    )
+
+
+def test_project_env_policy_line_only_when_the_project_has_one():
+    with_env = build_agent(_cfg(), project_env=_project_env())
+    without = build_agent(_cfg())
+
+    suffix = with_env.agent_context.system_message_suffix
+    assert "own Python environment at /p/.venv" in suffix
+    assert "python -m pip install <package>" in suffix
+    assert "own Python environment" not in without.agent_context.system_message_suffix
+
+
+def test_readme_suffix_mentions_the_project_environment():
+    assert "virtual environment" in _README_SUFFIX
+
+
+def test_terminal_env_reaches_the_terminal_tool_spec_with_the_subprocess_backend():
+    env = {"VIRTUAL_ENV": "/p/.venv", "PATH": "/p/.venv/bin:/usr/bin"}
+
+    agent = build_agent(_cfg(), terminal_env=env)
+
+    terminal = next(t for t in agent.tools if t.name == "terminal")
+    assert terminal.params == {"env": env, "terminal_type": "subprocess"}
+
+
+def test_terminal_tool_spec_is_untouched_without_a_terminal_env():
+    agent = build_agent(_cfg())
+
+    terminal = next(t for t in agent.tools if t.name == "terminal")
+    assert terminal.params == {}

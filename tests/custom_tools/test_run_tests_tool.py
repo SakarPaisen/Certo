@@ -19,6 +19,7 @@ from certo.custom_tools.run_tests_tool import (
     CheckOutcome,
     CheckSpec,
     ProjectDetection,
+    PythonEnvState,
     RunTestsAction,
     RunTestsExecutor,
     VerificationRun,
@@ -26,7 +27,6 @@ from certo.custom_tools.run_tests_tool import (
     _find_python_entrypoints,
     _mypy_configured,
     _npm_test_script,
-    _python_command,
     _python_plan,
     _ruff_configured,
     detect_project,
@@ -34,6 +34,7 @@ from certo.custom_tools.run_tests_tool import (
     execute_check,
     run_full_verification,
 )
+from certo.project_env import ProjectEnv, _base_python
 
 _FIXTURE = """
 def test_ok():
@@ -58,7 +59,21 @@ def _write_package_json(tmp_path, scripts):
     (tmp_path / "package.json").write_text(json.dumps({"name": "fixture", "scripts": scripts}))
 
 
-def test_reports_pass_and_fail_counts(tmp_path):
+def _state(tmp_path, modules=("pytest",), *, has_tests=True) -> PythonEnvState:
+    """A prepared environment for planning tests. The test interpreter stands
+    in for the project's (planning only builds commands from it)."""
+    env = ProjectEnv(
+        kind="venv",
+        host_dir=str(tmp_path / ".venv"),
+        venv_dir=str(tmp_path / ".venv"),
+        python=(sys.executable,),
+        install_hint="python -m pip install <package>",
+    )
+    return PythonEnvState(env=env, modules=set(modules), has_tests=has_tests, base_path="/usr/bin")
+
+
+def test_reports_pass_and_fail_counts(tmp_path, project_venv):
+    project_venv(tmp_path)
     _write_fixture(tmp_path)
     executor = RunTestsExecutor(str(tmp_path))
 
@@ -74,7 +89,8 @@ def test_reports_pass_and_fail_counts(tmp_path):
     assert "1 passed" in observation.summary
 
 
-def test_can_target_a_single_node_id(tmp_path):
+def test_can_target_a_single_node_id(tmp_path, project_venv):
+    project_venv(tmp_path)
     _write_fixture(tmp_path)
     executor = RunTestsExecutor(str(tmp_path))
 
@@ -86,7 +102,8 @@ def test_can_target_a_single_node_id(tmp_path):
     assert observation.failures == []
 
 
-def test_all_passing_has_no_failures(tmp_path):
+def test_all_passing_has_no_failures(tmp_path, project_venv):
+    project_venv(tmp_path)
     (tmp_path / "test_fixture.py").write_text("def test_ok():\n    assert True\n")
     executor = RunTestsExecutor(str(tmp_path))
 
@@ -100,23 +117,32 @@ def test_all_passing_has_no_failures(tmp_path):
     assert "1 passed" in observation.summary
 
 
-def test_python_command_uses_sys_executable_when_not_frozen(monkeypatch):
-    monkeypatch.setattr(sys, "frozen", False, raising=False)
-
-    assert _python_command() == [sys.executable]
-
-
-def test_python_command_falls_back_to_path_when_frozen(monkeypatch):
+def test_base_python_for_a_new_venv_comes_from_path_when_frozen(monkeypatch):
     # Regression test: sys.executable inside a PyInstaller-frozen process (the
     # Docker agent-server image) resolves to the frozen binary itself, not a
     # Python interpreter — using it there silently re-invoked the agent-server
-    # binary instead of running pytest.
+    # binary instead of running pytest. The project venv is now created from
+    # python3 on PATH, frozen or not.
+    from certo.project_env import LocalRunner
+
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(
-        "shutil.which", lambda name: f"/usr/bin/{name}" if name == "python3" else None
+        "shutil.which", lambda name, path=None: f"/usr/bin/{name}" if name == "python3" else None
     )
 
-    assert _python_command() == ["/usr/bin/python3"]
+    assert _base_python(LocalRunner()) == "/usr/bin/python3"
+
+
+def test_run_tests_tool_reports_pytest_unavailable_instead_of_failing(tmp_path, monkeypatch):
+    # No project environment can be made (no uv, no python3): the tool says
+    # so plainly instead of running pytest with Certo's own interpreter.
+    _write_fixture(tmp_path)
+    monkeypatch.setattr("shutil.which", lambda _name, path=None: None)
+
+    observation = RunTestsExecutor(str(tmp_path))(RunTestsAction())
+
+    assert observation.check_kind == "none"
+    assert "neither uv nor python3" in observation.summary
 
 
 def test_run_tests_tool_generic_path_covers_go(tmp_path, monkeypatch):
@@ -333,54 +359,106 @@ def test_a_single_shallower_match_wins_over_deeper_sibling_matches(tmp_path):
 # --- Stage 2: verification-plan discovery (pure, no subprocess) ------------
 
 
+def _python_plan_for(tmp_path, state):
+    return discover_verification_plan(
+        ProjectDetection(language="python", root=str(tmp_path)), python_env=state
+    )
+
+
 def test_python_plan_has_pytest_as_the_only_primary_check(tmp_path):
-    plan = discover_verification_plan(ProjectDetection(language="python", root=str(tmp_path)))
+    plan = _python_plan_for(tmp_path, _state(tmp_path))
 
     assert [s.name for s in plan] == ["pytest"]
     assert plan[0].primary is True
+    assert plan[0].command == [sys.executable, "-m", "pytest", "-q"]
+    assert plan[0].env["VIRTUAL_ENV"] == str(tmp_path / ".venv")
+    assert plan[0].env["PATH"].startswith(str(tmp_path / ".venv" / "bin"))
 
 
-def test_python_plan_adds_ruff_when_configured_and_available(tmp_path):
+def test_python_plan_adds_ruff_when_configured_and_in_the_project_env(tmp_path):
     (tmp_path / "pyproject.toml").write_text("[tool.ruff]\nline-length = 100\n")
 
-    plan = discover_verification_plan(ProjectDetection(language="python", root=str(tmp_path)))
+    plan = _python_plan_for(tmp_path, _state(tmp_path, ("pytest", "ruff")))
 
-    names = [s.name for s in plan]
-    assert "ruff" in names
     ruff_spec = next(s for s in plan if s.name == "ruff")
     assert ruff_spec.primary is False
-    assert ruff_spec.command is not None  # ruff is installed in this dev environment
+    assert ruff_spec.command == [sys.executable, "-m", "ruff", "check", "."]
 
 
-def test_python_plan_marks_ruff_unavailable_when_not_installed(tmp_path, monkeypatch):
+def test_python_plan_marks_ruff_unavailable_when_not_in_the_project_env(tmp_path):
+    # ruff on PATH (or in Certo's own environment) doesn't count: the check
+    # must run with the project's interpreter.
     (tmp_path / "pyproject.toml").write_text("[tool.ruff]\nline-length = 100\n")
-    monkeypatch.setattr("shutil.which", lambda _name: None)
 
-    plan = discover_verification_plan(ProjectDetection(language="python", root=str(tmp_path)))
+    plan = _python_plan_for(tmp_path, _state(tmp_path))
 
     ruff_spec = next(s for s in plan if s.name == "ruff")
     assert ruff_spec.command is None
-    assert "not installed" in ruff_spec.unavailable_reason
+    assert "not installed in the project environment" in ruff_spec.unavailable_reason
 
 
-@pytest.mark.skipif(shutil.which("mypy") is not None, reason="mypy installed")
-def test_python_plan_marks_mypy_unavailable_when_not_installed(tmp_path):
-    # mypy genuinely isn't installed in this dev environment — a real,
-    # not-monkeypatched exercise of the "configured but not installed" path.
+def test_python_plan_marks_mypy_unavailable_when_not_in_the_project_env(tmp_path):
     (tmp_path / "pyproject.toml").write_text("[tool.mypy]\nstrict = true\n")
 
-    plan = discover_verification_plan(ProjectDetection(language="python", root=str(tmp_path)))
+    plan = _python_plan_for(tmp_path, _state(tmp_path))
 
     mypy_spec = next(s for s in plan if s.name == "mypy")
     assert mypy_spec.command is None
-    assert shutil.which("mypy") is None  # confirms the test is exercising the real gap
-    assert "not installed" in mypy_spec.unavailable_reason
+    assert "not installed in the project environment" in mypy_spec.unavailable_reason
 
 
 def test_python_plan_has_no_lint_typecheck_when_unconfigured(tmp_path):
-    plan = discover_verification_plan(ProjectDetection(language="python", root=str(tmp_path)))
+    plan = _python_plan_for(tmp_path, _state(tmp_path))
 
     assert [s.name for s in plan] == ["pytest"]
+
+
+def test_python_plan_without_a_prepared_env_never_guesses_an_interpreter(tmp_path):
+    (tmp_path / "app.py").write_text("if __name__ == '__main__':\n    pass\n")
+
+    plan = _python_plan_for(tmp_path, None)
+
+    assert plan[0].name == "pytest"
+    assert plan[0].command is None
+    assert plan[0].unavailable_reason
+    assert not [s for s in plan if s.name.startswith("python ")]
+
+
+def test_python_plan_pytest_missing_with_tests_is_unavailable_not_failed(tmp_path):
+    state = _state(tmp_path, ())
+    state.pytest_unavailable_reason = "installing it failed: no network"
+
+    plan = _python_plan_for(tmp_path, state)
+
+    assert plan[0].command is None
+    assert plan[0].unavailable_reason == "installing it failed: no network"
+    assert execute_check(plan[0]).status == "unavailable"
+
+
+def test_python_plan_pytest_missing_without_tests_is_skipped(tmp_path):
+    plan = _python_plan_for(tmp_path, _state(tmp_path, (), has_tests=False))
+
+    assert execute_check(plan[0]).status == "skipped"
+
+
+@pytest.mark.parametrize("language_files", [{"app.py": "print(1)\n"}, {"pyproject.toml": ""}])
+def test_python_verification_commands_never_reference_certos_own_interpreter(
+    tmp_path, project_venv, language_files
+):
+    project_venv(tmp_path)
+    for name, text in language_files.items():
+        (tmp_path / name).write_text(text)
+    (tmp_path / "test_app.py").write_text("def test_ok():\n    assert True\n")
+    (tmp_path / "main.py").write_text("if __name__ == '__main__':\n    pass\n")
+    (tmp_path / "ruff.toml").write_text("")
+
+    run = run_full_verification(str(tmp_path))
+
+    assert run.commands
+    for command in run.commands:
+        assert sys.executable not in command
+        assert os.path.join(sys.prefix, "bin") not in command
+    assert all(c.split()[0] == str(tmp_path / ".venv" / "bin" / "python") for c in run.commands)
 
 
 def test_node_plan_prefers_build_as_primary_over_test(tmp_path):
@@ -881,7 +959,7 @@ def test_python_plan_smoke_run_command_uses_the_relative_nested_path(tmp_path):
     nested.mkdir()
     (nested / "main.py").write_text("if __name__ == '__main__':\n    pass\n")
 
-    specs = _python_plan(str(tmp_path))
+    specs = _python_plan(str(tmp_path), _state(tmp_path))
 
     smoke_specs = [s for s in specs if s.name.startswith("python ")]
     assert len(smoke_specs) == 1
@@ -920,7 +998,7 @@ def test_entrypoint_ordering_spec_fails_when_something_is_defined_after_the_guar
 def test_python_plan_adds_entrypoint_checks_when_a_guard_is_present(tmp_path):
     (tmp_path / "app.py").write_text(_ORDERING_OK_SOURCE)
 
-    plan = _python_plan(str(tmp_path))
+    plan = _python_plan(str(tmp_path), _state(tmp_path))
 
     names = {s.name for s in plan}
     assert "entrypoint-ordering" in names
@@ -934,12 +1012,15 @@ def test_python_plan_has_no_entrypoint_checks_without_a_guard(tmp_path):
     # file (bare directories of test_*.py with no __main__ guard anywhere).
     (tmp_path / "test_fixture.py").write_text("def test_ok():\n    assert True\n")
 
-    plan = _python_plan(str(tmp_path))
+    plan = _python_plan(str(tmp_path), _state(tmp_path))
 
     assert {s.name for s in plan} == {"pytest"}
 
 
-def test_full_verification_catches_the_live_ordering_bug_even_though_pytest_passes(tmp_path):
+def test_full_verification_catches_the_live_ordering_bug_even_though_pytest_passes(
+    tmp_path, project_venv
+):
+    project_venv(tmp_path)
     # The exact shape of the live failure: a test suite that only imports
     # the module (and therefore never calls into the __main__ guard) passes
     # cleanly, while running the script directly would crash. Verification
@@ -958,7 +1039,8 @@ def test_full_verification_catches_the_live_ordering_bug_even_though_pytest_pass
     assert ordering_check.status == "failed"
 
 
-def test_full_verification_passes_when_entrypoint_ordering_is_correct(tmp_path):
+def test_full_verification_passes_when_entrypoint_ordering_is_correct(tmp_path, project_venv):
+    project_venv(tmp_path)
     (tmp_path / "app.py").write_text(_ORDERING_OK_SOURCE)
     (tmp_path / "test_app.py").write_text(
         "from app import main\n\ndef test_main_is_importable():\n    assert callable(main)\n"
@@ -974,7 +1056,7 @@ def test_entrypoint_smoke_check_fails_on_a_real_startup_crash(tmp_path):
     # to do with the ordering bug, a plain startup-crash check.
     (tmp_path / "app.py").write_text("if __name__ == '__main__':\n    raise RuntimeError('boom')\n")
 
-    plan = _python_plan(str(tmp_path))
+    plan = _python_plan(str(tmp_path), _state(tmp_path))
     entrypoint_check = next(s for s in plan if s.name == "python app.py")
     outcome = execute_check(entrypoint_check)
 
@@ -1088,7 +1170,8 @@ def test_verification_run_commands_omits_unavailable_empty_commands():
 # --- Full pipeline: run_full_verification -----------------------------------
 
 
-def test_full_verification_python_project_with_passing_tests(tmp_path):
+def test_full_verification_python_project_with_passing_tests(tmp_path, project_venv):
+    project_venv(tmp_path)
     (tmp_path / "test_fixture.py").write_text("def test_ok():\n    assert True\n")
 
     run = run_full_verification(str(tmp_path))
@@ -1097,7 +1180,8 @@ def test_full_verification_python_project_with_passing_tests(tmp_path):
     assert [c.name for c in run.checks] == ["pytest"]
 
 
-def test_full_verification_python_project_with_failing_tests(tmp_path):
+def test_full_verification_python_project_with_failing_tests(tmp_path, project_venv):
+    project_venv(tmp_path)
     _write_fixture(tmp_path)
 
     run = run_full_verification(str(tmp_path))
@@ -1105,7 +1189,8 @@ def test_full_verification_python_project_with_failing_tests(tmp_path):
     assert run.state == "failed"
 
 
-def test_full_verification_no_test_python_project_is_inconclusive(tmp_path):
+def test_full_verification_no_test_python_project_is_inconclusive(tmp_path, project_venv):
+    project_venv(tmp_path)
     # A recognized Python project (has actual .py source) with no tests
     # defined yet — inconclusive, not a failure, per the pytest exit-5
     # exemption.
@@ -1148,7 +1233,8 @@ def test_full_verification_monorepo_with_sibling_projects_is_inconclusive_and_un
     assert str(backend) in run.limitation_notes[0]
 
 
-def test_full_verification_runs_ruff_when_configured_and_available(tmp_path):
+def test_full_verification_runs_ruff_when_configured_and_available(tmp_path, project_venv):
+    project_venv(tmp_path)
     (tmp_path / "pyproject.toml").write_text("[tool.ruff]\nline-length = 100\n")
     (tmp_path / "test_fixture.py").write_text("def test_ok():\n    assert True\n")
     # An unused import is a real ruff violation (F401) — deterministic, no

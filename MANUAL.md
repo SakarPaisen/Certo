@@ -24,6 +24,7 @@ reference — how to actually run and configure the thing.
 - [Server mode (HTTP/WebSocket)](#server-mode-httpwebsocket)
 - [Task registry persistence](#task-registry-persistence)
 - [Projects: one subfolder per generated project](#projects-one-subfolder-per-generated-project)
+- [Project environments (Python)](#project-environments-python)
 - [Skills](#skills)
 - [Execution modes](#execution-modes)
 - [Switching LLM provider / model](#switching-llm-provider--model)
@@ -872,7 +873,69 @@ before it finishes — not just when a task explicitly asks for one. This is a
 prompt-level instruction, not something the harness generates or enforces
 itself: the harness has no way to know how to run arbitrary generated code,
 only the agent that built it does. Since it's a soft instruction, a given run
-can still finish without one — check the project folder if in doubt.
+can still finish without one — check the project folder if in doubt. For a
+project with its own environment, the agent is also asked to include the
+commands that create it and install the dependencies into it.
+
+## Project environments (Python)
+
+Every Python project gets its own isolated environment, and both the agent's
+terminal and Certo's verification use it. Certo never runs a project's
+checks with its own interpreter, and never installs anything into the
+environment Certo itself runs from (after `uv tool install certo`, that
+environment has neither pytest nor pip).
+
+**Which environment.** Certo looks in the project root, then each parent up
+to the workspace root, and uses the first of:
+
+1. a `uv.lock` project, when `uv` is on PATH: everything runs through
+   `uv run --project <dir> python ...`, which also syncs it;
+2. a `.venv/` or `venv/` whose interpreter actually runs.
+
+If there is none, it creates `.venv` in the project root: `uv venv --seed`
+when `uv` is on PATH (so the venv has pip too), else `python3 -m venv`. A
+venv Certo created carries a `.certo-created` marker. If such a venv stops
+working (for example one made inside the Docker container, then used on
+the host), Certo rebuilds it. A broken venv without the marker belongs to
+someone else: Certo leaves it alone and reports pytest as `unavailable`.
+
+**When.** Before the agent starts, for:
+
+- a workspace detected as a Python project;
+- an empty workspace whose task names Python (`python`, `pytest`, `pip`,
+  a `.py` file, Django/Flask/FastAPI, ...).
+
+A Node, Go, Rust or Java project never gets one just for existing. At
+verification time, any project detected as Python gets one, including with
+`certo verify`.
+
+**The agent's terminal.** The terminal session starts with `VIRTUAL_ENV`
+set to the venv and its `bin/` first on `PATH`, so `python`, `pip` and
+`pytest` resolve there with no activation step. The system prompt also
+tells the agent the environment exists and how to install into it. Certo's
+own `bin/` is always removed from the terminal's `PATH`. When the project
+has an environment, the terminal uses the SDK's subprocess backend even if
+`tmux` is installed: under tmux, a new window takes `PATH` from Certo's own
+process instead (see [Known limitations](#known-limitations)).
+
+**Verification.** pytest, ruff, mypy and the entry-point smoke run all use
+the project interpreter (`<venv>/bin/python -m pytest -q`, `... -m ruff
+check .`, `... -m mypy .`, `<venv>/bin/python <entry point>`). ruff and mypy
+must be installed in the project environment; one on PATH doesn't count.
+If the project has test files (`test_*.py` / `*_test.py`) but no pytest,
+Certo installs pytest into the project environment (`uv pip install
+--python <venv>/bin/python pytest`, or the venv's own pip), with stdin
+closed and a 300s timeout, and says so in the run output. If that install
+fails, pytest is `unavailable` with the reason. A missing test runner is a
+limitation, not a test failure.
+
+**Docker.** Under `--execution docker`, the environment is created and used
+inside the container (`/workspace/.venv`), and the harness's verification
+runs there too. See [Execution modes](#execution-modes).
+
+`.venv/` and `venv/` are skipped by project detection, entry-point
+discovery and the unknown-workspace file listing. Acceptance checks only
+look at the paths you name, so they never walk into it.
 
 ## Skills
 
@@ -1171,6 +1234,17 @@ The agent loop and its tools run inside a container instead of this process.
   `/workspace`, so files the agent creates land in the same host folder
   regardless of execution mode — `--project my-api --execution docker` writes
   to `./projects/my-api` on the host exactly like `--execution local` does.
+- Certo's own post-run verification runs **inside the container** as well,
+  through the workspace's `execute_command`. It uses the same project
+  environment (`/workspace/.venv`) and the same toolchains as the agent.
+  Detection and planning still read the files on the host, through the bind
+  mount. A venv only works on the OS that created it, so a `.venv` made in
+  the container can't be used by a later `--execution local` run on the
+  same project. Certo rebuilds it then (see
+  [Project environments](#project-environments-python)).
+- After upgrading Certo, rebuild the image (`docker rmi
+  certo/agent-server:local`, then run again): the image carries a copy of
+  Certo's tool code, and the old image keeps the old code.
 - The container is torn down automatically after the run (success or
   failure) — `runner.py` uses `DockerWorkspace` as a context manager. No
   manual cleanup needed; `docker ps` should never show a leftover
@@ -1317,7 +1391,7 @@ live in `src/certo/custom_tools/`:
 
   | Language | Primary check | Secondary checks (only if configured) |
   |---|---|---|
-  | Python | `pytest -q` | `ruff check .` (`[tool.ruff]` or `ruff.toml`/`.ruff.toml`); `mypy .` (`[tool.mypy]` or `mypy.ini`/`.mypy.ini`); **always**, for any `.py` file with an `if __name__ == "__main__":` guard, found by a depth-bounded recursive scan (same depth bound and vendor/build-directory skip list as project detection, plus the project's own `tests`/`test` directory — see below): `entrypoint-ordering` (a static AST check, no subprocess — see below) and `python <entry point>` (actually runs it, stdin closed) |
+  | Python (every command runs with the project's own interpreter — see [Project environments](#project-environments-python)) | `pytest -q` | `ruff check .` (`[tool.ruff]` or `ruff.toml`/`.ruff.toml`); `mypy .` (`[tool.mypy]` or `mypy.ini`/`.mypy.ini`); **always**, for any `.py` file with an `if __name__ == "__main__":` guard, found by a depth-bounded recursive scan (same depth bound and vendor/build-directory skip list as project detection, plus the project's own `tests`/`test` directory — see below): `entrypoint-ordering` (a static AST check, no subprocess — see below) and `python <entry point>` (actually runs it, stdin closed) |
   | Node/JS/TS | `npm run build` if defined, else `npm test` if a real (non-placeholder) `scripts.test` exists | whichever of `scripts.test`/`scripts.lint`/`scripts.typecheck`(`-type-check`) aren't already primary |
   | Go | `go test ./...` | `go vet ./...` |
   | Rust | `cargo test` | `cargo check`; `cargo clippy` |
@@ -1838,6 +1912,17 @@ uv run pytest -q
   drive the program into every branch; a bug reachable only through a
   *correctly-ordered* but otherwise-broken interactive branch is still
   outside what either check can catch.
+- **A project with its own environment always gets the SDK's subprocess
+  terminal, never tmux.** The SDK passes extra terminal variables to tmux
+  as session environment, but a new tmux window takes `PATH` from the tmux
+  client, which is Certo's own process. So `VIRTUAL_ENV` arrived while
+  `python` still resolved to Certo's interpreter (confirmed live, SDK
+  1.47.0, tmux on macOS). The subprocess backend applies `PATH` correctly.
+- **An empty workspace gets a project environment only when the task names
+  Python.** If the task never says so and the agent writes Python anyway,
+  the agent's terminal starts without one. Verification still creates one
+  afterwards, but anything the agent installed went elsewhere, so the
+  project's imports may fail until the agent installs them again.
 - **`local` execution's terminal has no real PTY unless `tmux` is installed
   on the host** — without it, the SDK falls back to a subprocess-based
   terminal (a startup warning says so). `docker` execution is unaffected:

@@ -33,17 +33,25 @@ import ast
 import json
 import os
 import re
-import shutil
-import subprocess
-import sys
 import tomllib
 from collections.abc import Sequence
-from dataclasses import dataclass
-
-from pydantic import Field
+from dataclasses import dataclass, field
 
 from openhands.sdk import Action, ImageContent, Observation, TextContent, ToolDefinition
 from openhands.sdk.tool import Tool, ToolExecutor, register_tool
+from pydantic import Field
+
+from certo.project_env import (
+    _MAX_SCAN_DEPTH,
+    _SKIP_DIRS,
+    CommandRunner,
+    LocalRunner,
+    ProjectEnv,
+    available_modules,
+    ensure_project_env,
+    has_test_files,
+    install_into_env,
+)
 
 _FAILURE_LINE_RE = re.compile(r"^(?:FAILED|ERROR) (.+)$", re.MULTILINE)
 _COUNT_RE = re.compile(r"(\d+) (passed|failed|errors?|skipped)")
@@ -55,26 +63,13 @@ _COUNT_RE = re.compile(r"(\d+) (passed|failed|errors?|skipped)")
 # "Test verification".
 PYTEST_NO_TESTS_COLLECTED = 5
 
-# Directories that are large, irrelevant to project-type detection, and
-# expensive to walk into.
-_SKIP_DIRS = {
-    "node_modules",
-    ".git",
-    ".venv",
-    "venv",
-    "__pycache__",
-    "dist",
-    "build",
-    ".next",
-    "target",  # Rust/Java (Cargo, Maven) build output
-    "vendor",  # Go
-}
-# A scaffolded project can land a level or two below the workspace root
-# passed via --project — confirmed live: `npm create vite@latest ...` nested
-# the actual app under <project>/<name>/<name>/. Bounded so a large,
-# unrelated workspace doesn't turn every verification call into a full tree
-# walk.
-_MAX_SCAN_DEPTH = 4
+# `_SKIP_DIRS` (large, irrelevant directories such as node_modules and the
+# project's own `.venv`/`venv`) and `_MAX_SCAN_DEPTH` live in project_env.py,
+# shared with its own walks. The depth bound exists because a scaffolded
+# project can land a level or two below the workspace root passed via
+# --project — confirmed live: `npm create vite@latest ...` nested the actual
+# app under <project>/<name>/<name>/ — without turning every verification
+# call into a full tree walk.
 
 # Marker files that unambiguously identify a project's language/ecosystem,
 # checked in this order (so, e.g., a directory with both `pyproject.toml`
@@ -194,20 +189,6 @@ def _parse_counts(summary_line: str) -> dict[str, int]:
     return counts
 
 
-def _python_command() -> list[str]:
-    """The interpreter to run pytest with.
-
-    sys.executable is correct for a normal Python process (the same venv this
-    tool runs under). Inside a PyInstaller-frozen process — e.g. this
-    project's Docker agent-server image — it instead resolves to the frozen
-    binary itself, not an interpreter, so fall back to whatever `python3` /
-    `python` is on PATH there.
-    """
-    if getattr(sys, "frozen", False):
-        return [shutil.which("python3") or shutil.which("python") or "python3"]
-    return [sys.executable]
-
-
 class RunTestsAction(Action):
     path: str = Field(
         default="",
@@ -271,18 +252,36 @@ class RunTestsExecutor(ToolExecutor[RunTestsAction, RunTestsObservation]):
         )
 
     def _run_pytest(self, action: RunTestsAction, run_dir: str) -> RunTestsObservation:
-        cmd = [*_python_command(), "-m", "pytest", "-q"]
+        # The project's own environment, never this process's interpreter
+        # (see project_env.py). Runs wherever this tool runs: the host under
+        # local execution, the container under Docker.
+        runner = LocalRunner()
+        state = prepare_python_env(run_dir, runner, stop_at=self._working_dir, install_pytest=True)
+        if state.env is None or "pytest" not in state.modules:
+            return RunTestsObservation(
+                check_kind="none",
+                summary=state.pytest_unavailable_reason or "pytest is not available",
+            )
+        cmd = [*state.env.python, "-m", "pytest", "-q"]
         if action.path:
             cmd.append(action.path)
-        result = subprocess.run(
-            cmd,
-            cwd=run_dir,
-            capture_output=True,
-            text=True,
-            timeout=300,
+        result = runner.run(
+            cmd, cwd=run_dir, env=state.env.env_vars(runner.base_path()), timeout=300
         )
-        output = result.stdout + result.stderr
-        summary = _last_nonblank_line(output)
+        if result.returncode is None:
+            return RunTestsObservation(
+                check_kind="none",
+                summary=(
+                    "pytest timed out after 300s"
+                    if result.timed_out
+                    else f"pytest could not be run: {result.error}"
+                ),
+                output=result.output[-4000:],
+            )
+        output = result.output
+        if state.notices:
+            output = "\n".join(state.notices) + "\n" + output
+        summary = _last_nonblank_line(result.output)
         counts = _parse_counts(summary)
         failures = _FAILURE_LINE_RE.findall(output)
         return RunTestsObservation(
@@ -297,20 +296,24 @@ class RunTestsExecutor(ToolExecutor[RunTestsAction, RunTestsObservation]):
         )
 
     def _run_npm_build(self, run_dir: str) -> RunTestsObservation:
-        npm = shutil.which("npm")
+        runner = LocalRunner()
+        npm = runner.which("npm")
         if npm is None:
             return RunTestsObservation(
                 check_kind="none",
                 summary="npm not found on PATH; cannot verify the build",
             )
-        result = subprocess.run(
-            [npm, "run", "build"],
-            cwd=run_dir,
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        output = result.stdout + result.stderr
+        result = runner.run([npm, "run", "build"], cwd=run_dir, timeout=300)
+        output = result.output
+        if result.returncode is None:
+            return RunTestsObservation(
+                check_kind="npm_build",
+                exit_code=1,
+                summary="npm run build timed out"
+                if result.timed_out
+                else f"npm could not run: {result.error}",
+                output=output[-4000:],
+            )
         summary = (
             "npm run build succeeded"
             if result.returncode == 0
@@ -401,6 +404,9 @@ class VerificationRun:
     """The aggregate result of every check attempted for one verification pass."""
 
     checks: list[CheckOutcome]
+    # Things the harness did to the project while setting up, worth telling
+    # the user (e.g. "created .venv", "installed pytest into it").
+    notices: tuple[str, ...] = ()
 
     @property
     def state(self) -> str:
@@ -457,6 +463,10 @@ class CheckSpec:
     primary: bool
     command: list[str] | None
     cwd: str
+    # Extra environment variables on top of the runner's own environment
+    # (e.g. CI=true, or the project venv's VIRTUAL_ENV/PATH) — never a full
+    # copy of this process's environment, which wouldn't apply inside a
+    # Docker container anyway.
     env: dict[str, str] | None = None
     # Exit codes that mean "ran, found nothing to verify" rather than pass
     # or fail — pytest's PYTEST_NO_TESTS_COLLECTED is the only current use.
@@ -473,10 +483,21 @@ class CheckSpec:
 _CHECK_TIMEOUT_SECONDS = 300
 
 
-def execute_check(spec: CheckSpec, *, timeout: int = _CHECK_TIMEOUT_SECONDS) -> CheckOutcome:
+def execute_check(
+    spec: CheckSpec,
+    *,
+    timeout: int = _CHECK_TIMEOUT_SECONDS,
+    runner: CommandRunner | None = None,
+) -> CheckOutcome:
     """Stage 3: run one planned check. The only function in this module that
     spawns a subprocess for harness-side verification — except a
-    `precomputed` spec, which by definition needed none."""
+    `precomputed` spec, which by definition needed none. `runner` decides
+    where: a host subprocess by default, or inside the Docker container (see
+    project_env.WorkspaceRunner). Either way stdin is closed: no human is
+    available to answer a prompt (same rationale as agent.py's
+    _NONINTERACTIVE_TOOLING_SUFFIX), so a command that reads stdin fails
+    fast instead of hanging, which is also what lets the entry-point smoke
+    check observe how a script behaves with no input available."""
     if spec.precomputed is not None:
         return spec.precomputed
     if spec.command is None:
@@ -493,26 +514,10 @@ def execute_check(spec: CheckSpec, *, timeout: int = _CHECK_TIMEOUT_SECONDS) -> 
             output="",
         )
 
+    runner = runner or LocalRunner()
     command_str = " ".join(spec.command)
-    try:
-        result = subprocess.run(
-            spec.command,
-            cwd=spec.cwd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env=spec.env,
-            # No human is available to answer a prompt (same rationale as
-            # agent.py's _NONINTERACTIVE_TOOLING_SUFFIX) — without this, a
-            # subprocess that reads stdin would inherit the harness's own,
-            # which can hang this check indefinitely rather than failing
-            # fast. Also what lets the entry-point smoke-test check below
-            # observe how a script behaves with no input available, instead
-            # of blocking on it.
-            stdin=subprocess.DEVNULL,
-        )
-    except subprocess.TimeoutExpired as exc:
-        partial = (exc.stdout or "") + (exc.stderr or "")
+    result = runner.run(spec.command, cwd=spec.cwd, env=spec.env, timeout=timeout)
+    if result.timed_out:
         return CheckOutcome(
             name=spec.name,
             command=command_str,
@@ -521,9 +526,9 @@ def execute_check(spec: CheckSpec, *, timeout: int = _CHECK_TIMEOUT_SECONDS) -> 
             exit_code=None,
             project_root=spec.cwd,
             summary=f"{spec.name} exceeded its {timeout}s timeout and was killed",
-            output=partial[-4000:],
+            output=result.output[-4000:],
         )
-    except OSError as exc:
+    if result.returncode is None:
         return CheckOutcome(
             name=spec.name,
             command=command_str,
@@ -531,11 +536,11 @@ def execute_check(spec: CheckSpec, *, timeout: int = _CHECK_TIMEOUT_SECONDS) -> 
             status="unavailable",
             exit_code=None,
             project_root=spec.cwd,
-            summary=f"{spec.name} could not be run: {exc}",
+            summary=f"{spec.name} could not be run: {result.error}",
             output="",
         )
 
-    output = (result.stdout or "") + (result.stderr or "")
+    output = result.output
     if result.returncode in spec.skip_exit_codes:
         return CheckOutcome(
             name=spec.name,
@@ -761,46 +766,152 @@ def _entrypoint_ordering_spec(root: str, entrypoints: list[str]) -> CheckSpec | 
     )
 
 
-def _python_plan(root: str) -> list[CheckSpec]:
-    specs = [
-        CheckSpec(
-            name="pytest",
-            primary=True,
-            command=[*_python_command(), "-m", "pytest", "-q"],
-            cwd=root,
-            skip_exit_codes=(PYTEST_NO_TESTS_COLLECTED,),
-            skip_reason="no tests collected",
+@dataclass
+class PythonEnvState:
+    """Result of the Python setup stage (`prepare_python_env`): the project's
+    environment and what it can run. Planning (`_python_plan`) reads this
+    instead of probing anything itself, so it stays subprocess-free."""
+
+    env: ProjectEnv | None
+    modules: set[str] = field(default_factory=set)
+    # Why the environment, or pytest in it, isn't usable.
+    pytest_unavailable_reason: str | None = None
+    has_tests: bool = True
+    notices: list[str] = field(default_factory=list)
+    base_path: str = ""
+
+    def env_vars(self) -> dict[str, str] | None:
+        return self.env.env_vars(self.base_path) if self.env else None
+
+
+def prepare_python_env(
+    root: str,
+    runner: CommandRunner | None = None,
+    *,
+    stop_at: str | None = None,
+    install_pytest: bool = True,
+) -> PythonEnvState:
+    """Setup stage for a Python project (subprocesses allowed): find or
+    create its environment, see which check tools it has, and install pytest
+    into it when the project has tests but no pytest.
+
+    The install goes into the project environment only, with stdin closed
+    and a timeout. If it fails, pytest is reported unavailable with the
+    reason — a missing test runner is a limitation, not a test failure.
+    """
+    runner = runner or LocalRunner()
+    setup = ensure_project_env(root, runner, stop_at=stop_at)
+    state = PythonEnvState(
+        env=setup.env,
+        notices=list(setup.notices),
+        has_tests=has_test_files(root),
+        base_path=runner.base_path(),
+    )
+    if setup.env is None:
+        state.pytest_unavailable_reason = setup.unavailable_reason
+        return state
+    modules = available_modules(setup.env, runner, root)
+    if modules is None:
+        state.pytest_unavailable_reason = (
+            f"the project environment's interpreter ({' '.join(setup.env.python)}) could not be run"
         )
-    ]
-    if _ruff_configured(root):
-        ruff = shutil.which("ruff")
-        if ruff is not None:
-            specs.append(
-                CheckSpec(name="ruff", primary=False, command=[ruff, "check", "."], cwd=root)
+        return state
+    state.modules = modules
+    if "pytest" in modules or not state.has_tests or not install_pytest:
+        return state
+    result = install_into_env(setup.env, runner, "pytest", root)
+    if result.returncode == 0 and "pytest" in (available_modules(setup.env, runner, root) or set()):
+        state.modules.add("pytest")
+        state.notices.append(
+            f"Installed pytest into the project environment {setup.env.host_dir} "
+            "(the project's tests need it and it wasn't there)."
+        )
+        return state
+    detail = _last_nonblank_line(result.error or result.output) or (
+        "timed out" if result.timed_out else f"exit {result.returncode}"
+    )
+    state.pytest_unavailable_reason = (
+        "pytest is not installed in the project environment "
+        f"({setup.env.host_dir}) and installing it failed: {detail}"
+    )
+    return state
+
+
+def _python_plan(root: str, state: PythonEnvState | None = None) -> list[CheckSpec]:
+    """Every Python check runs with the project's interpreter (`state.env`),
+    never this process's own. Without a prepared environment (`state` None)
+    the test check is unavailable rather than guessed."""
+    env_vars = state.env_vars() if state else None
+    python = list(state.env.python) if state and state.env else None
+    modules = state.modules if state else set()
+
+    if python is None:
+        reason = (state.pytest_unavailable_reason if state else None) or (
+            "no project environment was prepared for this Python project"
+        )
+        specs = [
+            CheckSpec(
+                name="pytest", primary=True, command=None, cwd=root, unavailable_reason=reason
             )
-        else:
+        ]
+    elif "pytest" not in modules and state is not None and not state.has_tests:
+        specs = [
+            CheckSpec(
+                name="pytest",
+                primary=True,
+                command=None,
+                cwd=root,
+                skip_reason="no tests collected (no test files found)",
+            )
+        ]
+    elif "pytest" not in modules:
+        reason = (state.pytest_unavailable_reason if state else None) or (
+            "pytest is not installed in the project environment"
+        )
+        specs = [
+            CheckSpec(
+                name="pytest", primary=True, command=None, cwd=root, unavailable_reason=reason
+            )
+        ]
+    else:
+        specs = [
+            CheckSpec(
+                name="pytest",
+                primary=True,
+                command=[*python, "-m", "pytest", "-q"],
+                cwd=root,
+                env=env_vars,
+                skip_exit_codes=(PYTEST_NO_TESTS_COLLECTED,),
+                skip_reason="no tests collected",
+            )
+        ]
+    for tool, configured, what in (
+        ("ruff", _ruff_configured(root), "lint"),
+        ("mypy", _mypy_configured(root), "type checking"),
+    ):
+        if not configured:
+            continue
+        if python is not None and tool in modules:
+            args = ["check", "."] if tool == "ruff" else ["."]
             specs.append(
                 CheckSpec(
-                    name="ruff",
+                    name=tool,
                     primary=False,
-                    command=None,
+                    command=[*python, "-m", tool, *args],
                     cwd=root,
-                    unavailable_reason="ruff is configured but not installed; lint was not verified",
+                    env=env_vars,
                 )
             )
-    if _mypy_configured(root):
-        mypy = shutil.which("mypy")
-        if mypy is not None:
-            specs.append(CheckSpec(name="mypy", primary=False, command=[mypy, "."], cwd=root))
         else:
             specs.append(
                 CheckSpec(
-                    name="mypy",
+                    name=tool,
                     primary=False,
                     command=None,
                     cwd=root,
                     unavailable_reason=(
-                        "mypy is configured but not installed; type checking was not verified"
+                        f"{tool} is configured but not installed in the project "
+                        f"environment; {what} was not verified"
                     ),
                 )
             )
@@ -815,15 +926,17 @@ def _python_plan(root: str) -> list[CheckSpec]:
     # an interactive menu path like a "SOLVE" command. That's a real,
     # deliberate scope limit, not an oversight — see MANUAL.md "Test
     # verification".
-    for name in entrypoints:
-        specs.append(
-            CheckSpec(
-                name=f"python {name}",
-                primary=False,
-                command=[*_python_command(), name],
-                cwd=root,
+    if python is not None:
+        for name in entrypoints:
+            specs.append(
+                CheckSpec(
+                    name=f"python {name}",
+                    primary=False,
+                    command=[*python, name],
+                    cwd=root,
+                    env=env_vars,
+                )
             )
-        )
     return specs
 
 
@@ -833,8 +946,8 @@ def _python_plan(root: str) -> list[CheckSpec]:
 # else a real `test` script → test is primary. `lint`/`typecheck` are always
 # secondary when present. Nothing here is invented: a script only becomes a
 # check if the project's own package.json defines it.
-def _node_plan(root: str) -> list[CheckSpec]:
-    npm = shutil.which("npm")
+def _node_plan(root: str, runner: CommandRunner) -> list[CheckSpec]:
+    npm = runner.which("npm")
     scripts = _node_scripts(root)
     build = _real_node_script(scripts, "build")
     test = _real_node_script(scripts, "test")
@@ -872,7 +985,7 @@ def _node_plan(root: str) -> list[CheckSpec]:
         # _NONINTERACTIVE_TOOLING_SUFFIX, applied to the harness's own
         # subprocess calls. `build` isn't a watch-mode command, so it's
         # left out of this.
-        env = {**os.environ, "CI": "true"} if use_ci_env else None
+        env = {"CI": "true"} if use_ci_env else None
         return CheckSpec(name=name, primary=primary, command=command, cwd=root, env=env)
 
     specs = [spec_for(primary_key, primary=True, use_ci_env=primary_key != "build")]
@@ -885,8 +998,8 @@ def _node_plan(root: str) -> list[CheckSpec]:
     return specs
 
 
-def _go_plan(root: str) -> list[CheckSpec]:
-    go = shutil.which("go")
+def _go_plan(root: str, runner: CommandRunner) -> list[CheckSpec]:
+    go = runner.which("go")
     if go is None:
         return [
             CheckSpec(
@@ -903,8 +1016,8 @@ def _go_plan(root: str) -> list[CheckSpec]:
     ]
 
 
-def _rust_plan(root: str) -> list[CheckSpec]:
-    cargo = shutil.which("cargo")
+def _rust_plan(root: str, runner: CommandRunner) -> list[CheckSpec]:
+    cargo = runner.which("cargo")
     if cargo is None:
         return [
             CheckSpec(
@@ -922,29 +1035,30 @@ def _rust_plan(root: str) -> list[CheckSpec]:
     ]
 
 
-def _wrapper_or_tool(root: str, wrapper_name: str, tool_name: str) -> tuple[str | None, str | None]:
+def _wrapper_or_tool(
+    root: str, wrapper_name: str, tool_name: str, runner: CommandRunner
+) -> tuple[str | None, str | None]:
     """Prefer a checked-in wrapper script (`./mvnw`, `./gradlew`) over a
-    globally installed tool — same "prefer checked-in wrappers" convention
-    already used by `_python_command()` and this project's own
-    `testing-and-verification` skill. Returns (executable, error) — exactly
-    one is None."""
+    globally installed tool — the "prefer checked-in wrappers" convention of
+    this project's own `testing-and-verification` skill. Returns
+    (executable, error) — exactly one is None."""
     wrapper = os.path.join(root, wrapper_name)
     if os.path.isfile(wrapper) and os.access(wrapper, os.X_OK):
-        return wrapper, None
-    tool = shutil.which(tool_name)
+        return runner.exec_path(wrapper), None
+    tool = runner.which(tool_name)
     if tool is not None:
         return tool, None
     return None, f"neither ./{wrapper_name} nor {tool_name} is available"
 
 
-def _java_plan(detection: ProjectDetection) -> list[CheckSpec]:
+def _java_plan(detection: ProjectDetection, runner: CommandRunner) -> list[CheckSpec]:
     root = detection.root
     if detection.language == "java-maven":
-        executable, error = _wrapper_or_tool(root, "mvnw", "mvn")
+        executable, error = _wrapper_or_tool(root, "mvnw", "mvn", runner)
         name = "mvn test"
         manifest = "pom.xml"
     else:
-        executable, error = _wrapper_or_tool(root, "gradlew", "gradle")
+        executable, error = _wrapper_or_tool(root, "gradlew", "gradle", runner)
         name = "gradle test"
         manifest = "build.gradle"
     if executable is None:
@@ -960,9 +1074,17 @@ def _java_plan(detection: ProjectDetection) -> list[CheckSpec]:
     return [CheckSpec(name=name, primary=True, command=[executable, "test"], cwd=root)]
 
 
-def discover_verification_plan(detection: ProjectDetection) -> list[CheckSpec]:
+def discover_verification_plan(
+    detection: ProjectDetection,
+    *,
+    python_env: PythonEnvState | None = None,
+    runner: CommandRunner | None = None,
+) -> list[CheckSpec]:
     """Stage 2: given a detected project, decide which checks apply — pure
-    (file reads and `shutil.which` lookups only, no subprocess execution).
+    (file reads and tool lookups only, no check execution). A Python
+    project's environment comes from the setup stage (`python_env`, see
+    `prepare_python_env`); `runner` resolves tool names where the checks
+    will run (the host, or the Docker container).
     Never invents a check the project doesn't itself configure; an unknown
     project gets a single synthetic check explaining that plainly rather
     than a guessed command. An "ambiguous" detection (multiple candidate
@@ -970,16 +1092,17 @@ def discover_verification_plan(detection: ProjectDetection) -> list[CheckSpec]:
     treatment: one synthetic, unavailable check naming every candidate,
     instead of silently verifying whichever one was found first.
     """
+    runner = runner or LocalRunner()
     if detection.language == "python":
-        return _python_plan(detection.root)
+        return _python_plan(detection.root, python_env)
     if detection.language == "node":
-        return _node_plan(detection.root)
+        return _node_plan(detection.root, runner)
     if detection.language == "go":
-        return _go_plan(detection.root)
+        return _go_plan(detection.root, runner)
     if detection.language == "rust":
-        return _rust_plan(detection.root)
+        return _rust_plan(detection.root, runner)
     if detection.language in ("java-maven", "java-gradle"):
-        return _java_plan(detection)
+        return _java_plan(detection, runner)
     if detection.language == "ambiguous":
         candidates = ", ".join(
             f"{root} ({language})" for language, root in (detection.candidates or ())
@@ -1055,13 +1178,26 @@ def _describe_unrecognized_workspace(root: str) -> str:
     return message
 
 
-def run_full_verification(working_dir: str) -> VerificationRun:
-    """The full pipeline: detect → discover plan → execute every check →
-    aggregate. This is the language-neutral entry point `runner.py`'s
-    post-hoc verification loop calls; the agent-facing `run_tests` tool
-    above reuses stages 1-3 directly for non-Python/Node languages instead
-    of duplicating detection (see `RunTestsExecutor.__call__`).
+def run_full_verification(working_dir: str, runner: CommandRunner | None = None) -> VerificationRun:
+    """The full pipeline: detect → set up (Python: the project environment)
+    → discover plan → execute every check → aggregate. This is the
+    language-neutral entry point `runner.py`'s post-hoc verification loop
+    and `certo verify` call; the agent-facing `run_tests` tool above reuses
+    stages 1-3 directly for non-Python/Node languages instead of duplicating
+    detection (see `RunTestsExecutor.__call__`).
+
+    `runner` decides where commands run: host subprocesses by default, or
+    the Docker container (project_env.WorkspaceRunner). Detection and
+    planning read files on the host either way (the workspace is
+    bind-mounted).
     """
+    runner = runner or LocalRunner()
     detection = detect_project(working_dir)
-    plan = discover_verification_plan(detection)
-    return VerificationRun(checks=[execute_check(spec) for spec in plan])
+    python_env = None
+    if detection.language == "python":
+        python_env = prepare_python_env(detection.root, runner, stop_at=working_dir)
+    plan = discover_verification_plan(detection, python_env=python_env, runner=runner)
+    return VerificationRun(
+        checks=[execute_check(spec, runner=runner) for spec in plan],
+        notices=tuple(python_env.notices) if python_env else (),
+    )
