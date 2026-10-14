@@ -33,7 +33,12 @@ DEFAULT_MAX_ITERATIONS = 50
 DEFAULT_CONFIRM_MODE = "never"
 DEFAULT_EXECUTION = "local"
 DEFAULT_PROJECTS_DIR = "./projects"
+# Optional user catalog, loaded on top of the built-in one below (a user
+# skill replaces a built-in skill with the same name).
 DEFAULT_SKILLS_DIR = "./skills"
+# First-party catalog shipped inside the package, so it loads from any cwd
+# and from an installed wheel, not only from a repo checkout.
+BUILTIN_SKILLS_DIR = str(Path(__file__).resolve().parent / "builtin_skills")
 # Local-only, license-aware third-party skills (see third_party_skills.py):
 # downloaded files live in a gitignored directory, the lockfile (provenance +
 # enablement, never skill content) sits beside it and may be committed.
@@ -97,8 +102,9 @@ class Config:
     # missing, so each project's generated software lands in its own subfolder.
     projects_dir: str = DEFAULT_PROJECTS_DIR
 
-    # Shared skill catalog loaded into every agent's AgentContext (see skills.py).
-    # Trigger-based (keyword/task/path), not project-specific — see MANUAL.md.
+    # User skill catalog loaded into every agent's AgentContext on top of
+    # BUILTIN_SKILLS_DIR (see skills.py). Trigger-based (keyword/task/path),
+    # not project-specific — see MANUAL.md.
     skills_dir: str = DEFAULT_SKILLS_DIR
 
     # Third-party skills installed via `certo-admin skills ...` (see
@@ -310,8 +316,10 @@ def load_config(env: Mapping[str, str] | None = None, *, dotenv_path: str = ".en
     model = _clean(env.get("LLM_MODEL"))
     if model is None:
         raise ConfigError(
-            "LLM_MODEL is required (e.g. 'anthropic/claude-sonnet-4-5-20250929'). "
-            "Set it in .env. Switching provider = changing only this value."
+            "LLM_MODEL is required (e.g. 'anthropic/claude-sonnet-4-5-20250929' or "
+            "'ollama/qwen2.5-coder'). Export it in your shell (export LLM_MODEL=...) "
+            "or set it in a .env file in the current directory. Switching provider "
+            "= changing only this value."
         )
 
     api_key = _clean(env.get("LLM_API_KEY"))
@@ -350,12 +358,16 @@ def load_config(env: Mapping[str, str] | None = None, *, dotenv_path: str = ".en
     # The first-party loader rglob()s every .md under skills_dir, so a
     # third-party directory nested inside it would load downloaded content
     # regardless of enablement (and vice versa).
-    _tp, _fp = Path(third_party_skills_dir).resolve(), Path(skills_dir).resolve()
-    if _tp == _fp or _tp.is_relative_to(_fp) or _fp.is_relative_to(_tp):
-        raise ConfigError(
-            "CERTO_THIRD_PARTY_SKILLS_DIR must not overlap CERTO_SKILLS_DIR "
-            f"({third_party_skills_dir!r} vs {skills_dir!r})."
-        )
+    _tp = Path(third_party_skills_dir).resolve()
+    for _fp, _label in (
+        (Path(skills_dir).resolve(), f"CERTO_SKILLS_DIR ({skills_dir!r})"),
+        (Path(BUILTIN_SKILLS_DIR), f"the built-in skills directory ({BUILTIN_SKILLS_DIR!r})"),
+    ):
+        if _tp == _fp or _tp.is_relative_to(_fp) or _fp.is_relative_to(_tp):
+            raise ConfigError(
+                f"CERTO_THIRD_PARTY_SKILLS_DIR ({third_party_skills_dir!r}) must not "
+                f"overlap {_label}."
+            )
     docker_image = _get(env, "DOCKER_IMAGE") or DEFAULT_DOCKER_IMAGE
     docker_platform = _parse_choice(
         env,

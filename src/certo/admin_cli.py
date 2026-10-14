@@ -20,7 +20,7 @@ import argparse
 from . import third_party_skills as tps
 from .config import Config, ConfigError, load_config, override_llm
 from .llm_check import DEFAULT_TIMEOUT_SECONDS, check_llm
-from .skills import load_skill_catalog
+from .skills import load_first_party_skills
 from .task_store import build_task_store
 
 
@@ -155,7 +155,7 @@ def _skills_cmd(func):
 
 @_skills_cmd
 def _cmd_skills_install(args: argparse.Namespace, cfg: Config) -> int:
-    reserved = {s.name for s in load_skill_catalog(cfg.skills_dir)}
+    reserved = {s.name for s in load_first_party_skills(cfg.skills_dir)}
     result = tps.install(
         args.source, args.path, ref=args.ref, reserved_names=reserved, **_skill_paths(cfg)
     )

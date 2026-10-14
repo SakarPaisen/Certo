@@ -140,6 +140,29 @@ def test_missing_model_raises():
         load_config({"LLM_API_KEY": "sk-test"})
 
 
+def test_missing_model_error_says_how_to_set_it_without_a_dotenv():
+    # A pip-installed user may have no .env at all; exporting is enough.
+    with pytest.raises(ConfigError) as excinfo:
+        load_config({"LLM_API_KEY": "sk-test"})
+    message = str(excinfo.value)
+    assert "export LLM_MODEL=" in message
+    assert ".env" in message
+
+
+def test_exported_llm_vars_are_enough_with_no_dotenv_file(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)  # no .env here
+    for name in ("LLM_MODEL", "LLM_API_KEY", "LLM_BASE_URL"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("LLM_MODEL", "ollama/qwen2.5-coder")
+    monkeypatch.setenv("LLM_BASE_URL", "http://localhost:11434")
+
+    cfg = load_config()
+
+    assert cfg.model == "ollama/qwen2.5-coder"
+    assert cfg.base_url == "http://localhost:11434"
+    assert cfg.api_key is None
+
+
 def test_missing_key_without_base_url_raises():
     with pytest.raises(ConfigError, match="LLM_API_KEY is required"):
         load_config({"LLM_MODEL": "anthropic/claude-sonnet-4-5-20250929"})

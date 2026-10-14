@@ -170,14 +170,16 @@ decisions log below for *why* a given design was chosen.
 - **`admin_cli.py`** (`certo-admin`) — maintenance CLI talking directly to
   the store, no running server needed: `show`, `delete-task`,
   `delete-project`, `purge [--ttl-seconds N]` (refuses at `<= 0`).
-- **`skills.py`** — two mechanisms: `load_skill_catalog()` loads the shared,
-  trigger-based catalog (`skills/`) into every `AgentContext`;
+- **`skills.py`** — two mechanisms: `load_first_party_skills()` loads the
+  shared, trigger-based catalog into every `AgentContext` — the built-in
+  `src/certo/builtin_skills/` (ships in the wheel) merged with the user's
+  `CERTO_SKILLS_DIR`, each read by `load_skill_catalog()`;
   `write_project_context()` writes a caller-supplied, per-project
   `AGENTS.md` (requires `AgentContext.load_project_skills=True`, which is
   consumed lazily by `LocalConversation`, not validated by `AgentContext`
   itself — easy to silently omit). The catalog includes eight authored,
   legacy-format (`triggers:`/`paths:`) lifecycle skills under
-  `skills/lifecycle/` — `repository-discovery`, `requirements-analysis`,
+  `builtin_skills/lifecycle/` — `repository-discovery`, `requirements-analysis`,
   `implementation-planning`, `testing-and-verification`,
   `debugging-and-failure-repair`, `security-review`,
   `documentation-and-operational-readiness`,
@@ -193,7 +195,7 @@ decisions log below for *why* a given design was chosen.
   `load_enabled_skills()` after the first-party catalog. That call
   re-checks enabled, license acknowledgement, hash and name collision,
   since `AgentContext` raises on duplicate names. `config.py` rejects a
-  third-party dir that overlaps `CERTO_SKILLS_DIR`, because the
+  third-party dir that overlaps `CERTO_SKILLS_DIR` or the built-in dir, because the
   first-party `rglob("*.md")` would load downloaded files regardless of
   enablement.
 
@@ -628,6 +630,16 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   entry carries the real model name. Always computed (not gated on
   `CERTO_ARTIFACTS_DIR`), and read defensively in the `finally` so a
   metrics failure can't mask the run's own outcome or exception.
+- **First-party skills moved into the package (`src/certo/builtin_skills/`)
+  and always load; `CERTO_SKILLS_DIR` (still `./skills`) became an
+  additive user catalog that overrides built-ins by name.** A clean-venv
+  wheel install proved the old cwd-relative `./skills` default loaded zero
+  skills outside a repo checkout (nothing outside `src/certo` is in the
+  wheel). Named `builtin_skills`, not `skills`, so it doesn't sit beside
+  `skills.py`. Additive rather than "one dir replaces the other" so the
+  README's drop-a-file workflow and hand-placed `skills/frontend-design/`
+  copies keep working unchanged. `tests/test_packaging.py` builds the real
+  sdist→wheel and checks the catalog ships.
 - **`harness`/`harness-server`/`harness-admin` console aliases removed
   before the first PyPI release** (supersedes "they cost nothing" in the
   rename entry). There are no external users, and a globally installed

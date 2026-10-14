@@ -34,6 +34,25 @@ reference — how to actually run and configure the thing.
 
 ## Setup
 
+### From PyPI
+
+```bash
+pip install certo                 # or: uv tool install certo
+export LLM_MODEL=ollama/qwen2.5-coder
+export LLM_BASE_URL=http://localhost:11434   # or: export LLM_API_KEY=...
+certo "Build a CLI todo app in Python, with tests" --project todo
+```
+
+No `.env` file is needed: exported `LLM_*` / `CERTO_*` variables are read
+directly, and a `.env` in the current directory is loaded too if present
+(already-exported values win). The built-in skill catalog ships inside the
+package, so it loads from any directory. Relative defaults such as
+`CERTO_PROJECTS_DIR=./projects` resolve against the directory you run
+`certo` from. Extras: `pip install "certo[server]"`, `"certo[sandbox]"`,
+`"certo[store-sqlite]"` etc. — see `pyproject.toml`.
+
+### From a checkout (development)
+
 This project uses [uv](https://docs.astral.sh/uv/) for the virtual
 environment and dependencies. Run every command through `uv run`, which uses
 `.venv` automatically — never install into system Python.
@@ -87,8 +106,8 @@ are unchanged.
 | `CERTO_CONFIRM_MODE` | `never` | `never` \| `always` (pause before each tool call for approval — see [Confirmation mode](#confirmation-mode)). |
 | `CERTO_EXECUTION` | `local` | `local` \| `docker` — see [Execution modes](#execution-modes). |
 | `CERTO_PROJECTS_DIR` | `./projects` | Root folder for generated projects; `--project NAME` resolves to `CERTO_PROJECTS_DIR/NAME`. |
-| `CERTO_SKILLS_DIR` | `./skills` | Shared skill catalog loaded into every agent's `AgentContext` — see [Skills](#skills). |
-| `CERTO_THIRD_PARTY_SKILLS_DIR` | `./third_party_skills` | Local-only (gitignored) directory for third-party skills installed with `certo-admin skills install`. Must not overlap `CERTO_SKILLS_DIR`. See [Third-party skills](#third-party-skills-certo-admin-skills). |
+| `CERTO_SKILLS_DIR` | `./skills` | Your own skills, loaded into every agent's `AgentContext` on top of the built-in catalog that ships inside the package (a skill here replaces a built-in one with the same name). Optional: a missing directory just means no extra skills. See [Skills](#skills). |
+| `CERTO_THIRD_PARTY_SKILLS_DIR` | `./third_party_skills` | Local-only (gitignored) directory for third-party skills installed with `certo-admin skills install`. Must not overlap `CERTO_SKILLS_DIR` or the built-in skills directory. See [Third-party skills](#third-party-skills-certo-admin-skills). |
 | `CERTO_THIRD_PARTY_SKILLS_LOCK` | `./third_party_skills.lock.json` | Lockfile recording each third-party skill's provenance, license, content hash, and enabled state (never its content). |
 | `CERTO_DOCKER_IMAGE` | `certo/agent-server:local` | Image used for `CERTO_EXECUTION=docker`. Built automatically on first use. |
 | `CERTO_DOCKER_PLATFORM` | auto-detected from host arch | `linux/amd64` \| `linux/arm64`. Leave blank to auto-detect (arm64 on Apple Silicon, amd64 otherwise). |
@@ -861,12 +880,22 @@ project, by design). See `src/certo/skills.py` for the implementation and
 `ROADMAP.md`'s decisions log for why this shape was chosen over the
 alternatives that were considered.
 
-### Shared skill catalog (`skills/`)
+### Shared skill catalog (built-in + `CERTO_SKILLS_DIR`)
 
-`CERTO_SKILLS_DIR` (default `./skills`) is a library of **reusable**
-knowledge — conventions worth writing once and applying to *any* project
-where they're relevant, not facts about one specific project. Every skill is
-loaded into every agent's `AgentContext` (`build_agent()` in `agent.py`); the
+The shared catalog is a library of **reusable** knowledge — conventions
+worth writing once and applying to *any* project where they're relevant,
+not facts about one specific project. It comes from two places, merged:
+
+- **Built-in skills** ship inside the package (`src/certo/builtin_skills/`
+  in the repo, `certo/builtin_skills/` in an installed wheel) and always
+  load, from any working directory.
+- **Your own skills** in `CERTO_SKILLS_DIR` (default `./skills`, relative
+  to where you run `certo`) load on top. A skill there with the same `name`
+  as a built-in one replaces it, which is how you customize a built-in
+  skill. The directory is optional.
+
+Every skill is loaded into every agent's `AgentContext` (`build_agent()` in
+`agent.py`, via `load_first_party_skills()` in `skills.py`); the
 SDK matches each skill's own trigger against the task/conversation
 automatically — there's no custom "which skill applies" logic in this
 codebase, and no extra LLM call to decide relevance.
@@ -921,7 +950,7 @@ code-enforced discoverability *and* injection, not a hope the model
 remembers to invoke something. See ROADMAP.md's decisions log for the full
 reasoning behind that switch.
 
-**Subfolders are purely organizational** — `skills/testing/`, `skills/web/`,
+**Subfolders are purely organizational** — `testing/`, `lifecycle/`,
 etc. exist for human classification only. `load_skill_catalog()` doesn't walk
 directories itself; the SDK's `load_skills_from_dir()` finds `.md` files
 recursively (`rglob("*.md")`) under the hood, so nesting costs nothing extra.
@@ -929,13 +958,14 @@ The one caveat: `SKILL.md`-format AgentSkills directories are only detected
 one level deep (an SDK constraint) — use the flat `.md`-with-frontmatter
 format for anything inside a category subfolder.
 
-This repo ships four example skills (legacy-format) to prove the wiring and
-as a starting point: `skills/testing/pytest-conventions.md`,
-`skills/git/commit-conventions.md` (both `KeywordTrigger`),
-`skills/python-web/fastapi-conventions.md` (`KeywordTrigger`), and
-`skills/python-web/pin-dependencies.md` (`PathTrigger` — fires on
-`pyproject.toml`/`requirements*.txt`, not on task text). Add more the same
-way; no registration step beyond dropping the file in `skills/`.
+Besides the lifecycle skills below, the built-in catalog has four
+example skills (legacy-format), paths relative to `builtin_skills/`:
+`testing/pytest-conventions.md`, `git/commit-conventions.md` (both
+`KeywordTrigger`), `python-web/fastapi-conventions.md` (`KeywordTrigger`),
+and `python-web/pin-dependencies.md` (`PathTrigger` — fires on
+`pyproject.toml`/`requirements*.txt`, not on task text). Add your own the
+same way; no registration step beyond dropping the file in
+`CERTO_SKILLS_DIR`.
 
 Three more `SKILL.md`-format skills are **not shipped in this repo**:
 `frontend-design`, `webapp-testing`, and `web-artifacts-builder`, sourced
@@ -1028,13 +1058,13 @@ skill's *instructions* can still ask the agent to run its bundled scripts
 with the agent's normal tools. Read a skill before enabling it, and
 consider `CERTO_CONFIRM_MODE=always` if you're unsure about one.
 
-### Lifecycle skills (`skills/lifecycle/`)
+### Lifecycle skills (`builtin_skills/lifecycle/`)
 
 Eight legacy-format, keyword/path-triggered skills covering the software
 lifecycle end to end — requirements through release — deliberately
 **language- and framework-independent**: none of them assume Python, Node,
 or any other stack, and ecosystem-specific conventions stay in their own
-separate skills (`skills/python-web/`, `skills/testing/pytest-conventions.md`,
+separate skills (`python-web/`, `testing/pytest-conventions.md`,
 etc.), not mixed into these. Each is short (15-30 lines) and triggers on
 task language relevant to its own lifecycle point — not one large,
 always-active SDLC prompt.

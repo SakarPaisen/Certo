@@ -6,7 +6,7 @@ from openhands.sdk import Agent, AgentContext
 
 from .config import Config
 from .llm import build_llm
-from .skills import load_skill_catalog
+from .skills import load_first_party_skills
 from .third_party_skills import load_enabled_skills
 from .tools import build_tools
 
@@ -112,7 +112,7 @@ _VERIFY_BEFORE_FINISH_SUFFIX = (
     "re-verify, don't report the failure as something left for later."
 )
 
-# The eight lifecycle skills in skills/lifecycle/ (repository-discovery,
+# The eight lifecycle skills in builtin_skills/lifecycle/ (repository-discovery,
 # requirements-analysis, implementation-planning, testing-and-verification,
 # debugging-and-failure-repair, security-review,
 # documentation-and-operational-readiness, completion-and-release-readiness
@@ -167,7 +167,7 @@ def build_agent(cfg: Config, *, usage_id: str = "certo") -> Agent:
             _LIFECYCLE_SKILLS_SUFFIX,
         ]
     )
-    first_party_skills = load_skill_catalog(cfg.skills_dir)
+    first_party_skills = load_first_party_skills(cfg.skills_dir)
     # Third-party skills (third_party_skills.py) only when explicitly enabled
     # in the lockfile; a name already used by a first-party skill is skipped,
     # since AgentContext rejects duplicate skill names outright.
