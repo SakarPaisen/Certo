@@ -1,4 +1,4 @@
-"""llm_check.py + `harness-admin check-llm` tests. No network: `build_llm`
+"""llm_check.py + `certo-admin check-llm` tests. No network: `build_llm`
 is monkeypatched to return a fake LLM, so only result shaping, error
 classification, secret scrubbing, and CLI output/exit codes are exercised.
 (The real call path was verified live — see ROADMAP.md.)
@@ -127,7 +127,7 @@ def test_failure_while_building_the_llm_is_a_setup_failure(monkeypatch):
     assert "LLMContextWindowTooSmallError" in result.error
 
 
-# --- harness-admin check-llm --------------------------------------------------
+# --- certo-admin check-llm --------------------------------------------------
 
 
 def _run(monkeypatch, argv, cfg=None):

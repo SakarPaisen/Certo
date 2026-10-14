@@ -21,7 +21,7 @@ native per-key expiration for its TTL instead of a purge sweep — see
 
 None of this is agent-facing: it exists purely to answer "what happened to
 task X" after the fact, for `GET /tasks/{id}` and the admin CLI
-(`harness-admin`, see `admin_cli.py`).
+(`certo-admin`, see `admin_cli.py`).
 """
 
 from __future__ import annotations

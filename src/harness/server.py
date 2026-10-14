@@ -177,7 +177,7 @@ def create_app():
     # Built once at startup, not per-request: a store may hold real
     # resources (DB connections, a Redis client) that can't sensibly be
     # rebuilt on every request the way a per-request LLM override can.
-    # This does mean `harness-server` now requires a valid LLM_MODEL/
+    # This does mean `certo-server` now requires a valid LLM_MODEL/
     # LLM_API_KEY at startup rather than only on the first request — a
     # deliberate, minor behavior change (fail fast beats silently starting
     # a broken server); see ROADMAP.md's decisions log.
@@ -526,8 +526,8 @@ def main(argv: list[str] | None = None) -> None:
         ) from exc
 
     parser = argparse.ArgumentParser(
-        prog="harness-server",
-        description="Run the coding-agent harness as an HTTP/WebSocket server.",
+        prog="certo-server",
+        description="Run Certo as an HTTP/WebSocket server.",
     )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)

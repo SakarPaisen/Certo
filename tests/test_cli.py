@@ -4,7 +4,10 @@ these exercise only argument parsing and control flow.
 
 from __future__ import annotations
 
+import importlib.metadata
+import tomllib
 import urllib.error
+from pathlib import Path
 
 import pytest
 
@@ -1281,3 +1284,47 @@ def test_cli_prints_run_summary_at_the_end(monkeypatch, capsys):
     assert "Models: openai/gpt-4o" in out
     assert "Total tokens: 1,000" in out
     assert "Total cost: $0.0500" in out
+
+
+# --- Console scripts: certo-* commands and their pre-rename aliases --------
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+
+_SCRIPT_ALIASES = {
+    "harness": "certo",
+    "harness-server": "certo-server",
+    "harness-admin": "certo-admin",
+}
+
+
+def _declared_scripts() -> dict[str, str]:
+    with open(_REPO_ROOT / "pyproject.toml", "rb") as fh:
+        return tomllib.load(fh)["project"]["scripts"]
+
+
+@pytest.mark.parametrize("alias, command", sorted(_SCRIPT_ALIASES.items()))
+def test_console_script_alias_points_at_same_entry_point(alias, command):
+    scripts = _declared_scripts()
+    assert command in scripts
+    assert scripts[alias] == scripts[command]
+
+
+def test_console_scripts_are_exactly_the_certo_commands_and_aliases():
+    expected = set(_SCRIPT_ALIASES) | set(_SCRIPT_ALIASES.values())
+    assert set(_declared_scripts()) == expected
+
+
+@pytest.mark.parametrize("alias, command", sorted(_SCRIPT_ALIASES.items()))
+def test_installed_console_script_alias_matches(alias, command):
+    """Same check against the installed distribution's metadata, so a stale
+    install (pyproject edited, package not reinstalled) is caught too."""
+    try:
+        eps = importlib.metadata.distribution("certo").entry_points
+    except importlib.metadata.PackageNotFoundError:
+        pytest.skip("certo distribution is not installed")
+    by_name = {ep.name: ep.value for ep in eps if ep.group == "console_scripts"}
+    assert by_name[alias] == by_name[command]
+
+
+def test_parser_prog_is_certo():
+    assert cli._build_parser().prog == "certo"

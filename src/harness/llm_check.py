@@ -1,6 +1,6 @@
 """Connectivity check for the configured LLM: one tiny, direct completion.
 
-Used by `harness-admin check-llm`. Builds the model exactly as a real run
+Used by `certo-admin check-llm`. Builds the model exactly as a real run
 does (`llm.build_llm`, so `LLM_MODEL`/`LLM_API_KEY`/`LLM_BASE_URL`/
 `LLM_REASONING_EFFORT` and any per-call override apply unchanged), but with
 retries disabled and a short timeout: a health check should fail fast and

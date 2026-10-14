@@ -79,7 +79,7 @@ template with every variable documented inline.
 | `HARNESS_EXECUTION` | `local` | `local` \| `docker` — see [Execution modes](#execution-modes). |
 | `HARNESS_PROJECTS_DIR` | `./projects` | Root folder for generated projects; `--project NAME` resolves to `HARNESS_PROJECTS_DIR/NAME`. |
 | `HARNESS_SKILLS_DIR` | `./skills` | Shared skill catalog loaded into every agent's `AgentContext` — see [Skills](#skills). |
-| `HARNESS_THIRD_PARTY_SKILLS_DIR` | `./third_party_skills` | Local-only (gitignored) directory for third-party skills installed with `harness-admin skills install`. Must not overlap `HARNESS_SKILLS_DIR`. See [Third-party skills](#third-party-skills-harness-admin-skills). |
+| `HARNESS_THIRD_PARTY_SKILLS_DIR` | `./third_party_skills` | Local-only (gitignored) directory for third-party skills installed with `certo-admin skills install`. Must not overlap `HARNESS_SKILLS_DIR`. See [Third-party skills](#third-party-skills-certo-admin-skills). |
 | `HARNESS_THIRD_PARTY_SKILLS_LOCK` | `./third_party_skills.lock.json` | Lockfile recording each third-party skill's provenance, license, content hash, and enabled state (never its content). |
 | `HARNESS_DOCKER_IMAGE` | `certo/agent-server:local` | Image used for `HARNESS_EXECUTION=docker`. Built automatically on first use. |
 | `HARNESS_DOCKER_PLATFORM` | auto-detected from host arch | `linux/amd64` \| `linux/arm64`. Leave blank to auto-detect (arm64 on Apple Silicon, amd64 otherwise). |
@@ -90,7 +90,7 @@ template with every variable documented inline.
 | `HARNESS_MODEL_SELECTION` | `manual` | `manual` \| `auto` — pick the best-fit model per task from a hand-curated catalog instead of always using `LLM_MODEL`. See [Automatic model selection](#automatic-model-selection). |
 | `HARNESS_MODELS_FILE` | `./models.yaml` | Path to the model catalog, only read when `HARNESS_MODEL_SELECTION=auto`. |
 | `HARNESS_ARTIFACTS_DIR` | *(empty — disabled)* | Per-run metadata/transcript/token-cost directory. See [Run artifacts](#run-artifacts). |
-| `HARNESS_TASK_STORE` | `memory` | `memory` \| `redis` \| `sqlite` \| `mysql` \| `postgres` — server-mode task registry backend, consulted only by `harness-server`/`harness-admin`. See [Task registry persistence](#task-registry-persistence). |
+| `HARNESS_TASK_STORE` | `memory` | `memory` \| `redis` \| `sqlite` \| `mysql` \| `postgres` — server-mode task registry backend, consulted only by `certo-server`/`certo-admin`. See [Task registry persistence](#task-registry-persistence). |
 | `HARNESS_TASK_TTL_SECONDS` | `0` | Seconds a completed/failed task record is kept before it's eligible for purge; `0` means keep forever. |
 | `HARNESS_TASK_STORE_SQLITE_PATH` | `./harness_tasks.db` | sqlite backend only. |
 | `HARNESS_TASK_STORE_MYSQL_HOST` / `_PORT` / `_USER` / `_PASSWORD` / `_DATABASE` | `localhost` / `3306` / `root` / *(empty)* / `harness` | mysql backend only. |
@@ -106,8 +106,10 @@ uv run python -m harness "<task>" [--execution {local,docker}] [--project NAME] 
     [--require-verification] [--acceptance-checks JSON_OR_FILE]
 ```
 
-(Also installed as a console script: `harness "<task>" ...`, once the package
-is installed via `uv pip install -e .`.)
+(Also installed as a console script: `certo "<task>" ...`, once the package
+is installed via `uv pip install -e .`. The old command names `harness`,
+`harness-server` and `harness-admin` are kept as aliases for `certo`,
+`certo-server` and `certo-admin`, so existing scripts keep working.)
 
 - `task` (positional, required) — the instruction given to the agent, **or a
   reference to it**: an http(s) URL (fetched) or a path to an existing local
@@ -239,7 +241,7 @@ either way, off by default) turns that around for a human running the CLI:
   not while a prompt is sitting at your terminal.
 
 ```bash
-uv run harness --interactive "Scaffold a FastAPI service with a /health endpoint." --project my-api
+uv run certo --interactive "Scaffold a FastAPI service with a /health endpoint." --project my-api
 ```
 
 **Scope: only the initial run is interactive.** Once you press Enter (or
@@ -259,7 +261,7 @@ server-mode gotcha). Setting `HARNESS_INTERACTIVE=yes` for a server
 deployment still drops the autonomous instruction from the prompt with
 nobody available to answer if the agent does ask something, which can leave
 a task less thoroughly finished than the default — leave this at `no` (the
-default) for `harness-server`.
+default) for `certo-server`.
 
 ## Automatic model selection
 
@@ -410,14 +412,14 @@ shape — not a folder nested inside any one project, so harness telemetry
 never ends up inside a project's own (possibly-committed) directory tree.
 
 ```bash
-HARNESS_ARTIFACTS_DIR=./artifacts uv run harness "..." --project my-api
+HARNESS_ARTIFACTS_DIR=./artifacts uv run certo "..." --project my-api
 ```
 
 Layout: `<HARNESS_ARTIFACTS_DIR>/<project-or-_unscoped>/<run-id>/`, one
 subfolder per task invocation (a project run many times over its life gets
 one subfolder per run, never overwritten). `_unscoped` is used when no
 `--project`/`project` was given. `run-id` is minted automatically — the
-CLI generates one per invocation; `harness-server` uses the exact same ID
+CLI generates one per invocation; `certo-server` uses the exact same ID
 `GET /tasks/{id}` already returns, so a task's artifacts folder is always
 easy to find from its API response.
 
@@ -463,7 +465,7 @@ Requires the `server` extra (`uv pip install -e ".[server]"`); importing
 import failure.
 
 ```bash
-uv run harness-server --host 127.0.0.1 --port 8000
+uv run certo-server --host 127.0.0.1 --port 8000
 # or: uv run python -m harness.server --port 8000
 ```
 
@@ -582,7 +584,7 @@ curl -X DELETE "http://127.0.0.1:8000/tasks?project=my-api"
 
 `deleted` is the count actually removed — `0` for an unknown/empty project
 is a normal result, not an error. See [Task registry
-persistence](#task-registry-persistence) for the equivalent `harness-admin`
+persistence](#task-registry-persistence) for the equivalent `certo-admin`
 CLI commands (useful for a maintenance script, or when the store backend
 being cleaned up isn't the one the caller's own server process is running
 against).
@@ -700,7 +702,7 @@ enabling this feature is never a silent change for an existing deployment.
 |---|---|---|
 | `memory` (default) | none | Unbounded unless a TTL is set; lost on restart; not shared across processes. |
 | `sqlite` | `uv pip install -e ".[store-sqlite]"` | One local file (`HARNESS_TASK_STORE_SQLITE_PATH`); survives restarts, single-process only (sqlite's own concurrent-writer limits apply). |
-| `mysql` | `uv pip install -e ".[store-mysql]"` | Shared across multiple `harness-server` processes/workers. |
+| `mysql` | `uv pip install -e ".[store-mysql]"` | Shared across multiple `certo-server` processes/workers. |
 | `postgres` | `uv pip install -e ".[store-postgres]"` | Same as mysql. |
 | `redis` | `uv pip install -e ".[store-redis]"` | Shared across processes; TTL uses Redis's own native per-key expiration (`EX`) instead of a periodic sweep. |
 
@@ -712,7 +714,7 @@ query logic on all three dialects.
 set to a positive number of seconds, a *terminal* (`completed`/`failed`)
 task record older than that is eligible for removal — a `pending`/`running`
 task is never purged regardless of TTL. For `memory`/`sqlite`/`mysql`/
-`postgres`, `harness-server` runs a background sweep every 60 seconds while
+`postgres`, `certo-server` runs a background sweep every 60 seconds while
 a TTL is configured. For `redis`, there is no sweep — a terminal record's
 key is written with `EX=<ttl>` at save time, so Redis itself expires and
 deletes it natively; a `pending`/`running` record's key is written with no
@@ -725,32 +727,32 @@ TTL — both a REST call and a CLI command do this, use whichever fits:
 curl -X DELETE "http://127.0.0.1:8000/tasks?project=my-api"
 # or, without a running server request (e.g. a maintenance script, or a
 # store backend other than the one a given server process is using):
-uv run harness-admin delete-project my-api
+uv run certo-admin delete-project my-api
 ```
 
-### `harness-admin` — task store maintenance CLI
+### `certo-admin` — task store maintenance CLI
 
 Talks directly to whatever backend `HARNESS_TASK_STORE` selects (via the
 same `build_task_store(load_config())` `server.py` uses) — no running
 server required, just the same `.env`.
 
 ```bash
-uv run harness-admin show <task_id>              # print one record's summary
-uv run harness-admin delete-task <task_id>        # delete one record; exits 1 if unknown
-uv run harness-admin delete-project <NAME>        # delete every record for a project
-uv run harness-admin purge [--ttl-seconds N]      # manually trigger a TTL purge sweep
+uv run certo-admin show <task_id>              # print one record's summary
+uv run certo-admin delete-task <task_id>        # delete one record; exits 1 if unknown
+uv run certo-admin delete-project <NAME>        # delete every record for a project
+uv run certo-admin purge [--ttl-seconds N]      # manually trigger a TTL purge sweep
 ```
 
-`harness-admin skills ...` manages third-party skills — see
-[Third-party skills](#third-party-skills-harness-admin-skills).
+`certo-admin skills ...` manages third-party skills — see
+[Third-party skills](#third-party-skills-certo-admin-skills).
 
-**`harness-admin check-llm`** — checks that the configured model is
+**`certo-admin check-llm`** — checks that the configured model is
 reachable and answering, without running an agent:
 
 ```bash
-uv run harness-admin check-llm                        # the model from .env
-uv run harness-admin check-llm --model anthropic/claude-sonnet-4-5-20250929
-uv run harness-admin check-llm --model ollama/qwen2.5-coder --base-url http://localhost:11434
+uv run certo-admin check-llm                        # the model from .env
+uv run certo-admin check-llm --model anthropic/claude-sonnet-4-5-20250929
+uv run certo-admin check-llm --model ollama/qwen2.5-coder --base-url http://localhost:11434
 ```
 
 ```
@@ -912,11 +914,11 @@ repo's own MIT license; `.gitignore` deliberately keeps them out even if a
 local copy exists on disk. A copy placed by hand in `skills/frontend-design/`
 etc. is still loaded unconditionally, as before — but the recommended way to
 use these (or any other upstream skill) is now
-[Third-party skills](#third-party-skills-harness-admin-skills), which records
+[Third-party skills](#third-party-skills-certo-admin-skills), which records
 provenance and requires explicit enablement. Don't do both for the same
 name: `install` refuses a name the shared catalog already has.
 
-### Third-party skills (`harness-admin skills`)
+### Third-party skills (`certo-admin skills`)
 
 Upstream `SKILL.md` skills can be installed locally without committing their
 contents to this repo. They're kept separate from the first-party catalog
@@ -937,13 +939,13 @@ above:
   content.
 
 ```bash
-uv run harness-admin skills install github:anthropics/skills skills/frontend-design [--ref main]
-uv run harness-admin skills list
-uv run harness-admin skills enable frontend-design [--accept-unknown-license]
-uv run harness-admin skills disable frontend-design
-uv run harness-admin skills update frontend-design [--ref REF]
-uv run harness-admin skills remove frontend-design
-uv run harness-admin skills sync     # restore every locked skill at its pinned commit
+uv run certo-admin skills install github:anthropics/skills skills/frontend-design [--ref main]
+uv run certo-admin skills list
+uv run certo-admin skills enable frontend-design [--accept-unknown-license]
+uv run certo-admin skills disable frontend-design
+uv run certo-admin skills update frontend-design [--ref REF]
+uv run certo-admin skills remove frontend-design
+uv run certo-admin skills sync     # restore every locked skill at its pinned commit
 ```
 
 **Installed is not enabled.** `install` always leaves a skill disabled and
@@ -1675,7 +1677,7 @@ uv run pytest -q
 ## Known limitations
 
 - **Third-party skill license detection is a narrow text heuristic.**
-  `harness-admin skills` recognizes only a small set of permissive
+  `certo-admin skills` recognizes only a small set of permissive
   licenses. Everything else, including GPL-family licenses, is reported as
   `unknown` and needs `--accept-unknown-license`. A root-level license is
   assumed to cover the skill path, and a note says so. Only
@@ -1778,7 +1780,7 @@ uv run pytest -q
 - **Server mode's task registry is in-memory, per-process, and unbounded
   only by default (`HARNESS_TASK_STORE=memory`).** A `redis`/`sqlite`/
   `mysql`/`postgres` backend, a TTL-based purge, and on-demand delete-by-
-  project/delete-by-id (REST and `harness-admin` CLI) are all available —
+  project/delete-by-id (REST and `certo-admin` CLI) are all available —
   see [Task registry persistence](#task-registry-persistence). Still true
   of the default `memory` backend specifically: state is lost on restart
   and not shared across multiple server processes.
@@ -1820,7 +1822,7 @@ or a required value is blank. Copy `.env.example` and fill in `LLM_MODEL` +
 it) is under 16K tokens. That happens before any request is sent, so it
 blocks runs too. It's common with local models (e.g. `ollama/llama3`).
 Raise the model's context window on the server side (for Ollama, a larger
-`num_ctx`), or pick a model with a larger window. `harness-admin check-llm`
+`num_ctx`), or pick a model with a larger window. `certo-admin check-llm`
 reports this as a `setup` failure.
 
 **`LLM_BASE_URL` gets read as a literal `# comment` string** — `python-dotenv`

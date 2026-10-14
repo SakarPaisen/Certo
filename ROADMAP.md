@@ -139,7 +139,7 @@ decisions log below for *why* a given design was chosen.
   not free). Built in `stream_task`'s `finally` on every run, attached to
   `TaskOutcome.run_summary`, printed by `cli.py`, written to
   `metadata.json`/`metrics.json`.
-- **`llm_check.py`** + `harness-admin check-llm` — one direct
+- **`llm_check.py`** + `certo-admin check-llm` — one direct
   `LLM.completion()` built via `build_llm()` (same config path as a real
   run), `num_retries=0` plus a short timeout, pass = non-empty text.
   Construction happens inside the try, since the SDK validates at build
@@ -167,7 +167,7 @@ decisions log below for *why* a given design was chosen.
   `server.py` runs a 60s sweep only when a TTL is configured.
   `build_task_store(cfg)` is the one factory both `server.py` and
   `admin_cli.py` use.
-- **`admin_cli.py`** (`harness-admin`) — maintenance CLI talking directly to
+- **`admin_cli.py`** (`certo-admin`) — maintenance CLI talking directly to
   the store, no running server needed: `show`, `delete-task`,
   `delete-project`, `purge [--ttl-seconds N]` (refuses at `<= 0`).
 - **`skills.py`** — two mechanisms: `load_skill_catalog()` loads the shared,
@@ -183,7 +183,7 @@ decisions log below for *why* a given design was chosen.
   `documentation-and-operational-readiness`,
   `completion-and-release-readiness` — which supersede an earlier
   downloaded five-skill `SKILL.md` set (see decisions log).
-- **`third_party_skills.py`** + `harness-admin skills
+- **`third_party_skills.py`** + `certo-admin skills
   install|list|enable|disable|update|remove|sync` — local-only,
   license-aware third-party `SKILL.md` skills. Files live in gitignored
   `HARNESS_THIRD_PARTY_SKILLS_DIR`, one level deep. Provenance lives in a
@@ -569,9 +569,12 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
 - **Project renamed ARICode → Certo, deep and final** (supersedes the
   earlier `coding-agent-harness` → ARICode rename, which deliberately
   changed branding only and kept `import harness`/`HARNESS_*`/
-  `harness-admin`). This one renames the brand (docs, `pyproject.toml`
+  `certo-admin`). This one renames the brand (docs, `pyproject.toml`
   name, `server.py` title/`owned_by`, Docker image tag
   `certo/agent-server:local`) and links (GitHub redirects the old repo URL).
+  Console scripts are `certo`/`certo-server`/`certo-admin`; the old
+  `harness*` names stay as aliases to the same entry points (no deprecation
+  date — they cost nothing and keep shell history working).
 - **Live entrypoint-ordering/smoke-run test built its own throwaway
   `tmp_path` fixture, not `projects/hanoi/` or anything under `projects/`**
   — that directory is user-managed runtime state the harness must stay
@@ -593,7 +596,7 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   clone for a pinned SHA) and `Skill.load` are reused as-is. Enablement is
   enforced twice: at `enable` (CLI) and again at load (the lockfile is
   hand-editable). `update` disables on any content/license change. `sync`
-  refuses a hash mismatch. Commands live under `harness-admin skills`,
+  refuses a hash mismatch. Commands live under `certo-admin skills`,
   the existing argparse subcommand CLI, rather than a new entry point. The
   lockfile is JSON beside the gitignored dir, not in it, so it can be
   committed for reproducibility. Existing hand-placed
@@ -604,9 +607,9 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   entry carries the real model name. Always computed (not gated on
   `HARNESS_ARTIFACTS_DIR`), and read defensively in the `finally` so a
   metrics failure can't mask the run's own outcome or exception.
-- **`check-llm` lives in `harness-admin`, not the `harness` CLI** — `harness`
-  requires a task positional, while `harness-admin` is already the
+- **`check-llm` lives in `certo-admin`, not the `certo` CLI** — `certo`
+  requires a task positional, while `certo-admin` is already the
   subcommand-based maintenance CLI. There's no `--api-key` flag, so a key
-  never lands in shell history; use `LLM_API_KEY=... harness-admin check-llm`.
+  never lands in shell history; use `LLM_API_KEY=... certo-admin check-llm`.
   Retries are disabled so a bad key/endpoint fails in seconds, not after
   the SDK's 5 backoff retries.

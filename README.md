@@ -113,8 +113,8 @@ uv run python -m harness "Scaffold a FastAPI service with a /health endpoint." \
 uv run python -m harness "Fix the failing test in payments.py" --auto-model
 ```
 
-`uv pip install -e .` also installs `harness`, `harness-server`, and
-`harness-admin` as regular console scripts, so `harness "<task>"` works the
+`uv pip install -e .` also installs `certo`, `certo-server`, and
+`certo-admin` as regular console scripts, so `certo "<task>"` works the
 same way without the `uv run python -m` prefix once your venv is active.
 
 Full flag/env-var reference, the projects/execution-mode model, server

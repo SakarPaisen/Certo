@@ -1,4 +1,4 @@
-"""`harness-admin` — maintenance CLI: server-mode task store, third-party
+"""`certo-admin` — maintenance CLI: server-mode task store, third-party
 skills, and an LLM connectivity check (`check-llm`, see llm_check.py).
 
 The `skills` subcommand group manages local-only third-party skills (see
@@ -165,7 +165,7 @@ def _cmd_skills_install(args: argparse.Namespace, cfg: Config) -> int:
     print(
         f"\nInstalled but NOT enabled. Review the files in "
         f"{cfg.third_party_skills_dir}/{result.name}/ and the upstream license, then run: "
-        f"harness-admin skills enable {result.name}"
+        f"certo-admin skills enable {result.name}"
     )
     print(
         "The detected license is a text heuristic, not legal advice; downloading or "
@@ -216,7 +216,7 @@ def _cmd_skills_update(args: argparse.Namespace, cfg: Config) -> int:
     if reapproval:
         print(
             f"\nContent or license changed upstream: {args.name!r} was DISABLED. Review it, "
-            f"then run: harness-admin skills enable {args.name}"
+            f"then run: certo-admin skills enable {args.name}"
         )
     return 0
 
@@ -284,8 +284,8 @@ def _add_skills_parser(subparsers) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="harness-admin",
-        description="Maintenance CLI for the harness server's task store "
+        prog="certo-admin",
+        description="Maintenance CLI for the Certo server's task store "
         "(HARNESS_TASK_STORE-configured backend), local third-party skills, and an "
         "LLM connectivity check.",
     )

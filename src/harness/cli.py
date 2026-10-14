@@ -1,4 +1,4 @@
-"""CLI entry point: `python -m harness "<task>"` (also installed as `harness`)."""
+"""CLI entry point: `python -m harness "<task>"` (also installed as `certo`)."""
 
 from __future__ import annotations
 
@@ -149,8 +149,8 @@ def resolve_acceptance_checks(value: str) -> list[AcceptanceCheck]:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="harness",
-        description="Run a coding task through the agent harness.",
+        prog="certo",
+        description="Run a coding task through Certo.",
     )
     parser.add_argument(
         "task",

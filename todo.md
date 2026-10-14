@@ -184,7 +184,7 @@ default, `redis`, `sqlite`, `mysql`, `postgres`), fully configurable via
 `.env` (`HARNESS_TASK_STORE*`), a `HARNESS_TASK_TTL_SECONDS` retention
 setting (`0` = keep forever), and delete-by-project exposed both ways —
 `DELETE /tasks?project=NAME` / `DELETE /tasks/{id}` on `server.py`, and a
-new `harness-admin` CLI (`show`/`delete-task`/`delete-project`/`purge`).
+new `certo-admin` CLI (`show`/`delete-task`/`delete-project`/`purge`).
 sqlite/mysql/postgres share one SQLAlchemy Core implementation; redis uses
 native per-key TTL instead of a purge sweep. Verified live against real
 sqlite and redis-backed servers (task create/poll/delete/delete-by-project
@@ -309,8 +309,8 @@ its exact shape). Populating a real `usage` object from it is a
 self-contained, low-risk fix — no wire-format change, just no longer
 lying about a field OpenAI clients already expect to be meaningful.
 
-### 23. `TaskStore`/`harness-admin` has no way to list existing tasks or projects
-Every operation on the task store — `harness-admin show/delete-task`,
+### 23. `TaskStore`/`certo-admin` has no way to list existing tasks or projects
+Every operation on the task store — `certo-admin show/delete-task`,
 `DELETE /tasks/{id}`, `DELETE /tasks?project=`, `GET /tasks/{id}` — requires
 already knowing the exact task ID or project name ahead of time. There's no
 `list()`/`list_projects()` on the `TaskStore` ABC or any of its four
@@ -332,12 +332,12 @@ postgres task stores (an existing on-disk table lacks the new column;
 existing one), which wasn't in scope for that change and needs its own
 deliberate design rather than being bundled into an unrelated feature.
 
-### 25. `harness-admin`: preview model classification/ranking without running a task
+### 25. `certo-admin`: preview model classification/ranking without running a task
 Tuning a `models.yaml`'s `ratings`/`task_profiles` today means actually
 running a real (billed) task and reading `MODEL_DECISIONS.md` after the
 fact to see what got picked and why. `model_catalog.py`'s
 `classify_task()`/`rank_candidates()` are already pure, no-network
-functions — a `harness-admin classify "<task text>" [--models-file PATH]`
+functions — a `certo-admin classify "<task text>" [--models-file PATH]`
 subcommand printing the matched profile, its weights, and the full ranked
 table would let someone iterate on the catalog for free.
 

@@ -96,7 +96,7 @@ class Config:
     # Trigger-based (keyword/task/path), not project-specific — see MANUAL.md.
     skills_dir: str = DEFAULT_SKILLS_DIR
 
-    # Third-party skills installed via `harness-admin skills ...` (see
+    # Third-party skills installed via `certo-admin skills ...` (see
     # third_party_skills.py). Only lockfile entries explicitly enabled (and,
     # for an unknown license, explicitly acknowledged) reach the agent.
     third_party_skills_dir: str = DEFAULT_THIRD_PARTY_SKILLS_DIR
