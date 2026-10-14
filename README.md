@@ -9,8 +9,6 @@
 
 Give Certo a task. An agent plans, edits files and runs commands until it says it's done. Then Certo re-runs your project's real tests and build itself, with no LLM involved, and tells you whether the work is actually verified. Any model, local or cloud. *Certo* is Italian for "sure".
 
-<!-- TODO: 20-second terminal GIF. Agent says "done", Certo catches a failing check, sends it back, ends on "Verification: verified". -->
-![Certo catching a false "done"](docs/demo.gif)
 
 ## Why
 
