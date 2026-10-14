@@ -245,6 +245,23 @@ def test_create_task_with_reasoning_effort_override(monkeypatch):
     assert calls["cfg"].model == "anthropic/claude-x"
 
 
+def test_create_task_reasoning_effort_off_is_normalized(monkeypatch):
+    calls = {}
+
+    def _fake_stream_task(task, cfg=None, on_message=None, acceptance_checks=None, **_kwargs):
+        calls["cfg"] = cfg
+        return _fake_outcome()
+
+    monkeypatch.setattr(server, "load_config", lambda: _cfg(model="anthropic/claude-x"))
+    monkeypatch.setattr(server, "stream_task", _fake_stream_task)
+
+    client = TestClient(server.create_app())
+    response = client.post("/tasks", json={"task": "do something", "reasoning_effort": "off"})
+    _wait_for_status(client, response.json()["task_id"])
+
+    assert calls["cfg"].reasoning_effort == "none"
+
+
 def test_create_task_without_override_keeps_configured_model(monkeypatch):
     calls = {}
 

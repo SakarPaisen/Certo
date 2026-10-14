@@ -190,8 +190,8 @@ def _build_parser() -> argparse.ArgumentParser:
             "Override LLM_REASONING_EFFORT for this run only, without touching "
             ".env — e.g. to compare how the same model behaves at different "
             "effort levels. Common values: none | minimal | low | medium | "
-            "high | xhigh | max (provider-neutral; leave unset for the SDK's "
-            "own default)."
+            "high | xhigh | max (provider-neutral; none or off disables "
+            "reasoning; leave unset for the default)."
         ),
     )
     parser.add_argument(

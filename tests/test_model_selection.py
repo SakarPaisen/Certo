@@ -153,6 +153,21 @@ def test_llm_for_entry_clears_base_url_when_entry_does_not_set_one():
     assert llm.base_url is None
 
 
+def test_llm_for_entry_ollama_without_reasoning_effort_sends_none():
+    # The global LLM_REASONING_EFFORT doesn't leak into a catalog entry, so
+    # an Ollama entry with none of its own gets no reasoning parameter.
+    cfg = _cfg(reasoning_effort="high")
+    entry = _entry("local", model="ollama/certo-test-model", base_url="http://localhost:11434")
+
+    assert llm_for_entry(cfg, entry, usage_id="certo:local").reasoning_effort is None
+
+
+def test_llm_for_entry_reasoning_effort_off_sends_none():
+    entry = _entry("hosted", model="openai/gpt-4o", api_key="sk-openai", reasoning_effort="off")
+
+    assert llm_for_entry(_cfg(), entry, usage_id="certo:hosted").reasoning_effort is None
+
+
 # --- write_model_decisions -------------------------------------------------
 
 

@@ -95,6 +95,17 @@ def test_reasoning_effort_blank_treated_as_absent():
     assert cfg.reasoning_effort is None
 
 
+@pytest.mark.parametrize("value", ["none", "None", "off", " OFF "])
+def test_reasoning_effort_off_spellings_normalize_to_none_string(value):
+    cfg = load_config(_base_env(LLM_REASONING_EFFORT=value))
+    assert cfg.reasoning_effort == "none"
+
+
+def test_override_llm_reasoning_effort_off_normalizes_to_none_string():
+    cfg = override_llm(load_config(_base_env()), reasoning_effort="off")
+    assert cfg.reasoning_effort == "none"
+
+
 def test_reasoning_effort_accepts_forward_compatible_value():
     # Deliberately not validated against a fixed choice list — see config.py's
     # comment on the field. A value the SDK/provider might add later must not

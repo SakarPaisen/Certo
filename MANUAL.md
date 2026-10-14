@@ -100,7 +100,7 @@ are unchanged.
 | `LLM_MODEL` | *(required)* | LiteLLM-style model id, e.g. `anthropic/claude-sonnet-4-5-20250929`, `openai/gpt-4o`, `ollama/llama3`. The **only** thing you change to switch provider. |
 | `LLM_API_KEY` | *(required unless `LLM_BASE_URL` set)* | Key for whichever provider `LLM_MODEL` selects. |
 | `LLM_BASE_URL` | *(empty)* | Only for local/self-hosted models (e.g. `http://localhost:11434`). Leave the line with no value and no trailing text — see [Troubleshooting](#troubleshooting). |
-| `LLM_REASONING_EFFORT` | *(empty — SDK default `high` applies)* | Provider-neutral reasoning effort, passed straight through to the SDK's `LLM.reasoning_effort` (LiteLLM translates it per-provider). Common values: `none` \| `minimal` \| `low` \| `medium` \| `high` \| `xhigh` \| `max` — not validated against a fixed list, since the SDK accepts forward-compatible provider values too. |
+| `LLM_REASONING_EFFORT` | *(empty — SDK default `high`; no reasoning for `ollama/`/`ollama_chat/` models)* | Provider-neutral reasoning effort, passed straight through to the SDK's `LLM.reasoning_effort` (LiteLLM translates it per-provider). Common values: `none` \| `minimal` \| `low` \| `medium` \| `high` \| `xhigh` \| `max` — not validated against a fixed list, since the SDK accepts forward-compatible provider values too. `none` or `off` (any case) turns reasoning off: no reasoning parameter is sent at all. Left empty for an Ollama model, it behaves like `none`, because most Ollama models have no thinking mode and Ollama rejects the request outright; set it (e.g. `high`) to turn thinking on for a model that has one (`qwen3`, `deepseek-r1`). |
 | `CERTO_WORKSPACE` | `.` | Working directory the agent operates in when `--project` is not used. |
 | `CERTO_MAX_ITERATIONS` | `50` | Safety cap on the agent loop. |
 | `CERTO_CONFIRM_MODE` | `never` | `never` \| `always` (pause before each tool call for approval — see [Confirmation mode](#confirmation-mode)). |
@@ -1201,7 +1201,10 @@ registration points, not one — see [Custom tools](#custom-tools).
 Edit **only** `LLM_MODEL` in `.env` — no code changes, ever. Nothing in
 `src/` hardcodes a model, provider, or base URL (verified via
 `grep -rniE "gpt-|claude-|anthropic/|openai/|gemini/|ollama/" src/` — the only
-hits are example strings in error messages and docstrings).
+hits are example strings in error messages and docstrings). The one
+provider-aware default is reasoning effort: an Ollama model with no
+`LLM_REASONING_EFFORT` gets none, instead of the SDK's `high` (see
+[Troubleshooting](#troubleshooting)).
 
 - `anthropic/claude-...` — Anthropic
 - `openai/gpt-4o` — OpenAI
@@ -1228,7 +1231,9 @@ entry point accepts an explicit, optional override instead:
 `LLM_REASONING_EFFORT`/`reasoning_effort` is provider-neutral — passed
 straight through to the SDK's own `LLM.reasoning_effort` field (LiteLLM
 translates it per-provider). Leave it unset to use the SDK's own default
-(`"high"`).
+(`"high"`), except for an `ollama/`/`ollama_chat/` model, where unset means
+no reasoning. `none` or `off` sends no reasoning parameter at all, for any
+provider.
 
 Any subset may be given; an omitted field keeps `.env`'s value for that one
 setting (e.g. passing only `--model` keeps the configured `LLM_API_KEY`). This
@@ -1901,6 +1906,15 @@ blocks runs too. It's common with local models (e.g. `ollama/llama3`).
 Raise the model's context window on the server side (for Ollama, a larger
 `num_ctx`), or pick a model with a larger window. `certo-admin check-llm`
 reports this as a `setup` failure.
+
+**`OllamaException: "qwen3-coder:30b" does not support thinking`** — the
+request asked an Ollama model with no thinking mode to think, and Ollama
+rejects that on the first call. It happens when `LLM_REASONING_EFFORT` (or
+`--reasoning-effort`, or a `models.yaml` entry's `reasoning_effort`) is set
+to a level such as `high` for that model. Clear it or set it to `none`. With
+it unset, Certo already sends no reasoning parameter to Ollama models. Up to
+v0.1.0 the SDK's `high` default was sent instead, so every such model failed
+this way.
 
 **`LLM_BASE_URL` gets read as a literal `# comment` string** — `python-dotenv`
 does not strip a trailing `# comment` from a line whose value is otherwise

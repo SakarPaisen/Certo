@@ -52,9 +52,10 @@ decisions log below for *why* a given design was chosen.
   state, applied once at the very end of `stream_task`, downgrading what
   would otherwise be `"verified"` only.
 - **`llm.py` / `tools.py` / `agent.py`** — SDK wiring; default preset tools +
-  `run_tests`. `build_llm()` only passes `reasoning_effort` when set (else
-  the SDK's own `"high"` default applies — passing an explicit `None` would
-  silently override it). `AgentContext.system_message_suffix` carries five
+  `run_tests`. `build_llm()` passes `reasoning_effort` through when set;
+  `none`/`off` (config folds `off` into `none`) and an unset Ollama model
+  pass an explicit `None` (no reasoning param sent); any other unset model
+  omits the kwarg so the SDK's own `"high"` default applies. `AgentContext.system_message_suffix` carries five
   behavioral policies: `_AUTONOMOUS_SUFFIX` (omitted when `cfg.interactive`),
   `_README_SUFFIX` (leave a real `README.md`), `_NONINTERACTIVE_TOOLING_SUFFIX`
   (use CI/non-interactive flags, don't blindly retry a no-op command),
@@ -676,6 +677,18 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   sqlite `SQLTaskStore` tests are the only automated coverage of the code
   path shared with mysql/postgres, so a plain `.[dev]` install must run
   them rather than silently skip them.
+- **An unset reasoning effort means none for Ollama models; `none`/`off`
+  pass an explicit `None`.** The SDK default `"high"` reaches Ollama as
+  `think: true`, and Ollama rejects it for any model without a thinking
+  mode (`qwen3-coder:30b`, the README quickstart model), failing the first
+  call. Passing the string `"none"` through still sends `think: false`, so
+  it becomes `None`, which the SDK's chat options skip entirely. That
+  gives up OpenAI's literal `reasoning_effort="none"`: that request now
+  gets the API's own default instead (accepted, per the user's request).
+  Matched on the `ollama`/`ollama_chat` model prefix: only the default
+  changes, never the provider. `tests/test_llm.py` asserts the wire request
+  against a local fake Ollama that returns the real 400. The bug reproduces
+  there with the old `build_llm`.
 - **`check-llm` lives in `certo-admin`, not the `certo` CLI** — `certo`
   requires a task positional, while `certo-admin` is already the
   subcommand-based maintenance CLI. There's no `--api-key` flag, so a key

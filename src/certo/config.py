@@ -141,7 +141,9 @@ class Config:
     # field accepts forward-compatible values beyond its documented ones
     # ('none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', ...), so
     # this harness shouldn't reject one it doesn't yet know about. None
-    # means "don't override" — the SDK's own default ('high') applies.
+    # means "not configured" — llm.py picks the default (see
+    # `build_llm`). "off" is normalized to "none", which llm.py turns into
+    # an explicit "send no reasoning parameter at all".
     reasoning_effort: str | None = None
 
     # Server-mode task registry persistence (see task_store.py). Default
@@ -202,6 +204,18 @@ def _clean(value: str | None) -> str | None:
         return None
     value = value.strip()
     return value or None
+
+
+# Spellings of "reasoning disabled", normalized to the SDK's own "none".
+_REASONING_OFF = {"none", "off"}
+
+
+def _clean_reasoning_effort(value: str | None) -> str | None:
+    """Like `_clean`, but folds every "disabled" spelling into "none"."""
+    value = _clean(value)
+    if value is not None and value.lower() in _REASONING_OFF:
+        return "none"
+    return value
 
 
 # Every policy env var is CERTO_<NAME>. The pre-rename HARNESS_<NAME> spelling
@@ -329,7 +343,7 @@ def load_config(env: Mapping[str, str] | None = None, *, dotenv_path: str = ".en
             "LLM_API_KEY is required unless LLM_BASE_URL is set (e.g. a local "
             "Ollama/vLLM/LM Studio endpoint that needs no key)."
         )
-    reasoning_effort = _clean(env.get("LLM_REASONING_EFFORT"))
+    reasoning_effort = _clean_reasoning_effort(env.get("LLM_REASONING_EFFORT"))
 
     workspace = _get(env, "WORKSPACE") or DEFAULT_WORKSPACE
     max_iterations = _parse_positive_int(
@@ -534,7 +548,7 @@ def override_llm(
     if base_url is not None:
         updates["base_url"] = _clean(base_url)
     if reasoning_effort is not None:
-        updates["reasoning_effort"] = _clean(reasoning_effort)
+        updates["reasoning_effort"] = _clean_reasoning_effort(reasoning_effort)
     return replace(cfg, **updates) if updates else cfg
 
 
