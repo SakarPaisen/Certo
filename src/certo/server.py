@@ -518,20 +518,23 @@ def create_app():
 def main(argv: list[str] | None = None) -> None:
     import argparse
 
+    from . import __version__
+
+    parser = argparse.ArgumentParser(
+        prog="certo-server",
+        description="Run Certo as an HTTP/WebSocket server.",
+    )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8000)
+    args = parser.parse_args(argv)
+
     try:
         import uvicorn
     except ImportError as exc:
         raise RuntimeError(
             'Server mode requires the "server" extra: run `uv pip install -e ".[server]"`.'
         ) from exc
-
-    parser = argparse.ArgumentParser(
-        prog="certo-server",
-        description="Run Certo as an HTTP/WebSocket server.",
-    )
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8000)
-    args = parser.parse_args(argv)
 
     uvicorn.run(create_app(), host=args.host, port=args.port)
 

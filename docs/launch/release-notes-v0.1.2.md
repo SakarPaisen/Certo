@@ -1,6 +1,7 @@
-# Certo v0.1.1
+# Certo v0.1.2
 
 This release makes Certo work end to end when it's installed from PyPI.
+(0.1.1 was never published; this is the first release after 0.1.0.)
 The first real `uv tool install certo` run, with a local Ollama model,
 found three problems that never showed up from the development
 environment. All three are fixed, and a new release check now installs
@@ -42,6 +43,7 @@ every wheel the way users do before it can be published.
   `Verification: <state>` line and exit codes. `PATH` defaults to the
   current directory. A task such as `certo "verify the login flow"` still
   runs an agent.
+- **`--version`** on `certo`, `certo-admin` and `certo-server`.
 
 ## For contributors
 

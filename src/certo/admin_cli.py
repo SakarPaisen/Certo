@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 
+from . import __version__
 from . import third_party_skills as tps
 from .config import Config, ConfigError, load_config, override_llm
 from .llm_check import DEFAULT_TIMEOUT_SECONDS, check_llm
@@ -289,6 +290,7 @@ def build_parser() -> argparse.ArgumentParser:
         "(CERTO_TASK_STORE-configured backend), local third-party skills, and an "
         "LLM connectivity check.",
     )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     delete_project = subparsers.add_parser(

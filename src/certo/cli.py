@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 
 from openhands.sdk.event import ActionEvent
 
+from . import __version__
 from .acceptance import AcceptanceCheck, AcceptanceCheckError, parse_acceptance_checks
 from .config import ConfigError, load_config, override_llm, resolve_project_dir
 from .custom_tools.run_tests_tool import detect_project, run_full_verification
@@ -157,6 +158,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "(see certo verify --help)."
         ),
     )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument(
         "task",
         help=(

@@ -783,6 +783,16 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   that `publish` uploads. There is no pull-request CI workflow to attach it
   to yet. The dependency fixture asserts its package is *not* importable
   from Certo's tool env, so a pass can't come from Certo's own packages.
+- **Versioning: every feature bumps the third digit, in the same commit**
+  (user's rule; full text in CLAUDE.md). The first two digits move only on
+  the user's decision. The version is written literally in
+  `pyproject.toml` and `certo/__init__.py`, not read from installed
+  metadata, because the Docker image imports `certo` from source with no
+  dist-info. `tests/test_version.py` keeps those two and `uv.lock` equal.
+  `--version` is on all three commands. `certo-server` parses its
+  arguments before importing uvicorn, so `--version` works without the
+  `server` extra. 0.1.1 was bumped but never published: `--version` was
+  the first feature under this rule, so the next release is 0.1.2.
 - **`check-llm` lives in `certo-admin`, not the `certo` CLI** — `certo`
   requires a task positional, while `certo-admin` is already the
   subcommand-based maintenance CLI. There's no `--api-key` flag, so a key

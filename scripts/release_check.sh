@@ -82,6 +82,10 @@ run() {
   last_output="$out"
 }
 
+echo "== certo --version"
+wheel_version="$(basename "$wheel" | cut -d- -f2)"
+run version 0 "certo $wheel_version" "$certo" --version
+
 echo "== certo --help"
 run help 0 "" "$certo" --help
 echo "$last_output" | grep -q "certo verify \[PATH\]" && pass "help mentions certo verify" || fail "help doesn't mention certo verify"

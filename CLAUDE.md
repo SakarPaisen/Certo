@@ -109,6 +109,17 @@ keep `openhands-sdk`/`openhands-tools` pinned to the same version.
   is absent**, so CI passes without secrets.
 - Run `uv run pytest -q` after each milestone; do not move on with failing tests.
 
+## Versioning
+
+Every change that adds a feature bumps the third digit of the version
+(`0.1.2` → `0.1.3`), in the same commit as the feature. Bug fixes and docs
+alone don't bump it. The first two digits change only when the user decides
+on a bigger release. Never reuse a number: PyPI rejects it, even if that
+version was deleted. A bump updates three places, which
+`tests/test_version.py` checks agree: `version` in `pyproject.toml`,
+`__version__` in `src/certo/__init__.py`, and `uv.lock` (run `uv lock`).
+`certo --version` prints the result.
+
 ## Working style
 
 - Implement one milestone at a time (spec section 11). After each: run tests,

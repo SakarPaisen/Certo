@@ -138,6 +138,7 @@ uv run python -m certo "<task>" [--execution {local,docker}] [--project NAME] \
 (Also installed as a console script: `certo "<task>" ...`, once the package
 is installed via `pip install certo` or `uv pip install -e .`. The package
 installs exactly three commands: `certo`, `certo-server` and `certo-admin`.
+Each accepts `--version` and prints, e.g., `certo 0.1.2`.
 The pre-rename `harness`, `harness-server` and `harness-admin` aliases were
 removed before the first PyPI release; use the `certo*` names.)
 
@@ -1721,7 +1722,8 @@ are installed. That hid a real bug: Certo 0.1.0 verified projects with its
 own interpreter, which only worked there. `release_check.sh` installs the
 wheel with `uv tool install` into a throwaway `UV_TOOL_DIR` /
 `UV_TOOL_BIN_DIR` (never your real ones). From an empty temp directory, it
-runs `certo --help` and `certo verify` on three fixture projects:
+runs `certo --version` (it must match the wheel's version), `certo --help`,
+and `certo verify` on three fixture projects:
 
 | Fixture | Expected |
 |---|---|
