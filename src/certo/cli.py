@@ -16,8 +16,9 @@ from openhands.sdk.event import ActionEvent
 
 from .acceptance import AcceptanceCheck, AcceptanceCheckError, parse_acceptance_checks
 from .config import ConfigError, load_config, override_llm, resolve_project_dir
+from .custom_tools.run_tests_tool import detect_project, run_full_verification
 from .model_catalog import ModelCatalogEntry
-from .runner import run_task
+from .runner import _build_completion_contract, run_task
 from .skills import write_project_context
 
 _URL_FETCH_TIMEOUT_SECONDS = 15
@@ -151,6 +152,10 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="certo",
         description="Run a coding task through Certo.",
+        epilog=(
+            "To check a project without running an agent: certo verify [PATH] "
+            "(see certo verify --help)."
+        ),
     )
     parser.add_argument(
         "task",
@@ -275,7 +280,86 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+# Final verdicts that exit nonzero, for an agent run and for `certo verify`
+# alike. "failed" can only be final for `certo verify`, which never retries.
+_FAILING_STATES = (
+    "failed",
+    "retry_exhausted",
+    "no_progress",
+    "timed_out",
+    "incomplete",
+    "confirmation_required",
+    "budget_exhausted",
+    "acceptance_failed",
+    "stuck",
+)
+
+
+def _build_verify_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="certo verify",
+        description=(
+            "Run Certo's verification on a project without an agent or an LLM: "
+            "project detection, the project's own environment, then every check "
+            "Certo runs after an agent finishes. No LLM_MODEL needed."
+        ),
+    )
+    parser.add_argument(
+        "path", nargs="?", default=".", help="Project directory (default: current directory)."
+    )
+    parser.add_argument(
+        "--require-verification",
+        action="store_true",
+        help="Exit nonzero for 'inconclusive' too, not only for a failure.",
+    )
+    return parser
+
+
+def verify_main(argv: list[str]) -> int:
+    """`certo verify [PATH]`: the post-agent verification on its own.
+
+    Same pipeline as runner.py's post-hoc check (`run_full_verification`),
+    run locally against PATH once, with no retries (there's no agent to send
+    a failure back to), so a failure is final here.
+    """
+    args = _build_verify_parser().parse_args(argv)
+    path = os.path.abspath(args.path)
+    if not os.path.isdir(path):
+        print(f"Error: {args.path} is not a directory", file=sys.stderr)
+        return 1
+
+    detection = detect_project(path)
+    print(f"Project: {path} ({detection.language})")
+    run = run_full_verification(path)
+    for notice in run.notices:
+        print(f"Certo: {notice}")
+    for check in run.checks:
+        print(
+            f"  {check.status:<11} {check.name}" + (f"  ({check.command})" if check.command else "")
+        )
+    for check in run.failing + run.timed_out_checks:
+        if check.output.strip():
+            print(f"\n--- {check.name} output ---\n{check.output.rstrip()}")
+
+    state = run.state
+    print(f"\nVerification: {state}")
+    contract = _build_completion_contract("certo verify", run, skipped=False, aborted=False)
+    for note in contract.limitations:
+        print(f"  - {note}")
+    if state in _FAILING_STATES:
+        return 1
+    if args.require_verification and state == "inconclusive":
+        return 1
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else list(argv)
+    # `verify` is a subcommand only as the exact, whole first argument. A
+    # task is always one argument (quoted), so "verify the login flow" can
+    # never match, and `certo -- verify` still runs the one-word task.
+    if argv and argv[0] == "verify":
+        return verify_main(argv[1:])
     args = _build_parser().parse_args(argv)
 
     try:
@@ -387,16 +471,7 @@ def main(argv: list[str] | None = None) -> int:
         print("\nRun summary:")
         for line in outcome.run_summary.format_lines():
             print(f"  {line}")
-    if outcome.verification_state in (
-        "retry_exhausted",
-        "no_progress",
-        "timed_out",
-        "incomplete",
-        "confirmation_required",
-        "budget_exhausted",
-        "acceptance_failed",
-        "stuck",
-    ):
+    if outcome.verification_state in _FAILING_STATES:
         return 1
     if args.require_verification and outcome.verification_state == "inconclusive":
         return 1

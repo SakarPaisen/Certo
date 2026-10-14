@@ -120,7 +120,9 @@ decisions log below for *why* a given design was chosen.
 - **`cli.py`** — `python -m certo "<task>" [--execution] [--project]
   [--agents-md] [--model] [--api-key] [--base-url] [--reasoning-effort]
   [--interactive] [--require-verification] [--acceptance-checks]
-  [--auto-model]`. `task` resolves via `resolve_task_source()` (http(s) URL,
+  [--auto-model]`, plus `certo verify [PATH] [--require-verification]`
+  (`verify_main()`: `run_full_verification` with no agent/LLM, same verdict
+  line and `_FAILING_STATES` exit codes). `task` resolves via `resolve_task_source()` (http(s) URL,
   then existing local file, then literal text — CLI-only). `--require-verification`
   makes an `inconclusive` result exit nonzero too (default behavior
   unchanged otherwise). `--auto-model` sets `cfg.model_selection="auto"`;
@@ -762,6 +764,14 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   `execute_command`. **Not run against a real container yet**: the Docker
   daemon wasn't usable in the session that built it. Covered by fake-
   workspace unit tests only.
+- **`certo verify` is dispatched on `argv[0] == "verify"` exactly, before
+  argparse** (user-approved). Subparsers would make a task positional and
+  a subcommand compete, and argparse would reject or misroute existing
+  task invocations. A task is one argument, so "verify the login flow"
+  can't match. The only input whose meaning changed is the one-word task
+  `verify`, still reachable as `certo -- verify`. It lives in `certo`, not
+  `certo-admin`, because it's the user-facing check, not store
+  maintenance.
 - **`check-llm` lives in `certo-admin`, not the `certo` CLI** — `certo`
   requires a task positional, while `certo-admin` is already the
   subcommand-based maintenance CLI. There's no `--api-key` flag, so a key

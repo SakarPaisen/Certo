@@ -229,6 +229,32 @@ uv run python -m certo "Fix the race condition in the queue worker." --project m
     --reasoning-effort xhigh
 ```
 
+### `certo verify [PATH]` — verification without an agent
+
+```bash
+certo verify                       # the current directory
+certo verify ./projects/todo       # any project
+certo verify ./projects/todo --require-verification
+```
+
+Runs exactly the verification Certo runs after an agent finishes: project
+detection, the project's own environment (see
+[Project environments](#project-environments-python), so it may create
+`.venv` and install pytest into it), then every check from
+[Test verification](#test-verification). It needs no LLM and no
+`LLM_MODEL`, and reads no `.env`. It runs locally against `PATH` once, with
+no retries, since there is no agent to send a failure back to.
+
+Output: the detected project type, any setup notice, one line per check,
+the output of each failing check, then the same verdict line an agent run
+prints (`Verification: <state>`) and its limitations. Exit codes match an
+agent run: `verified` and `inconclusive` exit `0` (`inconclusive` exits `1`
+with `--require-verification`), and `failed` or `timed_out` exit `1`.
+
+`verify` is a subcommand only as the exact, whole first argument. A task is
+always one (quoted) argument, so `certo "verify the login flow"` still runs
+an agent. To run the one-word task `verify`, write `certo -- verify`.
+
 ### Task source resolution
 
 `resolve_task_source()` checks, in order: is it an http(s) URL (fetched with

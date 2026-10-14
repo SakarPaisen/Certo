@@ -1358,3 +1358,90 @@ def test_sdk_banner_is_suppressed_by_default():
 
 def test_sdk_banner_shows_when_explicitly_enabled():
     assert "OpenHands SDK v" in _run_help({"OPENHANDS_SUPPRESS_BANNER": "0"})
+
+
+# --- certo verify -------------------------------------------------------------
+
+
+def _capture_task(monkeypatch):
+    calls = {}
+
+    def _fake_run_task(task, **_kwargs):
+        calls["task"] = task
+        return _fake_result([_FakeMessage("done")])
+
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg())
+    monkeypatch.setattr(cli, "run_task", _fake_run_task)
+    monkeypatch.setattr(cli, "verify_main", lambda _argv: pytest.fail("verify must not run"))
+    return calls
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["verify the login flow"],
+        ["Verify"],
+        ["verify:"],
+        ["--", "verify"],
+        ["--model", "x/y", "verify the app"],
+    ],
+)
+def test_a_task_mentioning_verify_is_still_a_task(monkeypatch, argv):
+    calls = _capture_task(monkeypatch)
+
+    assert cli.main(argv) == 0
+    assert calls["task"] == argv[-1]
+
+
+def test_verify_subcommand_needs_no_llm_config(monkeypatch, tmp_path, project_venv, capsys):
+    project_venv(tmp_path)
+    (tmp_path / "test_ok.py").write_text("def test_ok():\n    assert True\n")
+    monkeypatch.setattr(cli, "load_config", lambda: pytest.fail("verify must not load LLM config"))
+    monkeypatch.setattr(
+        cli, "run_task", lambda *a, **kw: pytest.fail("verify must not run an agent")
+    )
+
+    exit_code = cli.main(["verify", str(tmp_path)])
+
+    out = capsys.readouterr().out
+    assert exit_code == 0
+    assert f"Project: {tmp_path} (python)" in out
+    assert "Verification: verified" in out
+
+
+def test_verify_defaults_to_the_current_directory(monkeypatch, tmp_path, project_venv, capsys):
+    project_venv(tmp_path)
+    (tmp_path / "test_ok.py").write_text("def test_ok():\n    assert True\n")
+    monkeypatch.chdir(tmp_path)
+
+    assert cli.main(["verify"]) == 0
+    assert "Verification: verified" in capsys.readouterr().out
+
+
+def test_verify_failing_project_exits_nonzero_and_shows_the_output(tmp_path, project_venv, capsys):
+    project_venv(tmp_path)
+    (tmp_path / "test_bad.py").write_text("def test_bad():\n    assert 1 == 2, 'boom'\n")
+
+    exit_code = cli.main(["verify", str(tmp_path)])
+
+    out = capsys.readouterr().out
+    assert exit_code == 1
+    assert "Verification: failed" in out
+    assert "boom" in out
+
+
+def test_verify_inconclusive_exits_zero_unless_verification_is_required(tmp_path, capsys):
+    (tmp_path / "notes.md").write_text("nothing to run\n")
+
+    assert cli.main(["verify", str(tmp_path)]) == 0
+    assert "Verification: inconclusive" in capsys.readouterr().out
+    assert cli.main(["verify", str(tmp_path), "--require-verification"]) == 1
+
+
+def test_verify_rejects_a_missing_directory(tmp_path, capsys):
+    assert cli.main(["verify", str(tmp_path / "nope")]) == 1
+    assert "is not a directory" in capsys.readouterr().err
+
+
+def test_task_help_mentions_the_verify_subcommand():
+    assert "certo verify [PATH]" in cli._build_parser().format_help()
