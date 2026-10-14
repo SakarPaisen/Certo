@@ -1286,14 +1286,16 @@ def test_cli_prints_run_summary_at_the_end(monkeypatch, capsys):
     assert "Total cost: $0.0500" in out
 
 
-# --- Console scripts: certo-* commands and their pre-rename aliases --------
+# --- Console scripts: exactly the certo-* commands --------------------------
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
-_SCRIPT_ALIASES = {
-    "harness": "certo",
-    "harness-server": "certo-server",
-    "harness-admin": "certo-admin",
+# The pre-rename `harness*` aliases were dropped before the first PyPI
+# release: a bare `harness` on a user's PATH could shadow another tool.
+_SCRIPTS = {
+    "certo": "certo.cli:main",
+    "certo-server": "certo.server:main",
+    "certo-admin": "certo.admin_cli:main",
 }
 
 
@@ -1302,20 +1304,11 @@ def _declared_scripts() -> dict[str, str]:
         return tomllib.load(fh)["project"]["scripts"]
 
 
-@pytest.mark.parametrize("alias, command", sorted(_SCRIPT_ALIASES.items()))
-def test_console_script_alias_points_at_same_entry_point(alias, command):
-    scripts = _declared_scripts()
-    assert command in scripts
-    assert scripts[alias] == scripts[command]
+def test_console_scripts_are_exactly_the_certo_commands():
+    assert _declared_scripts() == _SCRIPTS
 
 
-def test_console_scripts_are_exactly_the_certo_commands_and_aliases():
-    expected = set(_SCRIPT_ALIASES) | set(_SCRIPT_ALIASES.values())
-    assert set(_declared_scripts()) == expected
-
-
-@pytest.mark.parametrize("alias, command", sorted(_SCRIPT_ALIASES.items()))
-def test_installed_console_script_alias_matches(alias, command):
+def test_installed_console_scripts_are_exactly_the_certo_commands():
     """Same check against the installed distribution's metadata, so a stale
     install (pyproject edited, package not reinstalled) is caught too."""
     try:
@@ -1323,7 +1316,7 @@ def test_installed_console_script_alias_matches(alias, command):
     except importlib.metadata.PackageNotFoundError:
         pytest.skip("certo distribution is not installed")
     by_name = {ep.name: ep.value for ep in eps if ep.group == "console_scripts"}
-    assert by_name[alias] == by_name[command]
+    assert by_name == _SCRIPTS
 
 
 def test_parser_prog_is_certo():

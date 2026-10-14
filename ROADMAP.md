@@ -573,8 +573,7 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   name, `server.py` title/`owned_by`, Docker image tag
   `certo/agent-server:local`) and links (GitHub redirects the old repo URL).
   Console scripts are `certo`/`certo-server`/`certo-admin`; the old
-  `harness*` names stay as aliases to the same entry points (no deprecation
-  date — they cost nothing and keep shell history working).
+  `harness*` aliases were later removed (see the entry below).
   The package moved `src/harness/` → `src/certo/` (`import certo`,
   `python -m certo`, Docker `--import-modules certo.custom_tools` with
   `OH_EXTRA_PYTHON_PATH=/certo_src`); no import shim for `harness` — the
@@ -629,6 +628,13 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   entry carries the real model name. Always computed (not gated on
   `CERTO_ARTIFACTS_DIR`), and read defensively in the `finally` so a
   metrics failure can't mask the run's own outcome or exception.
+- **`harness`/`harness-server`/`harness-admin` console aliases removed
+  before the first PyPI release** (supersedes "they cost nothing" in the
+  rename entry). There are no external users, and a globally installed
+  `harness` could shadow another tool on a user's PATH. The `HARNESS_*`
+  env-var fallback and legacy storage reads are unaffected — those protect
+  local data, not command names. `tests/test_cli.py` asserts the declared
+  and installed scripts are exactly the three `certo*` commands.
 - **Release workflow: `verify` → `build` → `publish` jobs, trusted
   publishing only.** A PyPI version can never be reused, so the tag must
   equal `pyproject.toml`'s version and the suite must pass before anything

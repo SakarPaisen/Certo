@@ -116,9 +116,10 @@ uv run python -m certo "<task>" [--execution {local,docker}] [--project NAME] \
 ```
 
 (Also installed as a console script: `certo "<task>" ...`, once the package
-is installed via `uv pip install -e .`. The old command names `harness`,
-`harness-server` and `harness-admin` are kept as aliases for `certo`,
-`certo-server` and `certo-admin`, so existing scripts keep working.)
+is installed via `pip install certo` or `uv pip install -e .`. The package
+installs exactly three commands: `certo`, `certo-server` and `certo-admin`.
+The pre-rename `harness`, `harness-server` and `harness-admin` aliases were
+removed before the first PyPI release; use the `certo*` names.)
 
 - `task` (positional, required) — the instruction given to the agent, **or a
   reference to it**: an http(s) URL (fetched) or a path to an existing local

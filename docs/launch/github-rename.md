@@ -47,10 +47,8 @@ installed. Remove any topic that names `aricode`.)
   to an existing project, and the only real check is the first upload.
   Nothing has been published.
 - Console scripts installed by the package: `certo`, `certo-server`,
-  `certo-admin`, plus the aliases `harness`, `harness-server` and
-  `harness-admin`. A bare `harness` command on PyPI users' PATH could
-  collide with other tools. Consider dropping the aliases before a first
-  public release, since nobody outside this repo depends on them yet.
+  `certo-admin`. The `harness*` aliases were dropped before the first
+  release so a bare `harness` can't collide with other tools on PATH.
 
 ## 5. Not needed
 

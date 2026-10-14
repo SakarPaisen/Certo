@@ -75,12 +75,6 @@ store-redis = ["redis>=5.0"]
 certo = "certo.cli:main"
 certo-server = "certo.server:main"
 certo-admin = "certo.admin_cli:main"
-# Pre-rename command names, kept as aliases so existing shell history and
-# scripts keep working. Each must point at the same entry point as its
-# certo-* counterpart (tests/test_cli.py checks this).
-harness = "certo.cli:main"
-harness-server = "certo.server:main"
-harness-admin = "certo.admin_cli:main"
 
 [build-system]
 # >=1.27 for PEP 639 `license`/`license-files`.
