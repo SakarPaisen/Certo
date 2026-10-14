@@ -630,6 +630,14 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   entry carries the real model name. Always computed (not gated on
   `CERTO_ARTIFACTS_DIR`), and read defensively in the `finally` so a
   metrics failure can't mask the run's own outcome or exception.
+- **sdist is an explicit allowlist (`src/certo`, `tests`, the Dockerfile,
+  README/MANUAL/LICENSE, `.env.example`, `models.yaml.example`) plus
+  explicit secret/state/cache excludes on both targets** — hatchling's
+  default sdist relied on `.gitignore` alone to keep `.env`/`models.yaml`/
+  `projects/` out, and shipped dev-only files (`.claude/`, `CLAUDE.md`,
+  `todo.md`, `docs/`, `uv.lock`). Verified by building a copy with no
+  `.gitignore` and planted decoys: none shipped. `tests/test_packaging.py`
+  enforces the allowlist and the forbidden patterns.
 - **First-party skills moved into the package (`src/certo/builtin_skills/`)
   and always load; `CERTO_SKILLS_DIR` (still `./skills`) became an
   additive user catalog that overrides built-ins by name.** A clean-venv

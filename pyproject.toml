@@ -81,8 +81,52 @@ certo-admin = "certo.admin_cli:main"
 requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
+# What ships is an explicit list, and the excludes repeat the secret/state
+# patterns from .gitignore, so a missing or edited .gitignore can't leak
+# local files into a release. tests/test_packaging.py checks both archives.
 [tool.hatch.build.targets.wheel]
 packages = ["src/certo"]
+exclude = [
+    "**/__pycache__",
+    "**/*.py[cod]",
+    "**/.DS_Store",
+    "**/.env",
+    "**/.env.local",
+    "**/.envrc",
+    "**/models.yaml",
+    "**/*.db",
+    "**/*.sqlite",
+    "**/*.sqlite3",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src/certo",
+    "/tests",
+    "/docker/agent-server.Dockerfile",
+    "/README.md",
+    "/MANUAL.md",
+    "/LICENSE",
+    "/pyproject.toml",
+    "/.env.example",
+    "/models.yaml.example",
+]
+exclude = [
+    "**/__pycache__",
+    "**/*.py[cod]",
+    "**/.pytest_cache",
+    "**/.ruff_cache",
+    "**/.DS_Store",
+    "**/.env",
+    "**/.env.local",
+    "**/.envrc",
+    "**/models.yaml",
+    "**/*.db",
+    "**/*.sqlite",
+    "**/*.sqlite3",
+    "**/third_party_skills",
+    "**/third_party_skills.lock.json",
+]
 
 [tool.ruff]
 line-length = 100

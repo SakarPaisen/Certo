@@ -7,10 +7,12 @@ when `uv` isn't on PATH.
 
 from __future__ import annotations
 
+import fnmatch
 import shutil
 import subprocess
+import tarfile
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -35,6 +37,83 @@ def built(tmp_path_factory) -> dict[str, Path]:
 def _wheel_names(wheel: Path) -> list[str]:
     with zipfile.ZipFile(wheel) as zf:
         return zf.namelist()
+
+
+def _sdist_names(sdist: Path) -> list[str]:
+    # Strip the leading "certo-X.Y.Z/" so paths read like repo paths.
+    with tarfile.open(sdist) as tf:
+        return [m.name.split("/", 1)[1] for m in tf.getmembers() if m.isfile()]
+
+
+# Local state, secrets and caches that must never be published. Matched
+# against every path component (directories) or the file name (files).
+_FORBIDDEN_DIRS = {
+    "projects",
+    "artifacts",
+    "private",
+    "secrets",
+    "third_party_skills",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    ".git",
+    # Gitignored Apache-2.0 copies hand-placed in ./skills; not ours to ship.
+    "frontend-design",
+    "webapp-testing",
+    "web-artifacts-builder",
+}
+_FORBIDDEN_FILES = (
+    ".env",
+    ".env.local",
+    ".envrc",
+    "models.yaml",
+    "*.db",
+    "*.sqlite",
+    "*.sqlite3",
+    "*.pyc",
+    ".DS_Store",
+    ".pypirc",
+    "third_party_skills.lock.json",
+)
+
+
+def _forbidden(paths: list[str]) -> list[str]:
+    bad = []
+    for path in paths:
+        parts = PurePosixPath(path).parts
+        if set(parts[:-1]) & _FORBIDDEN_DIRS or any(
+            fnmatch.fnmatch(parts[-1], pattern) for pattern in _FORBIDDEN_FILES
+        ):
+            bad.append(path)
+    return bad
+
+
+def test_wheel_contains_no_secrets_state_or_caches(built):
+    assert _forbidden(_wheel_names(built["wheel"])) == []
+
+
+def test_sdist_contains_no_secrets_state_or_caches(built):
+    assert _forbidden(_sdist_names(built["sdist"])) == []
+
+
+def test_sdist_ships_only_the_allowlisted_paths(built):
+    allowed_prefixes = ("src/certo/", "tests/")
+    allowed_files = {
+        "PKG-INFO",
+        ".gitignore",  # hatchling always adds it to an sdist
+        "pyproject.toml",
+        "README.md",
+        "MANUAL.md",
+        "LICENSE",
+        ".env.example",
+        "models.yaml.example",
+        "docker/agent-server.Dockerfile",
+    }
+    names = _sdist_names(built["sdist"])
+    unexpected = [n for n in names if n not in allowed_files and not n.startswith(allowed_prefixes)]
+    assert unexpected == []
+    assert "src/certo/builtin_skills/lifecycle/repository-discovery.md" in names
 
 
 def test_wheel_ships_the_builtin_skill_catalog(built):
