@@ -198,7 +198,7 @@ class Config:
     artifacts_dir: str = ""
 
 
-# Certo's LLM settings. Certo 0.1.0 read the bare LLM_* names, which other
+# Certo's LLM settings. Up to 0.1.1 Certo read the bare LLM_* names, which other
 # tools use too; those are never read now (another app's LLM_MODEL must not
 # leak in), only named in the "required" errors so an old setup gets told why.
 LLM_ENV_PREFIX = "CERTO_LLM_"

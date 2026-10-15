@@ -97,7 +97,7 @@ blank value counts as unset, so a blank `CERTO_` line copied from
 
 **The LLM settings use the `CERTO_LLM_` prefix** (`CERTO_LLM_MODEL`,
 `CERTO_LLM_API_KEY`, `CERTO_LLM_BASE_URL`, `CERTO_LLM_REASONING_EFFORT`).
-Certo 0.1.0 read the bare `LLM_*` names, which other tools use too. Those
+Up to 0.1.1, Certo read the bare `LLM_*` names, which other tools use too. Those
 are **not** read any more, with no fallback, so another app's `LLM_MODEL`
 can never leak into Certo. If a required setting is missing and the old
 name is set, the error names it and the rename to make (never its value).
