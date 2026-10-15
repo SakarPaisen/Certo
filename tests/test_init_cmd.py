@@ -668,6 +668,21 @@ def test_certo_check_without_settings_says_where_to_run_it(tmp_path, monkeypatch
 
     assert init_cmd.check_main([], out=out) == 1
     assert "this folder has no .env" in out.getvalue()
+    assert init_cmd.user_settings_path() in out.getvalue()
+
+
+def test_certo_check_reads_the_user_settings_file(tmp_path, monkeypatch, checks):
+    monkeypatch.chdir(tmp_path)
+    for name in ("CERTO_LLM_MODEL", "CERTO_LLM_API_KEY", "CERTO_LLM_BASE_URL"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    (tmp_path / "xdg" / "certo").mkdir(parents=True)
+    (tmp_path / "xdg" / "certo" / ".env").write_text(
+        "CERTO_LLM_MODEL=gemini/u\nCERTO_LLM_API_KEY=k\n"
+    )
+
+    assert init_cmd.check_main([], out=io.StringIO()) == 0
+    assert checks[0].model == "gemini/u"
 
 
 def test_certo_check_reads_the_folders_env(tmp_path, monkeypatch, checks):

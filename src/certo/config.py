@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 import os
 import platform as _platform
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -330,37 +330,108 @@ def _parse_bool(env: Mapping[str, str], suffix: str, *, default: bool) -> bool:
     raise ConfigError(f"{name} must be a boolean (true/false), got {value!r}.")
 
 
-def load_config(env: Mapping[str, str] | None = None, *, dotenv_path: str = ".env") -> Config:
+def user_settings_path(environ: Mapping[str, str] | None = None) -> str:
+    """The settings file for every project on this computer:
+    `$XDG_CONFIG_HOME/certo/.env`, else `~/.config/certo/.env`, on every
+    platform. A relative XDG_CONFIG_HOME is ignored, as the XDG spec says."""
+    environ = os.environ if environ is None else environ
+    xdg = (environ.get("XDG_CONFIG_HOME") or "").strip()
+    base = xdg if os.path.isabs(xdg) else os.path.join(os.path.expanduser("~"), ".config")
+    return os.path.join(base, "certo", ".env")
+
+
+@dataclass(frozen=True)
+class SettingSource:
+    """Where one setting's value came from."""
+
+    kind: str  # "environment" | "folder" | "user"
+    path: str | None = None
+
+    def describe(self) -> str:
+        if self.kind == "environment":
+            return "environment variable"
+        if self.kind == "folder":
+            return f"./.env ({self.path})"
+        return f"user settings ({self.path})"
+
+
+def load_settings_files(
+    dotenv_path: str = ".env",
+    user_path: str | None = None,
+    environ: MutableMapping[str, str] | None = None,
+) -> dict[str, SettingSource]:
+    """Fill `environ` (os.environ by default) from the folder's `.env`, then
+    the user settings file, and return where each set variable came from.
+
+    Each variable is resolved on its own, in this order: the environment,
+    then `dotenv_path`, then `user_path`. A source only fills a variable no
+    earlier source set, so nothing overrides a higher-priority value. A
+    blank value counts as unset (as in `_read`), so a `CERTO_LLM_API_KEY=`
+    line left empty in a folder's `.env` doesn't hide the user file's key.
+    The user file is read after the folder's values are in `environ`, so
+    its `${VAR}` references can see them. Missing files are skipped.
+    """
+    # DotEnv with override=False is what load_dotenv() uses: a `${VAR}`
+    # reference sees the environment before the file's own earlier lines.
+    from dotenv.main import DotEnv
+
+    environ = os.environ if environ is None else environ
+    user_path = user_settings_path(environ) if user_path is None else user_path
+    sources = {
+        name: SettingSource("environment") for name, value in environ.items() if _clean(value)
+    }
+    for kind, path in (("folder", dotenv_path), ("user", user_path)):
+        if not os.path.isfile(path):
+            continue
+        values = DotEnv(path, interpolate=True, override=False, encoding="utf-8").dict()
+        for name, value in values.items():
+            if name in sources or _clean(value) is None:
+                continue
+            environ[name] = value  # type: ignore[assignment]
+            sources[name] = SettingSource(kind, os.path.abspath(path))
+    return sources
+
+
+def _missing_model_message(env: Mapping[str, str], dotenv_path: str, user_path: str) -> str:
+    return (
+        "CERTO_LLM_MODEL is required (e.g. 'anthropic/claude-sonnet-5-5' or "
+        "'ollama/qwen3-coder:30b'), and it isn't set in any of the three places "
+        "Certo looks, in this order: 1. the environment (export CERTO_LLM_MODEL=...); "
+        f"2. .env in the current folder ({os.path.abspath(dotenv_path)}); "
+        f"3. the user settings file ({user_path}). Run certo init to write it, "
+        "or set it in one of these. Switching provider = changing only this value."
+        + _old_llm_names_hint(env, "MODEL")
+    )
+
+
+def load_config(
+    env: Mapping[str, str] | None = None,
+    *,
+    dotenv_path: str = ".env",
+    user_dotenv_path: str | None = None,
+) -> Config:
     """Load and validate configuration.
 
     Args:
         env: Optional mapping to read from (defaults to os.environ). Passing a dict
             makes this fully testable without touching the real environment or a
             .env file.
-        dotenv_path: Path to a .env file loaded into os.environ when `env` is None.
-            Missing file is ignored.
+        dotenv_path: The folder's .env, loaded into os.environ when `env` is None.
+        user_dotenv_path: The user settings file, loaded after `dotenv_path` when
+            `env` is None (default: `user_settings_path()`). See
+            `load_settings_files` for the order. Missing files are ignored.
 
     Raises:
         ConfigError: if required values are missing or any value is invalid.
     """
+    user_path = user_settings_path() if user_dotenv_path is None else user_dotenv_path
     if env is None:
-        # Lazy import so tests that pass `env` never require python-dotenv.
-        try:
-            from dotenv import load_dotenv
-
-            load_dotenv(dotenv_path)
-        except ImportError:  # pragma: no cover - dotenv is a declared dependency
-            pass
+        load_settings_files(dotenv_path, user_path)
         env = os.environ
 
     model = _clean(env.get(LLM_ENV_PREFIX + "MODEL"))
     if model is None:
-        raise ConfigError(
-            "CERTO_LLM_MODEL is required (e.g. 'anthropic/claude-sonnet-4-5-20250929' "
-            "or 'ollama/qwen3-coder:30b'). Export it in your shell (export "
-            "CERTO_LLM_MODEL=...) or set it in a .env file in the current directory. "
-            "Switching provider = changing only this value." + _old_llm_names_hint(env, "MODEL")
-        )
+        raise ConfigError(_missing_model_message(env, dotenv_path, user_path))
 
     api_key = _clean(env.get(LLM_ENV_PREFIX + "API_KEY"))
     base_url = _clean(env.get(LLM_ENV_PREFIX + "BASE_URL"))

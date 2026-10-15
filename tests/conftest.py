@@ -7,8 +7,15 @@ import os
 import subprocess
 import sys
 import sysconfig
+import tempfile
 
 import pytest
+
+# Certo reads a user settings file from $XDG_CONFIG_HOME/certo/.env. Point
+# it at an empty temporary folder before any test module is imported (some
+# call load_config() at collection time), so no test reads or writes the
+# real ~/.config. Tests that need the file set their own folder.
+os.environ["XDG_CONFIG_HOME"] = tempfile.mkdtemp(prefix="certo-tests-xdg-")
 
 
 def make_project_venv(project_dir) -> str:

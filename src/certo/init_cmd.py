@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from importlib import resources
 from typing import TextIO
 
-from .config import ConfigError, load_config
+from .config import ConfigError, load_config, user_settings_path
 from .llm_check import check_tool_calling, explain
 
 DEFAULT_FOLDER = "certo-workspace"
@@ -457,10 +457,15 @@ def check_main(argv: list[str], *, out: TextIO | None = None) -> int:
     """`certo check`: re-run init's model check against the current settings."""
     args = build_check_parser().parse_args(argv)
     out = out or sys.stdout
-    if not os.path.exists(".env") and not os.environ.get("CERTO_LLM_MODEL"):
+    if (
+        not os.path.exists(".env")
+        and not os.path.exists(user_settings_path())
+        and not os.environ.get("CERTO_LLM_MODEL")
+    ):
         print(
-            "No settings here: this folder has no .env and CERTO_LLM_MODEL isn't set. "
-            "Run certo check in the folder certo init created, or run certo init.",
+            "No settings found: CERTO_LLM_MODEL isn't set, this folder has no .env, "
+            f"and there is no user settings file ({user_settings_path()}). "
+            "Run certo init.",
             file=out,
         )
         return 1

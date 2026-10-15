@@ -28,9 +28,12 @@ from certo.config import (
     DEFAULT_WORKSPACE,
     Config,
     ConfigError,
+    SettingSource,
     load_config,
+    load_settings_files,
     override_llm,
     resolve_project_dir,
+    user_settings_path,
 )
 
 
@@ -711,3 +714,134 @@ def test_required_error_has_no_rename_hint_without_old_variables():
         load_config({})
 
     assert "no longer reads" not in str(exc.value)
+
+
+# --- settings sources: environment, ./.env, the user settings file -----------
+
+_LLM_VARS = ("CERTO_LLM_MODEL", "CERTO_LLM_API_KEY", "CERTO_LLM_BASE_URL")
+
+
+@pytest.fixture
+def sources(tmp_path, monkeypatch):
+    """A clean environment, an empty working folder, and a temporary
+    XDG_CONFIG_HOME. Returns (folder .env path, user file path)."""
+    for name in _LLM_VARS:
+        monkeypatch.delenv(name, raising=False)
+    work = tmp_path / "work"
+    work.mkdir()
+    monkeypatch.chdir(work)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    user = tmp_path / "xdg" / "certo" / ".env"
+    user.parent.mkdir(parents=True)
+    return work / ".env", user
+
+
+def test_user_settings_path_follows_xdg_config_home(tmp_path):
+    assert user_settings_path({"XDG_CONFIG_HOME": str(tmp_path)}) == str(
+        tmp_path / "certo" / ".env"
+    )
+
+
+@pytest.mark.parametrize("xdg", [None, "", "relative/dir"])
+def test_user_settings_path_falls_back_to_dot_config(xdg, monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    env = {} if xdg is None else {"XDG_CONFIG_HOME": xdg}
+    assert user_settings_path(env) == str(tmp_path / ".config" / "certo" / ".env")
+
+
+def test_environment_only(sources, monkeypatch):
+    monkeypatch.setenv("CERTO_LLM_MODEL", "openai/from-env")
+    monkeypatch.setenv("CERTO_LLM_API_KEY", "k-env")
+
+    cfg = load_config()
+
+    assert (cfg.model, cfg.api_key) == ("openai/from-env", "k-env")
+
+
+def test_folder_env_only(sources):
+    folder, _user = sources
+    folder.write_text("CERTO_LLM_MODEL=openai/from-folder\nCERTO_LLM_API_KEY=k-folder\n")
+
+    cfg = load_config()
+
+    assert (cfg.model, cfg.api_key) == ("openai/from-folder", "k-folder")
+
+
+def test_user_file_only(sources):
+    _folder, user = sources
+    user.write_text("CERTO_LLM_MODEL=openai/from-user\nCERTO_LLM_API_KEY=k-user\n")
+
+    cfg = load_config()
+
+    assert (cfg.model, cfg.api_key) == ("openai/from-user", "k-user")
+
+
+def test_folder_overrides_the_user_file_one_setting_at_a_time(sources):
+    folder, user = sources
+    user.write_text("CERTO_LLM_MODEL=openai/from-user\nCERTO_LLM_API_KEY=k-user\n")
+    folder.write_text("CERTO_LLM_MODEL=anthropic/from-folder\n")
+
+    cfg = load_config()
+
+    assert cfg.model == "anthropic/from-folder"
+    assert cfg.api_key == "k-user"
+
+
+def test_environment_overrides_both_files(sources, monkeypatch):
+    folder, user = sources
+    user.write_text("CERTO_LLM_MODEL=openai/from-user\nCERTO_LLM_API_KEY=k-user\n")
+    folder.write_text("CERTO_LLM_MODEL=openai/from-folder\nCERTO_LLM_API_KEY=k-folder\n")
+    monkeypatch.setenv("CERTO_LLM_MODEL", "openai/from-env")
+
+    cfg = load_config()
+
+    assert cfg.model == "openai/from-env"
+    assert cfg.api_key == "k-folder"
+
+
+def test_a_blank_line_in_the_folder_env_does_not_hide_the_user_files_value(sources):
+    # `certo init` writes `CERTO_LLM_API_KEY=` for a key still to fill in.
+    folder, user = sources
+    user.write_text("CERTO_LLM_MODEL=openai/from-user\nCERTO_LLM_API_KEY=k-user\n")
+    folder.write_text("CERTO_LLM_MODEL=openai/from-folder\nCERTO_LLM_API_KEY=\n")
+
+    cfg = load_config()
+
+    assert (cfg.model, cfg.api_key) == ("openai/from-folder", "k-user")
+
+
+def test_user_file_references_resolve_from_the_environment(sources, monkeypatch):
+    _folder, user = sources
+    user.write_text("CERTO_LLM_MODEL=anthropic/m\nCERTO_LLM_API_KEY=${ANTHROPIC_API_KEY}\n")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "k-exported")
+
+    assert load_config().api_key == "k-exported"
+
+
+def test_load_settings_files_reports_each_source(sources, monkeypatch):
+    folder, user = sources
+    user.write_text(
+        "CERTO_LLM_MODEL=openai/u\nCERTO_LLM_API_KEY=k-user\nCERTO_LLM_BASE_URL=http://u\n"
+    )
+    folder.write_text("CERTO_LLM_MODEL=openai/f\n")
+    monkeypatch.setenv("CERTO_LLM_BASE_URL", "http://env")
+
+    found = load_settings_files()
+
+    assert found["CERTO_LLM_MODEL"] == SettingSource("folder", str(folder))
+    assert found["CERTO_LLM_API_KEY"] == SettingSource("user", str(user))
+    assert found["CERTO_LLM_BASE_URL"] == SettingSource("environment")
+    assert os.environ["CERTO_LLM_BASE_URL"] == "http://env"
+
+
+def test_missing_model_error_lists_the_three_places(sources):
+    folder, user = sources
+
+    with pytest.raises(ConfigError) as excinfo:
+        load_config()
+
+    message = str(excinfo.value)
+    assert "export CERTO_LLM_MODEL=" in message
+    assert str(folder) in message
+    assert str(user) in message
+    assert "certo init" in message
