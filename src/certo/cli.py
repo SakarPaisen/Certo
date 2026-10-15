@@ -18,6 +18,7 @@ from . import __version__
 from .acceptance import AcceptanceCheck, AcceptanceCheckError, parse_acceptance_checks
 from .config import ConfigError, load_config, override_llm, resolve_project_dir
 from .custom_tools.run_tests_tool import detect_project, run_full_verification
+from .init_cmd import init_main
 from .model_catalog import ModelCatalogEntry
 from .runner import _build_completion_contract, run_task
 from .skills import write_project_context
@@ -154,8 +155,9 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="certo",
         description="Run a coding task through Certo.",
         epilog=(
-            "To check a project without running an agent: certo verify [PATH] "
-            "(see certo verify --help)."
+            "Other commands: certo init [FOLDER] creates a ready-to-use workspace "
+            "(see certo init --help); certo verify [PATH] checks a project without "
+            "running an agent (see certo verify --help)."
         ),
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -357,11 +359,14 @@ def verify_main(argv: list[str]) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else list(argv)
-    # `verify` is a subcommand only as the exact, whole first argument. A
-    # task is always one argument (quoted), so "verify the login flow" can
-    # never match, and `certo -- verify` still runs the one-word task.
+    # `verify` and `init` are subcommands only as the exact, whole first
+    # argument. A task is always one argument (quoted), so "verify the login
+    # flow" or "init a repo" can never match, and `certo -- verify` still
+    # runs the one-word task.
     if argv and argv[0] == "verify":
         return verify_main(argv[1:])
+    if argv and argv[0] == "init":
+        return init_main(argv[1:])
     args = _build_parser().parse_args(argv)
 
     try:

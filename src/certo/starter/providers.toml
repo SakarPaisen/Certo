@@ -1,0 +1,50 @@
+# Providers and default models offered by `certo init`, in menu order.
+#
+# Keep this the only place these defaults live. Before each release, check
+# every `model` against the provider's own model list (`source`) and
+# LiteLLM's model map
+# (https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json),
+# then update `checked`. Prefer a good, reasonably priced coding model over
+# the most expensive one: a first task should not cost much.
+
+[[provider]]
+id = "openai"
+label = "OpenAI"
+model = "openai/gpt-6.1-sol"
+key_env = "OPENAI_API_KEY"
+key_url = "https://platform.openai.com/api-keys"
+source = "https://developers.openai.com/api/docs/models"
+checked = "2026-10-15"
+
+[[provider]]
+id = "anthropic"
+label = "Anthropic (Claude)"
+model = "anthropic/claude-sonnet-5-5"
+key_env = "ANTHROPIC_API_KEY"
+key_url = "https://platform.claude.com/settings/keys"
+source = "https://platform.claude.com/docs/en/about-claude/models/overview"
+checked = "2026-10-15"
+
+[[provider]]
+id = "gemini"
+label = "Google Gemini"
+model = "gemini/gemini-3.8-flash"
+key_env = "GEMINI_API_KEY"
+key_url = "https://aistudio.google.com/apikey"
+source = "https://ai.google.dev/gemini-api/docs/models"
+checked = "2026-10-15"
+
+[[provider]]
+id = "ollama"
+label = "Ollama (local models, no API key)"
+model = "ollama/qwen3-coder:30b"
+# For machines with less than about 20 GB of GPU or unified memory.
+small_model = "ollama/qwen2.5-coder:7b"
+base_url = "http://localhost:11434"
+source = "https://ollama.com/library/qwen3-coder"
+checked = "2026-10-15"
+
+[[provider]]
+id = "other"
+label = "Other (any LiteLLM model id)"
+source = "https://docs.litellm.ai/docs/providers"
