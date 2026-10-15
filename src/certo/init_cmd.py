@@ -29,7 +29,13 @@ from dataclasses import dataclass, field
 from importlib import resources
 from typing import TextIO
 
-from .config import ConfigError, load_config, user_settings_path
+from .config import (
+    ConfigError,
+    SettingSource,
+    load_config,
+    load_settings_files,
+    user_settings_path,
+)
 from .llm_check import check_tool_calling, explain
 
 DEFAULT_FOLDER = "certo-workspace"
@@ -467,7 +473,8 @@ def build_check_parser() -> argparse.ArgumentParser:
             "Check that the configured model works: one small real call, which "
             "must come back as a tool call, since that's what Certo's agent "
             "needs. Reads the settings exactly as a run does: exported "
-            "CERTO_LLM_* variables, then .env in the current folder."
+            "CERTO_LLM_* variables, then .env in the current folder, then the "
+            "user settings file. Prints where each setting came from first."
         ),
     )
     parser.add_argument(
@@ -483,22 +490,40 @@ def check_main(argv: list[str], *, out: TextIO | None = None) -> int:
     """`certo check`: re-run init's model check against the current settings."""
     args = build_check_parser().parse_args(argv)
     out = out or sys.stdout
-    if (
-        not os.path.exists(".env")
-        and not os.path.exists(user_settings_path())
-        and not os.environ.get("CERTO_LLM_MODEL")
-    ):
-        print(
-            "No settings found: CERTO_LLM_MODEL isn't set, this folder has no .env, "
-            f"and there is no user settings file ({user_settings_path()}). "
-            "Run certo init.",
-            file=out,
-        )
-        return 1
+    print_setting_sources(load_settings_files(), out)
     ok = run_check(None, out, timeout=args.timeout)
     if not ok:
-        print("Fix .env as described, then run: certo check", file=out)
+        print("Fix the settings as described, then run: certo check", file=out)
     return 0 if ok else 1
+
+
+# The settings `certo check` reports. The key is shown only as set/not set.
+_CHECK_SETTINGS = (
+    "CERTO_LLM_MODEL",
+    "CERTO_LLM_API_KEY",
+    "CERTO_LLM_BASE_URL",
+    "CERTO_LLM_REASONING_EFFORT",
+)
+_SECRET_SETTINGS = {"CERTO_LLM_API_KEY"}
+
+
+def print_setting_sources(sources: Mapping[str, SettingSource], out: TextIO) -> None:
+    """One line per LLM setting: its value (the key only as set/not set)
+    and where it came from. Reads values from os.environ, which
+    `load_settings_files` has just filled."""
+    print("Settings:", file=out)
+    width = max(len(name) for name in _CHECK_SETTINGS)
+    for name in _CHECK_SETTINGS:
+        value = (os.environ.get(name) or "").strip()
+        source = sources.get(name)
+        if not value or source is None:
+            if name == "CERTO_LLM_REASONING_EFFORT":
+                continue  # optional, and unset is the usual case
+            print(f"  {name:<{width}}  not set", file=out)
+            continue
+        shown = "set" if name in _SECRET_SETTINGS else value
+        print(f"  {name:<{width}}  {shown}, from {source.describe()}", file=out)
+    print(file=out)
 
 
 def build_init_parser() -> argparse.ArgumentParser:

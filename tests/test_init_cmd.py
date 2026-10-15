@@ -863,14 +863,56 @@ def test_tool_check_reports_an_unreachable_server():
 # --- certo check -------------------------------------------------------------
 
 
-def test_certo_check_without_settings_says_where_to_run_it(tmp_path, monkeypatch):
+def test_certo_check_without_settings_lists_the_three_places(tmp_path, monkeypatch, no_check):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("CERTO_LLM_MODEL", raising=False)
+    for name in ("CERTO_LLM_MODEL", "CERTO_LLM_API_KEY", "CERTO_LLM_BASE_URL"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
     out = io.StringIO()
 
     assert init_cmd.check_main([], out=out) == 1
-    assert "this folder has no .env" in out.getvalue()
-    assert init_cmd.user_settings_path() in out.getvalue()
+    text = out.getvalue()
+    assert "CERTO_LLM_MODEL             not set" in text
+    assert "export CERTO_LLM_MODEL=" in text
+    assert str(tmp_path / ".env") in text
+    assert init_cmd.user_settings_path() in text
+
+
+def test_certo_check_shows_where_each_setting_comes_from(tmp_path, monkeypatch, checks):
+    work = tmp_path / "work"
+    work.mkdir()
+    monkeypatch.chdir(work)
+    for name in ("CERTO_LLM_MODEL", "CERTO_LLM_API_KEY", "CERTO_LLM_REASONING_EFFORT"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("CERTO_LLM_BASE_URL", "http://from-env")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    user = tmp_path / "xdg" / "certo" / ".env"
+    user.parent.mkdir(parents=True)
+    user.write_text(f"CERTO_LLM_MODEL=openai/from-user\nCERTO_LLM_API_KEY={SECRET}\n")
+    (work / ".env").write_text("CERTO_LLM_MODEL=openai/from-folder\n")
+    out = io.StringIO()
+
+    assert init_cmd.check_main([], out=out) == 0
+    text = out.getvalue()
+    assert f"CERTO_LLM_MODEL             openai/from-folder, from ./.env ({work / '.env'})" in text
+    assert f"CERTO_LLM_API_KEY           set, from user settings ({user})" in text
+    assert "CERTO_LLM_BASE_URL          http://from-env, from environment variable" in text
+    assert "REASONING_EFFORT" not in text
+    assert SECRET not in text
+    assert text.index("Settings:") < text.index("Checking the model")
+    assert checks[0].model == "openai/from-folder"
+    assert checks[0].api_key == SECRET
+
+
+def test_certo_check_says_not_set_for_a_missing_key(tmp_path, monkeypatch, no_check):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("CERTO_LLM_API_KEY", raising=False)
+    monkeypatch.delenv("CERTO_LLM_BASE_URL", raising=False)
+    monkeypatch.setenv("CERTO_LLM_MODEL", "openai/x")
+    out = io.StringIO()
+
+    assert init_cmd.check_main([], out=out) == 1
+    assert "CERTO_LLM_API_KEY           not set" in out.getvalue()
 
 
 def test_certo_check_reads_the_user_settings_file(tmp_path, monkeypatch, checks):
@@ -913,6 +955,7 @@ def test_certo_check_failure_exits_nonzero(tmp_path, monkeypatch):
     assert init_cmd.check_main([], out=out) == 1
     assert "OpenAI rejected the API key" in out.getvalue()
     assert "then run: certo check" in out.getvalue()
+    assert "CERTO_LLM_MODEL             openai/x, from environment variable" in out.getvalue()
 
 
 # --- CLI dispatch --------------------------------------------------------------

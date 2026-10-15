@@ -38,3 +38,13 @@ def make_project_venv(project_dir) -> str:
 @pytest.fixture
 def project_venv():
     return make_project_venv
+
+
+@pytest.fixture(autouse=True)
+def _restore_environ():
+    """Undo whatever a test leaves in os.environ. load_config() copies .env
+    and user-file values into it, which monkeypatch doesn't track."""
+    saved = dict(os.environ)
+    yield
+    os.environ.clear()
+    os.environ.update(saved)
