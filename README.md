@@ -18,32 +18,43 @@ Certo exists to catch that. When the agent finishes, the harness checks the resu
 
 ## Quickstart
 
-With a local model (no API key):
-
 ```bash
 pip install certo
-ollama pull qwen3-coder:30b
-
-export CERTO_LLM_MODEL=ollama/qwen3-coder:30b
-export CERTO_LLM_BASE_URL=http://localhost:11434
-
-certo "Build a CLI todo app in Python, with tests" --project todo
+certo init
+cd certo-workspace
+certo tasks/wordle.md --project wordle
 ```
 
-`qwen3-coder:30b` needs roughly 20 GB of GPU or unified memory. With less, pull a smaller coder model such as `qwen2.5-coder:7b` and set `CERTO_LLM_MODEL=ollama/qwen2.5-coder:7b`. Expect weaker results on multi-step tasks.
+`certo init` asks which provider you use (OpenAI, Anthropic, Gemini, a local Ollama, or any LiteLLM model), takes your API key at a hidden prompt, writes a minimal `.env`, and makes one real call to check the model works. It also leaves two sample tasks in `tasks/`: a terminal Wordle in Python and a browser Asteroids game (which needs Node 18+). With a cloud model a run uses your credits, and Certo prints the cost at the end.
 
-With a cloud model, change two lines:
-
-```bash
-export CERTO_LLM_MODEL=anthropic/claude-sonnet-4-5-20250929   # or openai/..., gemini/..., deepseek/...
-export CERTO_LLM_API_KEY=sk-...
-```
-
-The generated project lands in `./projects/todo`. The last line of output is the verdict:
+The generated project lands in `projects/wordle`. The last line of output is the verdict:
 
 ```
 Verification: verified
 ```
+
+`certo check` re-runs the model check after you edit `.env`.
+
+### Without `certo init`
+
+Set two variables instead, in your shell or in a `.env` in the folder you run `certo` from:
+
+```bash
+export CERTO_LLM_MODEL=anthropic/claude-sonnet-5-5   # or openai/..., gemini/..., deepseek/...
+export CERTO_LLM_API_KEY=sk-...
+
+certo "Build a CLI todo app in Python, with tests" --project todo
+```
+
+With a local model (no API key):
+
+```bash
+ollama pull qwen3-coder:30b
+export CERTO_LLM_MODEL=ollama/qwen3-coder:30b
+export CERTO_LLM_BASE_URL=http://localhost:11434
+```
+
+`qwen3-coder:30b` needs roughly 20 GB of GPU or unified memory. With less, pull a smaller coder model such as `qwen2.5-coder:7b` and set `CERTO_LLM_MODEL=ollama/qwen2.5-coder:7b`. Expect weaker results on multi-step tasks.
 
 ## What the verdict means
 

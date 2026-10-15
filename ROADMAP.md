@@ -153,6 +153,18 @@ decisions log below for *why* a given design was chosen.
   run), `num_retries=0` plus a short timeout, pass = non-empty text.
   Construction happens inside the try, since the SDK validates at build
   time. Errors are classified, with the API key scrubbed.
+  `check_tool_calling()` is the variant behind `certo init`/`certo check`:
+  the same build, but sent through the SDK's `make_llm_completion` with
+  `FinishTool`, passing only on a tool call; `explain()` turns a result
+  into one plain sentence with the fix.
+- **`init_cmd.py`** — `certo init [FOLDER]` and `certo check`. Questions
+  go through an injectable `Prompter`; `gather_settings()` returns
+  `Settings` (key never in its repr) or `None` (no terminal, no flags:
+  every preset commented out). `render_env()` writes the chosen lines
+  plus the other providers' presets. Package data in
+  `src/certo/starter/`: `providers.toml` (menu order, default models),
+  the workspace `README.md`, `gitignore`, and `tasks/wordle.md`/
+  `asteroids.md`.
 - **`project_env.py`** — each Python project's own environment (stdlib
   only, since the Docker image imports it next to `custom_tools`).
   `ensure_project_env()` reuses a `uv.lock` project (through `uv run`), or a
@@ -802,6 +814,29 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   (`config._old_llm_names_hint`), so a 0.1.0/0.1.1 setup gets told what to
   rename. The SDK itself never reads `LLM_*` (checked: no reference in
   `openhands/`), so `config.py` is the only reader.
+- **`certo init` is interactive, with no `--api-key` flag, and keeps model
+  defaults in one data file** (0.1.4). Most first-run failures were model
+  setup (wrong address, missing key, a rejected setting), so init asks only
+  what `.env` needs and ends with a real tool call, which is what the agent
+  needs; a plain text reply would pass a model that then stalls the agent.
+  The check goes through `make_llm_completion`, the agent's own call, so
+  Responses vs Chat Completions and prompt-based tool calling match a run.
+  A key comes from `getpass` or the provider's own exported variable, never
+  argv (shell history), and an exported key is written as `${VAR}` rather
+  than copied. Without a TTY nothing is asked, so scripts and CI never hang.
+  Defaults live only in `starter/providers.toml`, each with its `source`
+  and `checked` date. They were picked from each provider's model page and
+  confirmed in LiteLLM's model map; re-check both before each release. All
+  three cloud defaults need LiteLLM >= 1.105 for pricing, which a fresh
+  install gets. The dev lock (1.100.1) runs them with an unknown cost.
+  `init` and `check` dispatch on `argv[0]` exactly, like `verify`.
+- **`LITELLM_MODE` defaults to `PRODUCTION`** (0.1.4). LiteLLM's import
+  calls `load_dotenv()` with no path when it is `DEV`, and python-dotenv
+  then searches upward from LiteLLM's own install folder: a venv inside the
+  checkout loaded the repo's `.env` from any directory, and a tool install
+  can load `~/.env`. Those values beat `./.env`, which config.py loads
+  without overriding. Found when `certo check` passed in an empty folder.
+  The variable gates nothing else in LiteLLM (checked).
 - **`check-llm` lives in `certo-admin`, not the `certo` CLI** — `certo`
   requires a task positional, while `certo-admin` is already the
   subcommand-based maintenance CLI. There's no `--api-key` flag, so a key

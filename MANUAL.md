@@ -39,6 +39,18 @@ reference — how to actually run and configure the thing.
 
 ```bash
 pip install certo                 # or: uv tool install certo
+certo init                        # asks a few questions, writes ./certo-workspace
+cd certo-workspace
+certo tasks/wordle.md --project wordle
+```
+
+`certo init` writes a minimal `.env`, checks the model with one real call,
+and leaves sample tasks to run. See
+[`certo init`](#certo-init-folder--a-ready-to-use-workspace).
+
+Or set the variables yourself:
+
+```bash
 export CERTO_LLM_MODEL=ollama/qwen3-coder:30b    # ~20 GB; smaller: ollama/qwen2.5-coder:7b
 export CERTO_LLM_BASE_URL=http://localhost:11434   # or: export CERTO_LLM_API_KEY=...
 certo "Build a CLI todo app in Python, with tests" --project todo
@@ -261,6 +273,91 @@ with `--require-verification`), and `failed` or `timed_out` exit `1`.
 `verify` is a subcommand only as the exact, whole first argument. A task is
 always one (quoted) argument, so `certo "verify the login flow"` still runs
 an agent. To run the one-word task `verify`, write `certo -- verify`.
+
+### `certo init [FOLDER]` — a ready-to-use workspace
+
+```bash
+certo init                         # creates ./certo-workspace
+certo init my-certo                # any folder
+certo init --provider anthropic    # skip the provider question
+certo init --yes --no-check        # ask nothing, make no call
+```
+
+Creates `FOLDER` (default `./certo-workspace`) with:
+
+| File | What it is |
+|---|---|
+| `.env` | Only the settings you chose (`CERTO_LLM_MODEL`, plus `CERTO_LLM_API_KEY` or `CERTO_LLM_BASE_URL`), then every other provider's two lines commented out. To switch provider, comment out the active lines and uncomment two others. Permissions `600`. |
+| `.gitignore` | `.env`, `projects/`, `artifacts/`. An existing `.gitignore` only gains the missing entries. |
+| `tasks/` | `wordle.md` (terminal Wordle, Python) and `asteroids.md` (browser game, needs Node 18+). |
+| `README.md` | The next steps. A `README.md` that `certo init` didn't write is never replaced, even with `--force`. |
+
+On a terminal it asks, in order:
+
+1. **Provider:** OpenAI, Anthropic, Google Gemini, Ollama, or Other (any
+   LiteLLM model id). The default is OpenAI, or the provider whose key is
+   already exported (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`).
+2. **Model:** one default per provider, from `src/certo/starter/providers.toml`.
+   Any id is accepted; an id typed without a prefix gets the provider's
+   (`claude-sonnet-5-5` → `anthropic/claude-sonnet-5-5`).
+3. **API key**, for a cloud provider: typed at a hidden prompt, never
+   echoed or printed. If the provider's own variable is already exported,
+   init offers to use it, and `.env` then refers to it
+   (`CERTO_LLM_API_KEY=${ANTHROPIC_API_KEY}`) instead of copying the key, so
+   that variable must be exported wherever you run Certo. Press Enter to
+   add a key to `.env` later.
+4. **Ollama:** the address (default `http://localhost:11434`), then a choice
+   among the models installed there, with a coder model preselected. If the
+   server can't be reached, or has no models, init says so and prints the
+   `ollama pull` commands.
+5. **Other:** the LiteLLM model id, then an optional key and base URL.
+
+Then it makes the [model check](#certo-check--does-the-model-work). A failed
+check deletes nothing: fix `.env` and run `certo check`.
+
+| Flag | Effect |
+|---|---|
+| `--provider {openai,anthropic,gemini,ollama,other}` | Skip the provider question. |
+| `--model ID` | Skip the model question (the provider is inferred from the prefix if `--provider` is absent). |
+| `--base-url URL` | Skip the Ollama address question; also sets `CERTO_LLM_BASE_URL` for any provider. |
+| `--yes`, `-y` | Ask nothing, accept every default. A key is taken only from the provider's exported variable. |
+| `--no-check` | Don't make the check call. |
+| `--force` | Write into a folder that isn't empty, or over an existing `.env`. Without it, init refuses both. |
+
+There is no `--api-key` flag, on purpose: a key typed on the command line
+is saved in your shell history.
+
+With no terminal (stdin isn't a TTY) and none of `--provider`, `--model` or
+`--yes`, init asks nothing and writes `.env` with every preset commented
+out, and says so.
+
+`init` is a subcommand only as the exact, whole first argument, like
+`verify`: `certo "init a git repo here"` still runs an agent.
+
+### `certo check` — does the model work?
+
+```bash
+cd certo-workspace
+certo check
+```
+
+Reads the settings as a run does (exported `CERTO_LLM_*`, then `./.env`)
+and sends one request through the agent's own call path, offering it the
+SDK's `finish` tool. It passes only if the model answers with a tool call,
+since the agent works only through tool calls. The answer is one line:
+
+| Output | Fix |
+|---|---|
+| `ok: reachable, tool calling works.` | — |
+| `… rejected the API key` | Check `CERTO_LLM_API_KEY`. |
+| `… doesn't know the model …` / `Ollama has no model named …` | Check the spelling of `CERTO_LLM_MODEL`, or `ollama pull` it. |
+| `Couldn't reach …` | Check `CERTO_LLM_BASE_URL`, the network, or that the server runs (`OLLAMA_HOST=0.0.0.0` for Ollama on another machine). |
+| `… out of credit, or it is being rate limited` | Add credit, or wait a minute. |
+| `… doesn't support tool calling` / `… answered, but without calling a tool` | Choose another model. |
+
+Exit code `0` on ok, `1` otherwise. `--timeout N` sets the wait (default
+120 seconds, since a local model may have to load first).
+`certo-admin check-llm` is the older, plain-text variant with no tool call.
 
 ### Task source resolution
 
@@ -1883,6 +1980,14 @@ access. Run it directly, not through `uv run`.
 
 ## Known limitations
 
+- **The cost of a run can show as unknown with a new model.** Certo takes
+  prices from LiteLLM's model map, which ships inside the installed
+  LiteLLM. A model newer than your LiteLLM still runs, but its tokens are
+  reported with an unknown cost. `certo init`'s default models need
+  LiteLLM 1.105 or newer. A fresh `pip install certo` gets the newest
+  LiteLLM; an older install needs `pip install -U litellm` (or
+  `uv tool upgrade certo`).
+
 - **`--execution docker` needs a source checkout, not just `pip install
   certo`.** The first Docker run builds the `certo/agent-server:local`
   image from `docker/agent-server.Dockerfile` using the repo root as build
@@ -2067,6 +2172,20 @@ this way.
 reads only the `CERTO_LLM_` names since 0.1.3. Rename `LLM_MODEL`,
 `LLM_API_KEY`, `LLM_BASE_URL` and `LLM_REASONING_EFFORT` in your `.env` or
 shell to `CERTO_LLM_MODEL` and so on. The error lists which old names it found.
+
+**Certo uses settings you didn't put in this folder's `.env` (before
+0.1.4)** — LiteLLM loaded a `.env` of its own when imported, found by
+searching upward from LiteLLM's install folder, not from the current one:
+the repo's `.env` from a venv inside a checkout, or a `~/.env` from a
+`uv tool install`. Those values won over `./.env`, since an already-set
+variable is never overridden. Since 0.1.4 Certo sets `LITELLM_MODE=PRODUCTION`
+(unless you've set it), which turns that load off, so only exported
+variables and `./.env` count.
+
+**`certo check` says `answered, but without calling a tool`** — the
+model replied with text when it was asked to call a tool. Certo's agent
+acts only through tool calls, so with this model a run would stop at its
+first answer. Pick a model with tool (function) calling support.
 
 **`CERTO_LLM_BASE_URL` gets read as a literal `# comment` string** — `python-dotenv`
 does not strip a trailing `# comment` from a line whose value is otherwise
