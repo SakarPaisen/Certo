@@ -1,6 +1,7 @@
 """Connectivity check for the configured LLM: one tiny, direct completion.
 
-Used by `certo-admin check-llm`. Builds the model exactly as a real run
+Used by `certo-admin check-llm`, and in its tool-calling form
+(`check_tool_calling`) by `certo init` and `certo check`. Builds the model exactly as a real run
 does (`llm.build_llm`, so `CERTO_LLM_MODEL`/`CERTO_LLM_API_KEY`/`CERTO_LLM_BASE_URL`/
 `CERTO_LLM_REASONING_EFFORT` and any per-call override apply unchanged), but with
 retries disabled and a short timeout: a health check should fail fast and
@@ -17,6 +18,7 @@ from dataclasses import dataclass
 
 from litellm.exceptions import NotFoundError as LiteLLMNotFoundError
 from openhands.sdk import Message, TextContent
+from openhands.sdk.agent.utils import make_llm_completion
 from openhands.sdk.llm.exceptions.types import (
     LLMAuthenticationError,
     LLMBadRequestError,
@@ -24,11 +26,16 @@ from openhands.sdk.llm.exceptions.types import (
     LLMServiceUnavailableError,
     LLMTimeoutError,
 )
+from openhands.sdk.tool.builtins import FinishTool
 
 from .config import Config
 from .llm import build_llm
 
 CHECK_PROMPT = "This is a connectivity check. Reply with exactly: OK"
+TOOL_CHECK_PROMPT = (
+    "This is a connectivity check. Do not reply with text: call the finish tool "
+    "with the message OK."
+)
 DEFAULT_TIMEOUT_SECONDS = 60
 
 # (exception type, short kind, actionable hint) — checked in order.
@@ -118,41 +125,58 @@ def _scrub(text: str, secret: str | None) -> str:
     return text.replace(secret, "***") if secret else text
 
 
+def _build_check_llm(cfg: Config, timeout: int):
+    # Called inside the caller's try: the SDK validates some settings when
+    # the LLM object is *built* (e.g. it rejects a context window below its
+    # 16K minimum, confirmed live with ollama/llama3), before any request is
+    # sent. The same error would stop a real run, so it's a check failure too.
+    try:
+        return build_llm(cfg, usage_id="check-llm").model_copy(
+            update={"num_retries": 0, "timeout": timeout}
+        )
+    except Exception as exc:
+        raise _SetupError(exc) from exc
+
+
+def _failure(cfg: Config, exc: Exception, started: float) -> LLMCheckResult:
+    kind, hint = "error", None
+    if isinstance(exc, _SetupError):
+        exc = exc.original
+        kind, hint = "setup", _SETUP_HINT
+    for exc_type, exc_kind, exc_hint in _ERROR_HINTS:
+        if isinstance(exc, exc_type):
+            kind, hint = exc_kind, exc_hint
+            break
+    return LLMCheckResult(
+        ok=False,
+        model=cfg.model,
+        base_url=cfg.base_url,
+        latency_seconds=time.monotonic() - started,
+        error_kind=kind,
+        error=_scrub(f"{type(exc).__name__}: {exc}", cfg.api_key),
+        hint=hint,
+    )
+
+
+def _usage(response) -> dict:
+    usage = response.metrics.accumulated_token_usage
+    return {
+        "prompt_tokens": usage.prompt_tokens if usage else 0,
+        "completion_tokens": usage.completion_tokens if usage else 0,
+        "cost": response.metrics.accumulated_cost,
+    }
+
+
 def check_llm(cfg: Config, *, timeout: int = DEFAULT_TIMEOUT_SECONDS) -> LLMCheckResult:
     """Send `CHECK_PROMPT` once to the configured model and report the result."""
     started = time.monotonic()
     try:
-        # Inside the try: the SDK validates some settings when the LLM object
-        # is *built* (e.g. it rejects a context window below its 16K minimum,
-        # confirmed live with ollama/llama3), before any request is sent —
-        # the same error would stop a real run, so it's a check failure too.
-        try:
-            llm = build_llm(cfg, usage_id="check-llm").model_copy(
-                update={"num_retries": 0, "timeout": timeout}
-            )
-        except Exception as exc:
-            raise _SetupError(exc) from exc
+        llm = _build_check_llm(cfg, timeout)
         response = llm.completion(
             messages=[Message(role="user", content=[TextContent(text=CHECK_PROMPT)])]
         )
     except Exception as exc:  # noqa: BLE001 - every failure becomes a reported result
-        kind, hint = "error", None
-        if isinstance(exc, _SetupError):
-            exc = exc.original
-            kind, hint = "setup", _SETUP_HINT
-        for exc_type, exc_kind, exc_hint in _ERROR_HINTS:
-            if isinstance(exc, exc_type):
-                kind, hint = exc_kind, exc_hint
-                break
-        return LLMCheckResult(
-            ok=False,
-            model=cfg.model,
-            base_url=cfg.base_url,
-            latency_seconds=time.monotonic() - started,
-            error_kind=kind,
-            error=_scrub(f"{type(exc).__name__}: {exc}", cfg.api_key),
-            hint=hint,
-        )
+        return _failure(cfg, exc, started)
     latency = time.monotonic() - started
 
     reply = " ".join(
@@ -160,17 +184,124 @@ def check_llm(cfg: Config, *, timeout: int = DEFAULT_TIMEOUT_SECONDS) -> LLMChec
         for content in response.message.content
         if (text := getattr(content, "text", None)) and text.strip()
     )
-    usage = response.metrics.accumulated_token_usage
     return LLMCheckResult(
         ok=bool(reply),
         model=cfg.model,
         base_url=cfg.base_url,
         latency_seconds=latency,
         reply=reply,
-        prompt_tokens=usage.prompt_tokens if usage else 0,
-        completion_tokens=usage.completion_tokens if usage else 0,
-        cost=response.metrics.accumulated_cost,
+        **_usage(response),
         error_kind=None if reply else "no_reply",
         error=None if reply else "The model answered, but with no text content.",
         hint=None,
     )
+
+
+def check_tool_calling(cfg: Config, *, timeout: int = DEFAULT_TIMEOUT_SECONDS) -> LLMCheckResult:
+    """One request offering the SDK's `finish` tool, sent through the same
+    call the agent makes (`make_llm_completion`), so the request has the
+    agent's shape: tool schema, Responses vs Chat Completions, and prompt-
+    based tool calling for models without native support. Passes only when
+    the model answers with a tool call, since the agent works only through
+    tool calls."""
+    started = time.monotonic()
+    try:
+        llm = _build_check_llm(cfg, timeout)
+        response = make_llm_completion(
+            llm,
+            [Message(role="user", content=[TextContent(text=TOOL_CHECK_PROMPT)])],
+            tools=list(FinishTool.create()),
+        )
+    except Exception as exc:  # noqa: BLE001 - every failure becomes a reported result
+        return _failure(cfg, exc, started)
+    calls = response.message.tool_calls or []
+    reply = calls[0].name if calls else ""
+    return LLMCheckResult(
+        ok=bool(calls),
+        model=cfg.model,
+        base_url=cfg.base_url,
+        latency_seconds=time.monotonic() - started,
+        reply=reply,
+        **_usage(response),
+        error_kind=None if calls else "no_tool_call",
+        error=None if calls else "The model answered without calling a tool.",
+        hint=None,
+    )
+
+
+_TOOLS_UNSUPPORTED = (
+    "does not support tools",
+    "tool use is not supported",
+    "tools are not supported",
+    "does not support function calling",
+    "function calling is not",
+    "tool_choice",
+)
+_NO_CREDIT = ("credit balance", "insufficient_quota", "exceeded your current quota", "billing")
+_MODEL_UNKNOWN = ("model_not_found", "does not exist", "unknown model", "invalid model")
+
+
+def explain(result: LLMCheckResult, provider: str | None = None) -> str:
+    """One plain line for a beginner: either the ok line or what's wrong and
+    how to fix it. `provider` is a display name (e.g. "Anthropic")."""
+    if result.ok:
+        return "ok: reachable, tool calling works."
+    text = (result.error or "").lower()
+    ollama = result.model.split("/", 1)[0] in ("ollama", "ollama_chat")
+    name = result.model.split("/", 1)[-1]
+    who = provider or "the provider"
+
+    if any(s in text for s in _NO_CREDIT) or result.error_kind == "rate_limit":
+        return (
+            f"{who} refused the request: the account is out of credit, or it is "
+            "being rate limited. Check your billing page, or wait a minute, then "
+            "run certo check again."
+        )
+    if result.error_kind == "authentication":
+        return (
+            f"{who} rejected the API key. Check CERTO_LLM_API_KEY in .env: it must "
+            f"be a valid key for {who}, pasted with no spaces."
+        )
+    suggestion = " Coder models such as qwen3-coder support it." if ollama else ""
+    if any(s in text for s in _TOOLS_UNSUPPORTED):
+        return (
+            f"The model {result.model} doesn't support tool calling, which Certo's "
+            "agent needs. Choose another model in CERTO_LLM_MODEL in .env." + suggestion
+        )
+    if result.error_kind == "no_tool_call":
+        return (
+            f"The model {result.model} answered, but without calling a tool. "
+            "Certo's agent works only through tool calls, so choose a model that "
+            "supports tool calling in CERTO_LLM_MODEL in .env." + suggestion
+        )
+    model_unknown = result.error_kind == "model_not_found" or any(s in text for s in _MODEL_UNKNOWN)
+    if ollama and "not found" in text and "model" in text:
+        model_unknown = True
+    if model_unknown:
+        if ollama:
+            return (
+                f"Ollama has no model named {name}. Install it with: ollama pull "
+                f"{name} (or pick an installed one, listed by: ollama list)."
+            )
+        return (
+            f"{who} doesn't know the model {result.model}. Check the spelling of "
+            "CERTO_LLM_MODEL in .env against the provider's model list."
+        )
+    if result.error_kind in ("unavailable", "timeout"):
+        if result.base_url:
+            tip = (
+                " If Ollama runs on another machine, start it there with OLLAMA_HOST=0.0.0.0."
+                if ollama
+                else ""
+            )
+            return (
+                f"Couldn't reach the server at {result.base_url}. Check "
+                f"CERTO_LLM_BASE_URL in .env and that the server is running.{tip}"
+            )
+        return (
+            f"Couldn't reach {who}. Check your internet connection; if it works, "
+            "the provider may be having an outage, so try again in a few minutes."
+        )
+    if result.error_kind == "setup":
+        return f"Certo can't use this model as configured: {result.error}"
+    return f"The check failed: {result.error}"

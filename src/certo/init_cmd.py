@@ -28,11 +28,16 @@ from dataclasses import dataclass, field
 from importlib import resources
 from typing import TextIO
 
+from .config import ConfigError, load_config
+from .llm_check import check_tool_calling, explain
+
 DEFAULT_FOLDER = "certo-workspace"
 README_TITLE = "# Certo workspace"
 
 _STARTER = resources.files("certo").joinpath("starter")
 _OLLAMA_TIMEOUT_SECONDS = 5
+# Generous: a local model may have to load into memory on the first call.
+CHECK_TIMEOUT_SECONDS = 120
 
 
 @dataclass(frozen=True)
@@ -389,6 +394,81 @@ def write_workspace(folder: str, env_text: str) -> list[str]:
     return notes
 
 
+def _provider_name(model: str) -> str | None:
+    """'Anthropic' for an anthropic/ model: the provider label without the
+    parenthesized note, for the plain-language check messages."""
+    provider = _provider_for_model(load_providers(), model)
+    if provider.id == "other":
+        return None
+    return provider.label.split(" (", 1)[0]
+
+
+def run_check(
+    env: Mapping[str, str] | None, out: TextIO, *, timeout: int = CHECK_TIMEOUT_SECONDS
+) -> bool:
+    """The test call behind `certo init` and `certo check`: one tool call
+    through the configured model, reported as one plain line. `env` None
+    reads the settings as a run does (environment, then ./.env)."""
+    try:
+        cfg = load_config(env)
+    except ConfigError as exc:
+        print(f"Checking the model... not configured: {exc}", file=out)
+        return False
+    local = cfg.model.split("/", 1)[0] in ("ollama", "ollama_chat")
+    wait = " (a local model may take a minute to load)" if local else ""
+    print(f"Checking the model {cfg.model}{wait}...", end=" ", file=out, flush=True)
+    result = check_tool_calling(cfg, timeout=timeout)
+    print(explain(result, _provider_name(cfg.model)), file=out)
+    return result.ok
+
+
+def _settings_env(settings: Settings, env: Mapping[str, str]) -> dict[str, str]:
+    """The CERTO_LLM_* values the written .env resolves to."""
+    values = {"CERTO_LLM_MODEL": settings.model}
+    key = settings.api_key or (env.get(settings.key_env, "") if settings.key_env else "")
+    if key:
+        values["CERTO_LLM_API_KEY"] = key
+    if settings.base_url:
+        values["CERTO_LLM_BASE_URL"] = settings.base_url
+    return values
+
+
+def build_check_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="certo check",
+        description=(
+            "Check that the configured model works: one small real call, which "
+            "must come back as a tool call, since that's what Certo's agent "
+            "needs. Reads the settings exactly as a run does: exported "
+            "CERTO_LLM_* variables, then .env in the current folder."
+        ),
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=CHECK_TIMEOUT_SECONDS,
+        help=f"Seconds to wait for the answer (default {CHECK_TIMEOUT_SECONDS}).",
+    )
+    return parser
+
+
+def check_main(argv: list[str], *, out: TextIO | None = None) -> int:
+    """`certo check`: re-run init's model check against the current settings."""
+    args = build_check_parser().parse_args(argv)
+    out = out or sys.stdout
+    if not os.path.exists(".env") and not os.environ.get("CERTO_LLM_MODEL"):
+        print(
+            "No settings here: this folder has no .env and CERTO_LLM_MODEL isn't set. "
+            "Run certo check in the folder certo init created, or run certo init.",
+            file=out,
+        )
+        return 1
+    ok = run_check(None, out, timeout=args.timeout)
+    if not ok:
+        print("Fix .env as described, then run: certo check", file=out)
+    return 0 if ok else 1
+
+
 def build_init_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="certo init",
@@ -432,6 +512,11 @@ def build_init_parser() -> argparse.ArgumentParser:
         "--base-url",
         default=None,
         help="Server address, for Ollama or a self-hosted model; skips that question.",
+    )
+    parser.add_argument(
+        "--no-check",
+        action="store_true",
+        help="Don't make the test call to the model after writing .env.",
     )
     parser.add_argument(
         "--yes",
@@ -492,6 +577,18 @@ def init_main(
         return 1
     notes = write_workspace(folder, render_env(providers, settings))
 
+    checkable = settings is not None and (settings.has_key or settings.base_url)
+    checked_ok = None
+    if checkable and not args.no_check:
+        checked_ok = run_check(_settings_env(settings, env), out)
+        if not checked_ok:
+            print(
+                f"Your settings are saved in {os.path.join(folder, '.env')}. Fix them "
+                "as described, then run certo check in that folder.",
+                file=out,
+            )
+        print(file=out)
+
     if settings is not None and interactive and not args.yes:
         print(file=out)
     shown = folder.rstrip("/") + "/"
@@ -515,5 +612,7 @@ def init_main(
     print("\nNext:", file=out)
     if os.path.abspath(folder) != os.getcwd():
         print(f"  cd {folder}", file=out)
+    if checked_ok is not True:
+        print("  certo check", file=out)
     print("  certo tasks/wordle.md --project wordle", file=out)
     return 0
