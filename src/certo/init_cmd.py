@@ -19,6 +19,7 @@ import argparse
 import getpass
 import json
 import os
+import shutil
 import sys
 import tomllib
 import urllib.error
@@ -598,6 +599,12 @@ def init_main(
     print("  README.md     what to do next", file=out)
     for note in notes:
         print(note, file=out)
+    if shutil.which("node") is None:
+        print(
+            "\ntasks/asteroids.md needs Node 18 or newer, which isn't installed here. "
+            "Start with Wordle.",
+            file=out,
+        )
     if settings is None:
         print(
             "\nNo terminal, so nothing was asked: .env has no model set yet. Open it "
