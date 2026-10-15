@@ -39,8 +39,8 @@ class ModelCatalogError(ValueError):
 @dataclass(frozen=True)
 class ModelCatalogEntry:
     """One candidate model. `api_key`/`base_url`/`reasoning_effort` mirror
-    the exact same fields `.env`'s LLM_API_KEY/LLM_BASE_URL/
-    LLM_REASONING_EFFORT carry for the single-model default — see
+    the exact same fields `.env`'s CERTO_LLM_API_KEY/CERTO_LLM_BASE_URL/
+    CERTO_LLM_REASONING_EFFORT carry for the single-model default — see
     `model_selection.py`'s `llm_for_entry()`, which builds an actual `LLM`
     from one of these via `config.override_llm()`, not a separate builder.
     """

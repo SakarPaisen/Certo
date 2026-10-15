@@ -282,14 +282,14 @@ def test_create_task_without_override_keeps_configured_model(monkeypatch):
 def test_create_app_raises_immediately_on_a_config_error(monkeypatch):
     # load_config() is now called once at create_app() time (to build the
     # task store), not deferred to the first request — a config error
-    # (missing LLM_MODEL, etc.) fails fast at server startup instead of
+    # (missing CERTO_LLM_MODEL, etc.) fails fast at server startup instead of
     # silently starting a server that only reveals the problem later.
     def _raise() -> Config:
-        raise ConfigError("LLM_MODEL is required")
+        raise ConfigError("CERTO_LLM_MODEL is required")
 
     monkeypatch.setattr(server, "load_config", _raise)
 
-    with pytest.raises(ConfigError, match="LLM_MODEL is required"):
+    with pytest.raises(ConfigError, match="CERTO_LLM_MODEL is required"):
         server.create_app()
 
 

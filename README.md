@@ -24,19 +24,19 @@ With a local model (no API key):
 pip install certo
 ollama pull qwen3-coder:30b
 
-export LLM_MODEL=ollama/qwen3-coder:30b
-export LLM_BASE_URL=http://localhost:11434
+export CERTO_LLM_MODEL=ollama/qwen3-coder:30b
+export CERTO_LLM_BASE_URL=http://localhost:11434
 
 certo "Build a CLI todo app in Python, with tests" --project todo
 ```
 
-`qwen3-coder:30b` needs roughly 20 GB of GPU or unified memory. With less, pull a smaller coder model such as `qwen2.5-coder:7b` and set `LLM_MODEL=ollama/qwen2.5-coder:7b`. Expect weaker results on multi-step tasks.
+`qwen3-coder:30b` needs roughly 20 GB of GPU or unified memory. With less, pull a smaller coder model such as `qwen2.5-coder:7b` and set `CERTO_LLM_MODEL=ollama/qwen2.5-coder:7b`. Expect weaker results on multi-step tasks.
 
 With a cloud model, change two lines:
 
 ```bash
-export LLM_MODEL=anthropic/claude-sonnet-4-5-20250929   # or openai/..., gemini/..., deepseek/...
-export LLM_API_KEY=sk-...
+export CERTO_LLM_MODEL=anthropic/claude-sonnet-4-5-20250929   # or openai/..., gemini/..., deepseek/...
+export CERTO_LLM_API_KEY=sk-...
 ```
 
 The generated project lands in `./projects/todo`. The last line of output is the verdict:

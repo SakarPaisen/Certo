@@ -454,14 +454,14 @@ def _cfg(tmp_path, **overrides) -> Config:
 
 
 def test_config_defaults_and_overlap_rejection(tmp_path):
-    cfg = load_config({"LLM_MODEL": "openai/gpt-4o", "LLM_API_KEY": "k"})
+    cfg = load_config({"CERTO_LLM_MODEL": "openai/gpt-4o", "CERTO_LLM_API_KEY": "k"})
     assert cfg.third_party_skills_dir == "./third_party_skills"
     assert cfg.third_party_skills_lock == "./third_party_skills.lock.json"
     with pytest.raises(ConfigError, match="must not overlap"):
         load_config(
             {
-                "LLM_MODEL": "openai/gpt-4o",
-                "LLM_API_KEY": "k",
+                "CERTO_LLM_MODEL": "openai/gpt-4o",
+                "CERTO_LLM_API_KEY": "k",
                 "CERTO_SKILLS_DIR": str(tmp_path / "skills"),
                 "CERTO_THIRD_PARTY_SKILLS_DIR": str(tmp_path / "skills" / "third_party"),
             }

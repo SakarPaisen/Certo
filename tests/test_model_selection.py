@@ -154,7 +154,7 @@ def test_llm_for_entry_clears_base_url_when_entry_does_not_set_one():
 
 
 def test_llm_for_entry_ollama_without_reasoning_effort_sends_none():
-    # The global LLM_REASONING_EFFORT doesn't leak into a catalog entry, so
+    # The global CERTO_LLM_REASONING_EFFORT doesn't leak into a catalog entry, so
     # an Ollama entry with none of its own gets no reasoning parameter.
     cfg = _cfg(reasoning_effort="high")
     entry = _entry("local", model="ollama/certo-test-model", base_url="http://localhost:11434")

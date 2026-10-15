@@ -35,7 +35,7 @@ from certo.config import (
 
 
 def _base_env(**overrides: str) -> dict[str, str]:
-    env = {"LLM_MODEL": "anthropic/claude-sonnet-4-5-20250929", "LLM_API_KEY": "sk-test"}
+    env = {"CERTO_LLM_MODEL": "anthropic/claude-sonnet-4-5-20250929", "CERTO_LLM_API_KEY": "sk-test"}
     env.update(overrides)
     return env
 
@@ -62,8 +62,8 @@ def test_minimal_valid_env_applies_defaults():
 def test_all_values_parsed():
     cfg = load_config(
         _base_env(
-            LLM_BASE_URL="http://localhost:11434",
-            LLM_REASONING_EFFORT="low",
+            CERTO_LLM_BASE_URL="http://localhost:11434",
+            CERTO_LLM_REASONING_EFFORT="low",
             CERTO_WORKSPACE="/tmp/ws",
             CERTO_MAX_ITERATIONS="12",
             CERTO_CONFIRM_MODE="always",
@@ -91,13 +91,13 @@ def test_all_values_parsed():
 
 
 def test_reasoning_effort_blank_treated_as_absent():
-    cfg = load_config(_base_env(LLM_REASONING_EFFORT="   "))
+    cfg = load_config(_base_env(CERTO_LLM_REASONING_EFFORT="   "))
     assert cfg.reasoning_effort is None
 
 
 @pytest.mark.parametrize("value", ["none", "None", "off", " OFF "])
 def test_reasoning_effort_off_spellings_normalize_to_none_string(value):
-    cfg = load_config(_base_env(LLM_REASONING_EFFORT=value))
+    cfg = load_config(_base_env(CERTO_LLM_REASONING_EFFORT=value))
     assert cfg.reasoning_effort == "none"
 
 
@@ -110,7 +110,7 @@ def test_reasoning_effort_accepts_forward_compatible_value():
     # Deliberately not validated against a fixed choice list — see config.py's
     # comment on the field. A value the SDK/provider might add later must not
     # be rejected here.
-    cfg = load_config(_base_env(LLM_REASONING_EFFORT="some-future-value"))
+    cfg = load_config(_base_env(CERTO_LLM_REASONING_EFFORT="some-future-value"))
     assert cfg.reasoning_effort == "some-future-value"
 
 
@@ -147,25 +147,25 @@ def test_invalid_docker_platform_raises():
 
 
 def test_missing_model_raises():
-    with pytest.raises(ConfigError, match="LLM_MODEL is required"):
-        load_config({"LLM_API_KEY": "sk-test"})
+    with pytest.raises(ConfigError, match="CERTO_LLM_MODEL is required"):
+        load_config({"CERTO_LLM_API_KEY": "sk-test"})
 
 
 def test_missing_model_error_says_how_to_set_it_without_a_dotenv():
     # A pip-installed user may have no .env at all; exporting is enough.
     with pytest.raises(ConfigError) as excinfo:
-        load_config({"LLM_API_KEY": "sk-test"})
+        load_config({"CERTO_LLM_API_KEY": "sk-test"})
     message = str(excinfo.value)
-    assert "export LLM_MODEL=" in message
+    assert "export CERTO_LLM_MODEL=" in message
     assert ".env" in message
 
 
 def test_exported_llm_vars_are_enough_with_no_dotenv_file(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)  # no .env here
-    for name in ("LLM_MODEL", "LLM_API_KEY", "LLM_BASE_URL"):
+    for name in ("CERTO_LLM_MODEL", "CERTO_LLM_API_KEY", "CERTO_LLM_BASE_URL"):
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setenv("LLM_MODEL", "ollama/qwen2.5-coder")
-    monkeypatch.setenv("LLM_BASE_URL", "http://localhost:11434")
+    monkeypatch.setenv("CERTO_LLM_MODEL", "ollama/qwen2.5-coder")
+    monkeypatch.setenv("CERTO_LLM_BASE_URL", "http://localhost:11434")
 
     cfg = load_config()
 
@@ -175,13 +175,13 @@ def test_exported_llm_vars_are_enough_with_no_dotenv_file(tmp_path, monkeypatch)
 
 
 def test_missing_key_without_base_url_raises():
-    with pytest.raises(ConfigError, match="LLM_API_KEY is required"):
-        load_config({"LLM_MODEL": "anthropic/claude-sonnet-4-5-20250929"})
+    with pytest.raises(ConfigError, match="CERTO_LLM_API_KEY is required"):
+        load_config({"CERTO_LLM_MODEL": "anthropic/claude-sonnet-4-5-20250929"})
 
 
 def test_base_url_allows_missing_key():
     # Local models can be keyless: base_url present, api_key absent -> OK.
-    cfg = load_config({"LLM_MODEL": "ollama/llama3", "LLM_BASE_URL": "http://localhost:11434"})
+    cfg = load_config({"CERTO_LLM_MODEL": "ollama/llama3", "CERTO_LLM_BASE_URL": "http://localhost:11434"})
     assert cfg.api_key is None
     assert cfg.base_url == "http://localhost:11434"
 
@@ -193,7 +193,7 @@ def test_blank_values_treated_as_absent():
 
 
 def test_whitespace_is_trimmed():
-    cfg = load_config(_base_env(LLM_MODEL="  openai/gpt-4o  "))
+    cfg = load_config(_base_env(CERTO_LLM_MODEL="  openai/gpt-4o  "))
     assert cfg.model == "openai/gpt-4o"
 
 
@@ -268,7 +268,7 @@ def test_override_llm_blank_reasoning_effort_clears_it():
     # Unlike model (which raises on blank), a blank reasoning_effort override
     # clears it back to "unset" -> the SDK's own default applies. Matches
     # api_key/base_url's leniency, not model's strictness.
-    cfg = load_config(_base_env(LLM_REASONING_EFFORT="low"))
+    cfg = load_config(_base_env(CERTO_LLM_REASONING_EFFORT="low"))
 
     overridden = override_llm(cfg, reasoning_effort="   ")
 
@@ -666,3 +666,48 @@ def test_legacy_fallback_covers_every_parser_kind(
 ):
     assert getattr(load_config(_base_env(**{f"HARNESS_{suffix}": value})), field) == expected
     assert getattr(load_config(_base_env(**{f"CERTO_{suffix}": value})), field) == expected
+
+
+# --- CERTO_LLM_* replaced the bare LLM_* names --------------------------------
+
+
+def test_bare_llm_variables_are_never_read():
+    # Another tool's LLM_* settings must not leak into Certo.
+    cfg = load_config(
+        _base_env(
+            LLM_MODEL="openai/other-app-model",
+            LLM_API_KEY="sk-other-app",
+            LLM_BASE_URL="http://other-app:1234",
+            LLM_REASONING_EFFORT="low",
+        )
+    )
+
+    assert cfg.model == _base_env()["CERTO_LLM_MODEL"]
+    assert cfg.api_key == _base_env()["CERTO_LLM_API_KEY"]
+    assert cfg.base_url is None
+    assert cfg.reasoning_effort is None
+
+
+def test_only_old_llm_model_set_explains_the_rename():
+    with pytest.raises(ConfigError) as exc:
+        load_config({"LLM_MODEL": "ollama/qwen3-coder:30b", "LLM_BASE_URL": "http://h:11434"})
+
+    message = str(exc.value)
+    assert "CERTO_LLM_MODEL is required" in message
+    assert "Rename LLM_MODEL -> CERTO_LLM_MODEL" in message
+
+
+def test_only_old_llm_api_key_set_explains_the_rename_without_leaking_it():
+    with pytest.raises(ConfigError) as exc:
+        load_config({"CERTO_LLM_MODEL": "openai/gpt-4o", "LLM_API_KEY": "sk-secret-value"})
+
+    message = str(exc.value)
+    assert "Rename LLM_API_KEY -> CERTO_LLM_API_KEY" in message
+    assert "sk-secret-value" not in message
+
+
+def test_required_error_has_no_rename_hint_without_old_variables():
+    with pytest.raises(ConfigError) as exc:
+        load_config({})
+
+    assert "no longer reads" not in str(exc.value)

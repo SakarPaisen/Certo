@@ -35,7 +35,7 @@ def _config_available() -> bool:
     return True
 
 
-@pytest.mark.skipif(not _config_available(), reason="No LLM_MODEL/LLM_API_KEY configured in .env")
+@pytest.mark.skipif(not _config_available(), reason="No CERTO_LLM_MODEL/CERTO_LLM_API_KEY configured in .env")
 def test_run_task_creates_a_file(tmp_path, monkeypatch):
     monkeypatch.setenv("CERTO_WORKSPACE", str(tmp_path))
 
@@ -53,7 +53,7 @@ def test_run_task_creates_a_file(tmp_path, monkeypatch):
     assert messages.outcome.verification_state in runner.VERIFICATION_STATES
 
 
-@pytest.mark.skipif(not _config_available(), reason="No LLM_MODEL/LLM_API_KEY configured in .env")
+@pytest.mark.skipif(not _config_available(), reason="No CERTO_LLM_MODEL/CERTO_LLM_API_KEY configured in .env")
 def test_run_task_catches_entrypoint_ordering_bug_live(tmp_path, monkeypatch):
     """Closes the "not yet re-verified live" caveat that recurs across
     ROADMAP.md's Known Limitations for the `entrypoint-ordering`/smoke-run

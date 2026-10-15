@@ -176,25 +176,25 @@ def _build_parser() -> argparse.ArgumentParser:
         "--model",
         default=None,
         help=(
-            "Override LLM_MODEL for this run only, without touching .env — "
+            "Override CERTO_LLM_MODEL for this run only, without touching .env — "
             "e.g. to compare how two models handle the same task."
         ),
     )
     parser.add_argument(
         "--api-key",
         default=None,
-        help="Override LLM_API_KEY for this run only (pairs with --model when swapping providers).",
+        help="Override CERTO_LLM_API_KEY for this run only (pairs with --model when swapping providers).",
     )
     parser.add_argument(
         "--base-url",
         default=None,
-        help="Override LLM_BASE_URL for this run only (e.g. to point at a local model endpoint).",
+        help="Override CERTO_LLM_BASE_URL for this run only (e.g. to point at a local model endpoint).",
     )
     parser.add_argument(
         "--reasoning-effort",
         default=None,
         help=(
-            "Override LLM_REASONING_EFFORT for this run only, without touching "
+            "Override CERTO_LLM_REASONING_EFFORT for this run only, without touching "
             ".env — e.g. to compare how the same model behaves at different "
             "effort levels. Common values: none | minimal | low | medium | "
             "high | xhigh | max (provider-neutral; none or off disables "
@@ -242,7 +242,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Pick the best-fit model for this task from a hand-curated "
             "catalog (models.yaml, or CERTO_MODELS_FILE), scored by task "
-            "type instead of always using LLM_MODEL. Falls back to the next "
+            "type instead of always using CERTO_LLM_MODEL. Falls back to the next "
             "candidate on a provider-level failure (auth/rate-limit/outage) "
             "or a failed verification/task_tracker retry. Combine with "
             "--interactive to be prompted before each choice instead of it "
@@ -303,7 +303,7 @@ def _build_verify_parser() -> argparse.ArgumentParser:
         description=(
             "Run Certo's verification on a project without an agent or an LLM: "
             "project detection, the project's own environment, then every check "
-            "Certo runs after an agent finishes. No LLM_MODEL needed."
+            "Certo runs after an agent finishes. No CERTO_LLM_MODEL needed."
         ),
     )
     parser.add_argument(

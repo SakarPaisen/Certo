@@ -328,10 +328,14 @@ def build_parser() -> argparse.ArgumentParser:
         "check-llm",
         help="Send one tiny prompt to the configured LLM and report whether it answers.",
     )
-    check.add_argument("--model", default=None, help="Override LLM_MODEL for this check.")
-    check.add_argument("--base-url", default=None, help="Override LLM_BASE_URL for this check.")
+    check.add_argument("--model", default=None, help="Override CERTO_LLM_MODEL for this check.")
     check.add_argument(
-        "--reasoning-effort", default=None, help="Override LLM_REASONING_EFFORT for this check."
+        "--base-url", default=None, help="Override CERTO_LLM_BASE_URL for this check."
+    )
+    check.add_argument(
+        "--reasoning-effort",
+        default=None,
+        help="Override CERTO_LLM_REASONING_EFFORT for this check.",
     )
     check.add_argument(
         "--timeout",

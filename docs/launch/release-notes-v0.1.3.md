@@ -1,11 +1,27 @@
-# Certo v0.1.2
+# Certo v0.1.3
 
 This release makes Certo work end to end when it's installed from PyPI.
-(0.1.1 was never published; this is the first release after 0.1.0.)
+(0.1.1 and 0.1.2 were never published; this is the first release after 0.1.0.)
 The first real `uv tool install certo` run, with a local Ollama model,
 found three problems that never showed up from the development
 environment. All three are fixed, and a new release check now installs
 every wheel the way users do before it can be published.
+
+## Breaking change: `LLM_*` is now `CERTO_LLM_*`
+
+Certo's LLM settings now use their own prefix, so they can't clash with
+other tools that read `LLM_MODEL`:
+
+| 0.1.0 | 0.1.3 |
+| --- | --- |
+| `LLM_MODEL` | `CERTO_LLM_MODEL` |
+| `LLM_API_KEY` | `CERTO_LLM_API_KEY` |
+| `LLM_BASE_URL` | `CERTO_LLM_BASE_URL` |
+| `LLM_REASONING_EFFORT` | `CERTO_LLM_REASONING_EFFORT` |
+
+The old names are no longer read at all. Rename them in your `.env` or
+shell. If you forget, the "required" error names the old variables it
+found and the rename to make.
 
 ## Fixes
 
@@ -24,11 +40,11 @@ every wheel the way users do before it can be published.
   `--execution docker`, the environment and the verification both live
   inside the container.
 - **Models without a thinking mode work with no extra settings.** With
-  `LLM_REASONING_EFFORT` unset, the SDK's default reasoning effort was sent
+  `CERTO_LLM_REASONING_EFFORT` unset, the SDK's default reasoning effort was sent
   to every model. Ollama rejects it for models such as `qwen3-coder:30b`
   (`"qwen3-coder:30b" does not support thinking`), so the first call
   failed. Ollama models (`ollama/`, `ollama_chat/`) now get no reasoning
-  parameter unless you set one. `LLM_REASONING_EFFORT=none` or `off` turns
+  parameter unless you set one. `CERTO_LLM_REASONING_EFFORT=none` or `off` turns
   reasoning off for any provider, and so do `--reasoning-effort`, the
   server fields and `models.yaml`.
 - **No SDK banner.** The OpenHands SDK's nine-line startup banner no longer

@@ -17,7 +17,7 @@
 #               the project's own .venv (not pytest)     -> verified, exit 0,
 #               pytest installed into that .venv, and
 #               nothing installed into Certo's own env;
-#   - with --with-llm, the real smoke task against whatever LLM_* variables
+#   - with --with-llm, the real smoke task against whatever CERTO_LLM_* variables
 #     are exported, expecting `Verification: verified`.
 #
 # Needs uv and network access (to install the wheel's dependencies and the
@@ -163,10 +163,10 @@ fi
 
 if [ "$with_llm" = 1 ]; then
   echo "== Live smoke task (--with-llm)"
-  if [ -z "${LLM_MODEL:-}" ]; then
-    fail "--with-llm needs LLM_MODEL (and LLM_API_KEY or LLM_BASE_URL) exported"
+  if [ -z "${CERTO_LLM_MODEL:-}" ]; then
+    fail "--with-llm needs CERTO_LLM_MODEL (and CERTO_LLM_API_KEY or CERTO_LLM_BASE_URL) exported"
   else
-    echo "  model: $LLM_MODEL"
+    echo "  model: $CERTO_LLM_MODEL"
     export CERTO_PROJECTS_DIR="$work/projects"
     run smoke 0 "Verification: verified" \
       "$certo" "Create hello.py that prints hello, plus a pytest test for it" --project smoke

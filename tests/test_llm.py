@@ -20,7 +20,7 @@ from certo.llm import build_llm
 
 
 def _base_env(**overrides: str) -> dict[str, str]:
-    env = {"LLM_MODEL": "anthropic/claude-sonnet-4-5-20250929", "LLM_API_KEY": "sk-test"}
+    env = {"CERTO_LLM_MODEL": "anthropic/claude-sonnet-4-5-20250929", "CERTO_LLM_API_KEY": "sk-test"}
     env.update(overrides)
     return env
 
@@ -35,7 +35,7 @@ def test_build_llm_without_reasoning_effort_uses_sdk_default():
 
 
 def test_build_llm_with_reasoning_effort_overrides_sdk_default():
-    cfg = load_config(_base_env(LLM_REASONING_EFFORT="low"))
+    cfg = load_config(_base_env(CERTO_LLM_REASONING_EFFORT="low"))
 
     llm = build_llm(cfg)
 
@@ -43,7 +43,7 @@ def test_build_llm_with_reasoning_effort_overrides_sdk_default():
 
 
 def test_build_llm_passes_through_model_and_base_url():
-    cfg = load_config(_base_env(LLM_BASE_URL="http://localhost:11434"))
+    cfg = load_config(_base_env(CERTO_LLM_BASE_URL="http://localhost:11434"))
 
     llm = build_llm(cfg)
 
@@ -72,7 +72,7 @@ def test_build_llm_usage_id_is_overridable():
 
 @pytest.mark.parametrize("value", ["none", "off", "OFF", " None "])
 def test_build_llm_reasoning_off_passes_explicit_none(value):
-    cfg = load_config(_base_env(LLM_REASONING_EFFORT=value))
+    cfg = load_config(_base_env(CERTO_LLM_REASONING_EFFORT=value))
 
     llm = build_llm(cfg)
 
@@ -80,14 +80,14 @@ def test_build_llm_reasoning_off_passes_explicit_none(value):
 
 
 def test_build_llm_reasoning_off_via_override_passes_explicit_none():
-    cfg = override_llm(load_config(_base_env(LLM_REASONING_EFFORT="high")), reasoning_effort="off")
+    cfg = override_llm(load_config(_base_env(CERTO_LLM_REASONING_EFFORT="high")), reasoning_effort="off")
 
     assert build_llm(cfg).reasoning_effort is None
 
 
 @pytest.mark.parametrize("model", ["ollama/qwen3-coder:30b", "ollama_chat/qwen3-coder:30b"])
 def test_build_llm_ollama_without_reasoning_effort_does_not_inherit_high(model):
-    cfg = load_config({"LLM_MODEL": model, "LLM_BASE_URL": "http://localhost:11434"})
+    cfg = load_config({"CERTO_LLM_MODEL": model, "CERTO_LLM_BASE_URL": "http://localhost:11434"})
 
     assert build_llm(cfg).reasoning_effort is None
 
@@ -96,9 +96,9 @@ def test_build_llm_ollama_explicit_reasoning_effort_still_applies():
     # A thinking-capable Ollama model (qwen3, deepseek-r1) can opt back in.
     cfg = load_config(
         {
-            "LLM_MODEL": "ollama/qwen3:8b",
-            "LLM_BASE_URL": "http://localhost:11434",
-            "LLM_REASONING_EFFORT": "high",
+            "CERTO_LLM_MODEL": "ollama/qwen3:8b",
+            "CERTO_LLM_BASE_URL": "http://localhost:11434",
+            "CERTO_LLM_REASONING_EFFORT": "high",
         }
     )
 
@@ -155,9 +155,9 @@ def fake_ollama_url():
 def test_ollama_request_never_asks_for_thinking(fake_ollama_url, model, effort):
     # End to end through the SDK and LiteLLM, against a local fake server:
     # the README quickstart model must not be sent `think`.
-    env = {"LLM_MODEL": model, "LLM_BASE_URL": fake_ollama_url}
+    env = {"CERTO_LLM_MODEL": model, "CERTO_LLM_BASE_URL": fake_ollama_url}
     if effort is not None:
-        env["LLM_REASONING_EFFORT"] = effort
+        env["CERTO_LLM_REASONING_EFFORT"] = effort
     llm = build_llm(load_config(env)).model_copy(update={"num_retries": 0})
 
     llm.completion([Message(role="user", content=[TextContent(text="ping")])])

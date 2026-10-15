@@ -252,7 +252,7 @@ def test_default_config_loads_lifecycle_skills_from_an_unrelated_cwd(tmp_path, m
     # Regression: the catalog used to default to ./skills, so an installed
     # `certo` run from any other directory loaded no skills at all.
     monkeypatch.chdir(tmp_path)
-    cfg = load_config({"LLM_MODEL": "openai/gpt-4o", "LLM_API_KEY": "k"})
+    cfg = load_config({"CERTO_LLM_MODEL": "openai/gpt-4o", "CERTO_LLM_API_KEY": "k"})
 
     names = {s.name for s in load_first_party_skills(cfg.skills_dir)}
 

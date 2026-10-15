@@ -177,8 +177,8 @@ def create_app():
     # Built once at startup, not per-request: a store may hold real
     # resources (DB connections, a Redis client) that can't sensibly be
     # rebuilt on every request the way a per-request LLM override can.
-    # This does mean `certo-server` now requires a valid LLM_MODEL/
-    # LLM_API_KEY at startup rather than only on the first request — a
+    # This does mean `certo-server` now requires a valid CERTO_LLM_MODEL/
+    # CERTO_LLM_API_KEY at startup rather than only on the first request — a
     # deliberate, minor behavior change (fail fast beats silently starting
     # a broken server); see ROADMAP.md's decisions log.
     startup_cfg = load_config()
@@ -409,7 +409,7 @@ def create_app():
         `request.model` is accepted (required by the wire format) and echoed
         back, but never used to select a provider — the model-agnostic
         invariant holds here too: the actual model defaults to whatever
-        `.env`'s LLM_MODEL says, exactly like every other interface, and
+        `.env`'s CERTO_LLM_MODEL says, exactly like every other interface, and
         `request.model` isn't a safe stand-in for an explicit override since
         a strict OpenAI client's value there may not be a LiteLLM-style
         "provider/model" id at all. Callers who want to experiment with a

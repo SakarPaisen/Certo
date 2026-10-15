@@ -1,12 +1,12 @@
 """Configuration for Certo.
 
 Pure environment parsing — deliberately free of any OpenHands SDK import so it can
-be unit-tested with no network and no SDK installed. `llm.py` consumes the LLM_*
-values (wrapping the key in SecretStr when it builds the SDK's LLM); everything
-else is harness policy.
+be unit-tested with no network and no SDK installed. `llm.py` consumes the
+CERTO_LLM_* values (wrapping the key in SecretStr when it builds the SDK's LLM);
+everything else is harness policy.
 
 The model-agnostic invariant lives here: the provider/model is entirely a function
-of the LLM_MODEL env var. Nothing in this module (or anywhere in src/) hardcodes a
+of the CERTO_LLM_MODEL env var. Nothing in this module (or anywhere in src/) hardcodes a
 provider, model, or base URL.
 """
 
@@ -194,8 +194,34 @@ class Config:
     # full message transcript, and token/cost metrics for each task run,
     # one subfolder per project per run. Blank (the default) means the
     # feature is off entirely — same "blank means off" convention as
-    # LLM_BASE_URL/CERTO_DOCKER_PLATFORM, no separate on/off flag needed.
+    # CERTO_LLM_BASE_URL/CERTO_DOCKER_PLATFORM, no separate on/off flag needed.
     artifacts_dir: str = ""
+
+
+# Certo's LLM settings. Certo 0.1.0 read the bare LLM_* names, which other
+# tools use too; those are never read now (another app's LLM_MODEL must not
+# leak in), only named in the "required" errors so an old setup gets told why.
+LLM_ENV_PREFIX = "CERTO_LLM_"
+_OLD_LLM_ENV_PREFIX = "LLM_"
+
+
+def _old_llm_names_hint(env: Mapping[str, str], *suffixes: str) -> str:
+    """A sentence naming old LLM_* variables that are set, for an error
+    message, or "" when there are none. Only says *that* they're set, never
+    their values (one may be an API key)."""
+    found = [
+        _OLD_LLM_ENV_PREFIX + s
+        for s in suffixes
+        if _clean(env.get(_OLD_LLM_ENV_PREFIX + s)) is not None
+    ]
+    if not found:
+        return ""
+    renames = ", ".join(f"{name} -> CERTO_{name}" for name in found)
+    return (
+        f" Found {', '.join(found)}, which Certo no longer reads: its LLM "
+        f"settings now use the CERTO_LLM_ prefix, so other tools' LLM_* "
+        f"variables can't leak in. Rename {renames}."
+    )
 
 
 def _clean(value: str | None) -> str | None:
@@ -327,23 +353,24 @@ def load_config(env: Mapping[str, str] | None = None, *, dotenv_path: str = ".en
             pass
         env = os.environ
 
-    model = _clean(env.get("LLM_MODEL"))
+    model = _clean(env.get(LLM_ENV_PREFIX + "MODEL"))
     if model is None:
         raise ConfigError(
-            "LLM_MODEL is required (e.g. 'anthropic/claude-sonnet-4-5-20250929' or "
-            "'ollama/qwen2.5-coder'). Export it in your shell (export LLM_MODEL=...) "
-            "or set it in a .env file in the current directory. Switching provider "
-            "= changing only this value."
+            "CERTO_LLM_MODEL is required (e.g. 'anthropic/claude-sonnet-4-5-20250929' "
+            "or 'ollama/qwen3-coder:30b'). Export it in your shell (export "
+            "CERTO_LLM_MODEL=...) or set it in a .env file in the current directory. "
+            "Switching provider = changing only this value." + _old_llm_names_hint(env, "MODEL")
         )
 
-    api_key = _clean(env.get("LLM_API_KEY"))
-    base_url = _clean(env.get("LLM_BASE_URL"))
+    api_key = _clean(env.get(LLM_ENV_PREFIX + "API_KEY"))
+    base_url = _clean(env.get(LLM_ENV_PREFIX + "BASE_URL"))
     if api_key is None and base_url is None:
         raise ConfigError(
-            "LLM_API_KEY is required unless LLM_BASE_URL is set (e.g. a local "
-            "Ollama/vLLM/LM Studio endpoint that needs no key)."
+            "CERTO_LLM_API_KEY is required unless CERTO_LLM_BASE_URL is set (e.g. a "
+            "local Ollama/vLLM/LM Studio endpoint that needs no key)."
+            + _old_llm_names_hint(env, "API_KEY", "BASE_URL")
         )
-    reasoning_effort = _clean_reasoning_effort(env.get("LLM_REASONING_EFFORT"))
+    reasoning_effort = _clean_reasoning_effort(env.get(LLM_ENV_PREFIX + "REASONING_EFFORT"))
 
     workspace = _get(env, "WORKSPACE") or DEFAULT_WORKSPACE
     max_iterations = _parse_positive_int(
@@ -526,8 +553,8 @@ def override_llm(
     base_url: str | None = None,
     reasoning_effort: str | None = None,
 ) -> Config:
-    """Return a copy of `cfg` with LLM_MODEL/LLM_API_KEY/LLM_BASE_URL/
-    LLM_REASONING_EFFORT overridden.
+    """Return a copy of `cfg` with CERTO_LLM_MODEL/CERTO_LLM_API_KEY/
+    CERTO_LLM_BASE_URL/CERTO_LLM_REASONING_EFFORT overridden.
 
     Lets a single call (CLI flag or a server request field) swap provider/model
     (or just the reasoning effort, independent of provider) for one run without

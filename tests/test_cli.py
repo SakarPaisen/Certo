@@ -151,14 +151,14 @@ def test_main_reports_task_resolution_error(monkeypatch, capsys):
 
 def test_config_error_is_reported_and_exits_nonzero(monkeypatch, capsys):
     def _raise() -> Config:
-        raise ConfigError("LLM_MODEL is required")
+        raise ConfigError("CERTO_LLM_MODEL is required")
 
     monkeypatch.setattr(cli, "load_config", _raise)
 
     exit_code = cli.main(["do something"])
 
     assert exit_code == 1
-    assert "LLM_MODEL is required" in capsys.readouterr().err
+    assert "CERTO_LLM_MODEL is required" in capsys.readouterr().err
 
 
 def test_docker_execution_is_passed_through_to_run_task(monkeypatch):

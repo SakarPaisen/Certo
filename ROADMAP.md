@@ -32,7 +32,7 @@ build plan.
 Per-module reference. See `MANUAL.md` for user-facing behavior; see the
 decisions log below for *why* a given design was chosen.
 
-- **`config.py`** — env parsing, model-agnostic (`LLM_MODEL` prefix selects
+- **`config.py`** — env parsing, model-agnostic (`CERTO_LLM_MODEL` prefix selects
   provider). `override_llm(cfg, model=, api_key=, base_url=,
   reasoning_effort=)` is the per-request override mechanism shared by
   `cli.py`/`server.py`. `resolve_project_dir(projects_dir, project)` is the
@@ -793,9 +793,17 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   arguments before importing uvicorn, so `--version` works without the
   `server` extra. 0.1.1 was bumped but never published: `--version` was
   the first feature under this rule, so the next release is 0.1.2.
+- **LLM settings renamed `LLM_*` → `CERTO_LLM_*`, with no fallback** (user's
+  choice, 0.1.3). The bare names are generic, and other tools set them too.
+  Unlike the `HARNESS_*` rename, the old names are never read, because a
+  fallback would still let another app's `LLM_MODEL` leak in. They are only
+  named, never echoed, in the "required" `ConfigError`s
+  (`config._old_llm_names_hint`), so a 0.1.0 setup gets told what to
+  rename. The SDK itself never reads `LLM_*` (checked: no reference in
+  `openhands/`), so `config.py` is the only reader.
 - **`check-llm` lives in `certo-admin`, not the `certo` CLI** — `certo`
   requires a task positional, while `certo-admin` is already the
   subcommand-based maintenance CLI. There's no `--api-key` flag, so a key
-  never lands in shell history; use `LLM_API_KEY=... certo-admin check-llm`.
+  never lands in shell history; use `CERTO_LLM_API_KEY=... certo-admin check-llm`.
   Retries are disabled so a bad key/endpoint fails in seconds, not after
   the SDK's 5 backoff retries.

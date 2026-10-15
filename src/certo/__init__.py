@@ -12,4 +12,4 @@ import os
 # setdefault: an explicit OPENHANDS_SUPPRESS_BANNER=0 still shows it.
 os.environ.setdefault("OPENHANDS_SUPPRESS_BANNER", "1")
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"

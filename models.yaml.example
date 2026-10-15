@@ -2,7 +2,7 @@
 # must never be committed — same rule as .env (see CLAUDE.md).
 #
 # Consulted only when CERTO_MODEL_SELECTION=auto (or --auto-model). With
-# the default (manual), none of this is read — LLM_MODEL/LLM_API_KEY from
+# the default (manual), none of this is read — CERTO_LLM_MODEL/CERTO_LLM_API_KEY from
 # .env are used exactly as they are today. See MANUAL.md "Automatic model
 # selection" for the full writeup.
 #
@@ -65,10 +65,10 @@ models:
   # ---------------------------------------------------------------------------
 
   - name: claude-opus-5              # short id used in logs, prompts, MODEL_DECISIONS.md
-    model: anthropic/claude-opus-5   # same LiteLLM-style id as LLM_MODEL
-    api_key: ""                      # same meaning as LLM_API_KEY
-    base_url: ""                     # same meaning as LLM_BASE_URL (blank = provider default)
-    reasoning_effort: ""             # same meaning as LLM_REASONING_EFFORT (blank = SDK default; common values: none/minimal/low/medium/high/xhigh/max)
+    model: anthropic/claude-opus-5   # same LiteLLM-style id as CERTO_LLM_MODEL
+    api_key: ""                      # same meaning as CERTO_LLM_API_KEY
+    base_url: ""                     # same meaning as CERTO_LLM_BASE_URL (blank = provider default)
+    reasoning_effort: ""             # same meaning as CERTO_LLM_REASONING_EFFORT (blank = SDK default; common values: none/minimal/low/medium/high/xhigh/max)
     description: >
       Flagship model — the strongest option for hard, multi-step reasoning
       and the trickiest code. Reach for it on gnarly debugging and large

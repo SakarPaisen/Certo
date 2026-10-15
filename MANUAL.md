@@ -39,12 +39,12 @@ reference — how to actually run and configure the thing.
 
 ```bash
 pip install certo                 # or: uv tool install certo
-export LLM_MODEL=ollama/qwen3-coder:30b    # ~20 GB; smaller: ollama/qwen2.5-coder:7b
-export LLM_BASE_URL=http://localhost:11434   # or: export LLM_API_KEY=...
+export CERTO_LLM_MODEL=ollama/qwen3-coder:30b    # ~20 GB; smaller: ollama/qwen2.5-coder:7b
+export CERTO_LLM_BASE_URL=http://localhost:11434   # or: export CERTO_LLM_API_KEY=...
 certo "Build a CLI todo app in Python, with tests" --project todo
 ```
 
-No `.env` file is needed: exported `LLM_*` / `CERTO_*` variables are read
+No `.env` file is needed: exported `CERTO_*` variables are read
 directly, and a `.env` in the current directory is loaded too if present
 (already-exported values win). The built-in skill catalog ships inside the
 package, so it loads from any directory. Relative defaults such as
@@ -60,7 +60,7 @@ environment and dependencies. Run every command through `uv run`, which uses
 
 ```bash
 cp .env.example .env
-# edit .env: set LLM_MODEL and LLM_API_KEY (see "Switching LLM provider / model")
+# edit .env: set CERTO_LLM_MODEL and CERTO_LLM_API_KEY (see "Switching LLM provider / model")
 
 uv pip install -e ".[dev]"        # certo + openhands-sdk/openhands-tools + pytest/ruff
 uv run pytest -q                  # should pass with no network/keys required
@@ -93,15 +93,21 @@ release):** the pre-rename `HARNESS_*` spelling of the same variable (e.g.
 name has a value, it's used and one deprecation warning naming the new
 variable is logged per process. If both have a value, `CERTO_*` wins. A
 blank value counts as unset, so a blank `CERTO_` line copied from
-`.env.example` doesn't hide an old `HARNESS_` setting. `LLM_*` variables
-are unchanged.
+`.env.example` doesn't hide an old `HARNESS_` setting.
+
+**The LLM settings use the `CERTO_LLM_` prefix** (`CERTO_LLM_MODEL`,
+`CERTO_LLM_API_KEY`, `CERTO_LLM_BASE_URL`, `CERTO_LLM_REASONING_EFFORT`).
+Certo 0.1.0 read the bare `LLM_*` names, which other tools use too. Those
+are **not** read any more, with no fallback, so another app's `LLM_MODEL`
+can never leak into Certo. If a required setting is missing and the old
+name is set, the error names it and the rename to make (never its value).
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `LLM_MODEL` | *(required)* | LiteLLM-style model id, e.g. `anthropic/claude-sonnet-4-5-20250929`, `openai/gpt-4o`, `ollama/llama3`. The **only** thing you change to switch provider. |
-| `LLM_API_KEY` | *(required unless `LLM_BASE_URL` set)* | Key for whichever provider `LLM_MODEL` selects. |
-| `LLM_BASE_URL` | *(empty)* | Only for local/self-hosted models (e.g. `http://localhost:11434`). Leave the line with no value and no trailing text — see [Troubleshooting](#troubleshooting). |
-| `LLM_REASONING_EFFORT` | *(empty — SDK default `high`; no reasoning for `ollama/`/`ollama_chat/` models)* | Provider-neutral reasoning effort, passed straight through to the SDK's `LLM.reasoning_effort` (LiteLLM translates it per-provider). Common values: `none` \| `minimal` \| `low` \| `medium` \| `high` \| `xhigh` \| `max` — not validated against a fixed list, since the SDK accepts forward-compatible provider values too. `none` or `off` (any case) turns reasoning off: no reasoning parameter is sent at all. Left empty for an Ollama model, it behaves like `none`, because most Ollama models have no thinking mode and Ollama rejects the request outright; set it (e.g. `high`) to turn thinking on for a model that has one (`qwen3`, `deepseek-r1`). |
+| `CERTO_LLM_MODEL` | *(required)* | LiteLLM-style model id, e.g. `anthropic/claude-sonnet-4-5-20250929`, `openai/gpt-4o`, `ollama/llama3`. The **only** thing you change to switch provider. |
+| `CERTO_LLM_API_KEY` | *(required unless `CERTO_LLM_BASE_URL` set)* | Key for whichever provider `CERTO_LLM_MODEL` selects. |
+| `CERTO_LLM_BASE_URL` | *(empty)* | Only for local/self-hosted models (e.g. `http://localhost:11434`). Leave the line with no value and no trailing text — see [Troubleshooting](#troubleshooting). |
+| `CERTO_LLM_REASONING_EFFORT` | *(empty — SDK default `high`; no reasoning for `ollama/`/`ollama_chat/` models)* | Provider-neutral reasoning effort, passed straight through to the SDK's `LLM.reasoning_effort` (LiteLLM translates it per-provider). Common values: `none` \| `minimal` \| `low` \| `medium` \| `high` \| `xhigh` \| `max` — not validated against a fixed list, since the SDK accepts forward-compatible provider values too. `none` or `off` (any case) turns reasoning off: no reasoning parameter is sent at all. Left empty for an Ollama model, it behaves like `none`, because most Ollama models have no thinking mode and Ollama rejects the request outright; set it (e.g. `high`) to turn thinking on for a model that has one (`qwen3`, `deepseek-r1`). |
 | `CERTO_WORKSPACE` | `.` | Working directory the agent operates in when `--project` is not used. |
 | `CERTO_MAX_ITERATIONS` | `50` | Safety cap on the agent loop. |
 | `CERTO_CONFIRM_MODE` | `never` | `never` \| `always` (pause before each tool call for approval — see [Confirmation mode](#confirmation-mode)). |
@@ -116,7 +122,7 @@ are unchanged.
 | `CERTO_MAX_VERIFY_RETRIES` | `2` | How many automated fix-and-retry cycles `CERTO_VERIFY_TESTS=always` allows before giving up. |
 | `CERTO_MAX_TASK_SECONDS` | `1800` | Shared wall-clock budget (seconds) for one whole task — the initial run plus every task_tracker/verification retry combined, not just a single `conversation.run()` call. See [Task budget](#task-budget). |
 | `CERTO_INTERACTIVE` | `no` | Allow the agent to pause and ask instead of always pushing forward autonomously. Only meaningful with the CLI's `--interactive` flag — see [Interactive mode](#interactive-mode). |
-| `CERTO_MODEL_SELECTION` | `manual` | `manual` \| `auto` — pick the best-fit model per task from a hand-curated catalog instead of always using `LLM_MODEL`. See [Automatic model selection](#automatic-model-selection). |
+| `CERTO_MODEL_SELECTION` | `manual` | `manual` \| `auto` — pick the best-fit model per task from a hand-curated catalog instead of always using `CERTO_LLM_MODEL`. See [Automatic model selection](#automatic-model-selection). |
 | `CERTO_MODELS_FILE` | `./models.yaml` | Path to the model catalog, only read when `CERTO_MODEL_SELECTION=auto`. |
 | `CERTO_ARTIFACTS_DIR` | *(empty — disabled)* | Per-run metadata/transcript/token-cost directory. See [Run artifacts](#run-artifacts). |
 | `CERTO_TASK_STORE` | `memory` | `memory` \| `redis` \| `sqlite` \| `mysql` \| `postgres` — server-mode task registry backend, consulted only by `certo-server`/`certo-admin`. See [Task registry persistence](#task-registry-persistence). |
@@ -159,8 +165,8 @@ All three commands hide the OpenHands SDK's startup banner by setting
 - `--agents-md TEXT` — writes `TEXT` as this project's `AGENTS.md`. Requires
   `--project`. See [Skills](#skills).
 - `--model MODEL` / `--api-key KEY` / `--base-url URL` / `--reasoning-effort
-  LEVEL` — override `LLM_MODEL` / `LLM_API_KEY` / `LLM_BASE_URL` /
-  `LLM_REASONING_EFFORT` for this run only, without touching `.env`. Useful
+  LEVEL` — override `CERTO_LLM_MODEL` / `CERTO_LLM_API_KEY` / `CERTO_LLM_BASE_URL` /
+  `CERTO_LLM_REASONING_EFFORT` for this run only, without touching `.env`. Useful
   for running the same task against different models/providers, or the same
   model at different reasoning-effort levels, to compare results. Any
   combination may be given; an omitted flag keeps `.env`'s value. See
@@ -169,7 +175,7 @@ All three commands hide the OpenHands SDK's startup banner by setting
   question instead of always pushing forward on its own — see [Interactive
   mode](#interactive-mode) below.
 - `--auto-model` — off by default. Pick the best-fit model for this task
-  from a hand-curated catalog instead of always using `LLM_MODEL` — see
+  from a hand-curated catalog instead of always using `CERTO_LLM_MODEL` — see
   [Automatic model selection](#automatic-model-selection) below.
 - `--require-verification` — off by default. Treats an `inconclusive`
   verification result (nothing runnable confirmed the software works — an
@@ -243,7 +249,7 @@ detection, the project's own environment (see
 [Project environments](#project-environments-python), so it may create
 `.venv` and install pytest into it), then every check from
 [Test verification](#test-verification). It needs no LLM and no
-`LLM_MODEL`, and reads no `.env`. It runs locally against `PATH` once, with
+`CERTO_LLM_MODEL`, and reads no `.env`. It runs locally against `PATH` once, with
 no retries, since there is no agent to send a failure back to.
 
 Output: the detected project type, any setup notice, one line per check,
@@ -327,7 +333,7 @@ default) for `certo-server`.
 ## Automatic model selection
 
 By default the harness runs one, explicitly-configured model for the whole
-task (`LLM_MODEL`, or a per-request/`--model` override). `--auto-model`
+task (`CERTO_LLM_MODEL`, or a per-request/`--model` override). `--auto-model`
 (`CERTO_MODEL_SELECTION=auto` in `.env`, or the CLI flag — off by
 default) picks instead from a hand-curated catalog of candidate models,
 scored by what the task looks like, with automatic fallback if the chosen
@@ -341,10 +347,10 @@ Copy `models.yaml.example` to `models.yaml` (git-ignored, exactly like
 ```yaml
 models:
   - name: claude-sonnet
-    model: anthropic/claude-sonnet-4-5-20250929   # same LiteLLM-style id as LLM_MODEL
-    api_key: "sk-..."                              # same meaning as LLM_API_KEY
-    base_url: ""                                   # same meaning as LLM_BASE_URL
-    reasoning_effort: ""                            # same meaning as LLM_REASONING_EFFORT
+    model: anthropic/claude-sonnet-4-5-20250929   # same LiteLLM-style id as CERTO_LLM_MODEL
+    api_key: "sk-..."                              # same meaning as CERTO_LLM_API_KEY
+    base_url: ""                                   # same meaning as CERTO_LLM_BASE_URL
+    reasoning_effort: ""                            # same meaning as CERTO_LLM_REASONING_EFFORT
     description: "Strong, well-rounded coding model."
     ratings: {reasoning: 4, cost: 3, precision: 4, code: 4}   # 0-5, hand-curated
     activated: true                                 # false = excluded from selection entirely
@@ -557,8 +563,8 @@ Request body: `task` (required), `project` (optional, same meaning as CLI
 `agents_md` (optional, same meaning as CLI `--agents-md` — requires `project`
 in the same request), `model` / `api_key` / `base_url` / `reasoning_effort`
 (all optional, same meaning as CLI `--model` / `--api-key` / `--base-url` /
-`--reasoning-effort` — override `LLM_MODEL`/`LLM_API_KEY`/`LLM_BASE_URL`/
-`LLM_REASONING_EFFORT` for this request only, without touching `.env`),
+`--reasoning-effort` — override `CERTO_LLM_MODEL`/`CERTO_LLM_API_KEY`/`CERTO_LLM_BASE_URL`/
+`CERTO_LLM_REASONING_EFFORT` for this request only, without touching `.env`),
 `require_verification` (optional, boolean, default `false` — same meaning
 as CLI `--require-verification`; see below), `acceptance_checks` (optional,
 a JSON array of check objects, same shape and meaning as CLI
@@ -706,7 +712,7 @@ curl -X POST http://127.0.0.1:8000/v1/chat/completions \
 
 - `model` (required by the wire format, echoed back in the response) **does
   not select a provider** — the real model defaults to whatever `.env`'s
-  `LLM_MODEL` says, and `model` isn't a safe stand-in for an explicit
+  `CERTO_LLM_MODEL` says, and `model` isn't a safe stand-in for an explicit
   override since a strict OpenAI client's value there may not be a
   LiteLLM-style `"provider/model"` id at all.
 - `messages`: every `system` message is concatenated as leading context; the
@@ -844,7 +850,7 @@ OK — answered in 2.8s: 'OK'
 Tokens: 17 in / 4 out; cost: $0.000008
 ```
 
-It builds the LLM exactly as a real run does (same `LLM_*` settings;
+It builds the LLM exactly as a real run does (same `CERTO_LLM_*` settings;
 `--model`/`--base-url`/`--reasoning-effort` override them for this check
 only), sends one tiny prompt with **no retries** and a `--timeout`
 (default `60`s), and passes only if the model returns non-empty text. It
@@ -853,7 +859,7 @@ error (`authentication`, `rate_limit`, `timeout`, `unavailable`,
 `model_not_found`, `bad_request`, `setup`, `no_reply`, or `error`) with a
 hint. `setup` means the SDK refused the configuration before sending
 anything (see [Troubleshooting](#troubleshooting)). The API key always comes
-from `.env`/`LLM_API_KEY` (there's no `--api-key` flag, so it never lands in
+from `.env`/`CERTO_LLM_API_KEY` (there's no `--api-key` flag, so it never lands in
 shell history) and is scrubbed from any error text before printing. A
 successful check costs one very small request.
 
@@ -1299,18 +1305,18 @@ registration points, not one — see [Custom tools](#custom-tools).
 
 ## Switching LLM provider / model
 
-Edit **only** `LLM_MODEL` in `.env` — no code changes, ever. Nothing in
+Edit **only** `CERTO_LLM_MODEL` in `.env` — no code changes, ever. Nothing in
 `src/` hardcodes a model, provider, or base URL (verified via
 `grep -rniE "gpt-|claude-|anthropic/|openai/|gemini/|ollama/" src/` — the only
 hits are example strings in error messages and docstrings). The one
 provider-aware default is reasoning effort: an Ollama model with no
-`LLM_REASONING_EFFORT` gets none, instead of the SDK's `high` (see
+`CERTO_LLM_REASONING_EFFORT` gets none, instead of the SDK's `high` (see
 [Troubleshooting](#troubleshooting)).
 
 - `anthropic/claude-...` — Anthropic
 - `openai/gpt-4o` — OpenAI
 - `gemini/gemini-...` — Google
-- `ollama/llama3` (+ `LLM_BASE_URL=http://localhost:11434`) — local model
+- `ollama/llama3` (+ `CERTO_LLM_BASE_URL=http://localhost:11434`) — local model
 - `openhands/claude-...` — OpenHands proxy
 
 ### Per-request override (no `.env` edit)
@@ -1329,7 +1335,7 @@ entry point accepts an explicit, optional override instead:
   — see
   [`POST /v1/chat/completions`](#post-v1chatcompletions--openai-compatible-adapter)).
 
-`LLM_REASONING_EFFORT`/`reasoning_effort` is provider-neutral — passed
+`CERTO_LLM_REASONING_EFFORT`/`reasoning_effort` is provider-neutral — passed
 straight through to the SDK's own `LLM.reasoning_effort` field (LiteLLM
 translates it per-provider). Leave it unset to use the SDK's own default
 (`"high"`), except for an `ollama/`/`ollama_chat/` model, where unset means
@@ -1337,7 +1343,7 @@ no reasoning. `none` or `off` sends no reasoning parameter at all, for any
 provider.
 
 Any subset may be given; an omitted field keeps `.env`'s value for that one
-setting (e.g. passing only `--model` keeps the configured `LLM_API_KEY`). This
+setting (e.g. passing only `--model` keeps the configured `CERTO_LLM_API_KEY`). This
 is `certo.config.override_llm()` under the hood — it returns a modified
 copy of the resolved `Config`, `.env` itself is never touched, so the override
 applies to that one run only. This is additive to, not a replacement for, the
@@ -1732,7 +1738,7 @@ and `certo verify` on three fixture projects:
 | tests import a package installed only in the project's own `.venv` (no pytest there) | `verified`, exit `0`; pytest installed into that `.venv`; Certo's own environment still has no pytest |
 
 `--with-llm` also runs `certo "Create hello.py that prints hello, plus a
-pytest test for it" --project smoke` with whatever `LLM_*` variables are
+pytest test for it" --project smoke` with whatever `CERTO_LLM_*` variables are
 exported (no `.env` is read, since it runs from an empty directory) and
 expects `Verification: verified`. The release workflow runs the non-LLM part
 against the exact wheel it is about to publish. It needs `uv` and network
@@ -1818,7 +1824,7 @@ access. Run it directly, not through `uv run`.
   Skips cleanly (`pytest.importorskip("fastapi")`) when the `server` extra
   isn't installed.
 - `tests/test_runner.py` — one real end-to-end smoke test (**skips cleanly**
-  when `LLM_MODEL`/`LLM_API_KEY` aren't configured; when they are, it makes
+  when `CERTO_LLM_MODEL`/`CERTO_LLM_API_KEY` aren't configured; when they are, it makes
   one real, cheap LLM call, asserts a file was actually created, and asserts
   `.outcome.verification_state` is a valid state — that's intentional, spec
   section 10, not a leak), plus the harness-side verification-loop unit
@@ -2036,9 +2042,9 @@ access. Run it directly, not through `uv run`.
 
 ## Troubleshooting
 
-**"LLM_MODEL is required" / "LLM_API_KEY is required"** — `.env` is missing
-or a required value is blank. Copy `.env.example` and fill in `LLM_MODEL` +
-`LLM_API_KEY` (or `LLM_BASE_URL` for a keyless local model).
+**"CERTO_LLM_MODEL is required" / "CERTO_LLM_API_KEY is required"** — `.env` is missing
+or a required value is blank. Copy `.env.example` and fill in `CERTO_LLM_MODEL` +
+`CERTO_LLM_API_KEY` (or `CERTO_LLM_BASE_URL` for a keyless local model).
 
 **"context window of 8,192 tokens, which is below the minimum of 16,384"**
 — the SDK refuses to build an LLM whose context window (as LiteLLM reports
@@ -2050,17 +2056,22 @@ reports this as a `setup` failure.
 
 **`OllamaException: "qwen3-coder:30b" does not support thinking`** — the
 request asked an Ollama model with no thinking mode to think, and Ollama
-rejects that on the first call. It happens when `LLM_REASONING_EFFORT` (or
+rejects that on the first call. It happens when `CERTO_LLM_REASONING_EFFORT` (or
 `--reasoning-effort`, or a `models.yaml` entry's `reasoning_effort`) is set
 to a level such as `high` for that model. Clear it or set it to `none`. With
 it unset, Certo already sends no reasoning parameter to Ollama models. Up to
 v0.1.0 the SDK's `high` default was sent instead, so every such model failed
 this way.
 
-**`LLM_BASE_URL` gets read as a literal `# comment` string** — `python-dotenv`
+**"CERTO_LLM_MODEL is required" although `LLM_MODEL` is set** — Certo
+reads only the `CERTO_LLM_` names since 0.1.3. Rename `LLM_MODEL`,
+`LLM_API_KEY`, `LLM_BASE_URL` and `LLM_REASONING_EFFORT` in your `.env` or
+shell to `CERTO_LLM_MODEL` and so on. The error lists which old names it found.
+
+**`CERTO_LLM_BASE_URL` gets read as a literal `# comment` string** — `python-dotenv`
 does not strip a trailing `# comment` from a line whose value is otherwise
 blank (`KEY=                    # comment` keeps the comment as the value; a
-non-blank value before the comment strips fine). Keep the line as `LLM_BASE_URL=`
+non-blank value before the comment strips fine). Keep the line as `CERTO_LLM_BASE_URL=`
 with nothing else on it if you're not using a local model.
 
 **Agent writes to the wrong path / "Read-only file system" errors under

@@ -1,8 +1,8 @@
 """Connectivity check for the configured LLM: one tiny, direct completion.
 
 Used by `certo-admin check-llm`. Builds the model exactly as a real run
-does (`llm.build_llm`, so `LLM_MODEL`/`LLM_API_KEY`/`LLM_BASE_URL`/
-`LLM_REASONING_EFFORT` and any per-call override apply unchanged), but with
+does (`llm.build_llm`, so `CERTO_LLM_MODEL`/`CERTO_LLM_API_KEY`/`CERTO_LLM_BASE_URL`/
+`CERTO_LLM_REASONING_EFFORT` and any per-call override apply unchanged), but with
 retries disabled and a short timeout: a health check should fail fast and
 say why, not sit through the SDK's default 5 retries with up to 64s waits.
 
@@ -37,8 +37,8 @@ _ERROR_HINTS: tuple[tuple[type[Exception], str, str], ...] = (
         LLMAuthenticationError,
         "authentication",
         (
-            "The provider rejected the credentials — check LLM_API_KEY matches "
-            "the provider in LLM_MODEL's prefix."
+            "The provider rejected the credentials — check CERTO_LLM_API_KEY matches "
+            "the provider in CERTO_LLM_MODEL's prefix."
         ),
     ),
     (
@@ -50,7 +50,7 @@ _ERROR_HINTS: tuple[tuple[type[Exception], str, str], ...] = (
         LLMTimeoutError,
         "timeout",
         (
-            "No answer within the timeout — check LLM_BASE_URL / network, or "
+            "No answer within the timeout — check CERTO_LLM_BASE_URL / network, or "
             "retry with a larger --timeout."
         ),
     ),
@@ -58,7 +58,7 @@ _ERROR_HINTS: tuple[tuple[type[Exception], str, str], ...] = (
         LLMServiceUnavailableError,
         "unavailable",
         (
-            "The provider/endpoint is unreachable or down — check LLM_BASE_URL "
+            "The provider/endpoint is unreachable or down — check CERTO_LLM_BASE_URL "
             "and that a local server (e.g. Ollama) is running."
         ),
     ),
@@ -69,7 +69,7 @@ _ERROR_HINTS: tuple[tuple[type[Exception], str, str], ...] = (
         "model_not_found",
         (
             "The provider doesn't know this model id, or the key has no access "
-            "to it — check the spelling in LLM_MODEL against the provider's "
+            "to it — check the spelling in CERTO_LLM_MODEL against the provider's "
             "current model list."
         ),
     ),
@@ -78,7 +78,7 @@ _ERROR_HINTS: tuple[tuple[type[Exception], str, str], ...] = (
         "bad_request",
         (
             "The request was rejected — often an unknown model id or an option "
-            "the model doesn't support (e.g. LLM_REASONING_EFFORT)."
+            "the model doesn't support (e.g. CERTO_LLM_REASONING_EFFORT)."
         ),
     ),
 )

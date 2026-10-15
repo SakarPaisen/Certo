@@ -37,7 +37,7 @@ drift findings and corrected patterns. Re-verify SDK behavior after upgrades.
    directory (see "SDK references" below). Prefer `get_default_tools()` over
    importing individual tool classes by name. Use `/verify-sdk` for this.
 3. **Preserve the model-agnostic invariant.** Switching provider must require
-   editing only `LLM_MODEL` in `.env` — never a code change. Do not hardcode a
+   editing only `CERTO_LLM_MODEL` in `.env` — never a code change. Do not hardcode a
    model, provider, or base URL anywhere in `src/`.
 4. **Never read or print secrets.** `.env` holds real keys and is git-ignored and
    permission-denied. Use `.env.example` for structure. Never echo key values.
@@ -126,7 +126,7 @@ version was deleted. A bump updates three places, which
   then briefly report what changed and what's next. Use `/next-milestone`.
 - Milestone 3 remains blocked until a second provider key or local model
   endpoint is available. When one is available, run the same task with two
-  different `LLM_MODEL` values to prove the model-agnostic invariant.
+  different `CERTO_LLM_MODEL` values to prove the model-agnostic invariant.
 - Ask before adding heavy optional pieces (Docker execution, server mode) — they
   are section 9 / "optional", not part of the core.
 

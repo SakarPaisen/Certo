@@ -33,7 +33,7 @@ def _reasoning_effort_kwargs(cfg: Config) -> dict[str, str | None]:
       `think: true`, and Ollama rejects that outright for a model with no
       thinking mode ("... does not support thinking"), failing the very
       first call. A thinking-capable Ollama model can still opt in with
-      LLM_REASONING_EFFORT.
+      CERTO_LLM_REASONING_EFFORT.
     - unset, anything else: omit the kwarg so the SDK's "high" applies.
     """
     effort = cfg.reasoning_effort

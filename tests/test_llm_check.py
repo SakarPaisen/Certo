@@ -100,7 +100,7 @@ def test_authentication_error_is_classified_with_a_hint_and_key_scrubbed(monkeyp
 
     assert not result.ok
     assert result.error_kind == "authentication"
-    assert "LLM_API_KEY" in result.hint
+    assert "CERTO_LLM_API_KEY" in result.hint
     assert SECRET not in result.error
     assert "***" in result.error
 
