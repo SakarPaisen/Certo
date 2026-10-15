@@ -197,6 +197,10 @@ class Config:
     # CERTO_LLM_BASE_URL/CERTO_DOCKER_PLATFORM, no separate on/off flag needed.
     artifacts_dir: str = ""
 
+    # CERTO_NO_WORKTREE_WARNING: skip the CLI's note before the agent edits
+    # a folder that already has files (see worktree.py).
+    no_worktree_warning: bool = False
+
 
 # Certo's LLM settings. Up to 0.1.1 Certo read the bare LLM_* names, which other
 # tools use too; those are never read now (another app's LLM_MODEL must not
@@ -572,6 +576,7 @@ def load_config(
     )
     models_file = _get(env, "MODELS_FILE") or DEFAULT_MODELS_FILE
     artifacts_dir = _get(env, "ARTIFACTS_DIR") or ""
+    no_worktree_warning = _parse_bool(env, "NO_WORKTREE_WARNING", default=False)
 
     return Config(
         model=model,
@@ -613,6 +618,7 @@ def load_config(
         model_selection=model_selection,
         models_file=models_file,
         artifacts_dir=artifacts_dir,
+        no_worktree_warning=no_worktree_warning,
     )
 
 

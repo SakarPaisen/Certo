@@ -22,6 +22,7 @@ from .init_cmd import check_main, init_main
 from .model_catalog import ModelCatalogEntry
 from .runner import _build_completion_contract, run_task
 from .skills import write_project_context
+from .worktree import record_created_project, was_created_by_certo, worktree_warning
 
 _URL_FETCH_TIMEOUT_SECONDS = 15
 
@@ -415,9 +416,18 @@ def main(argv: list[str] | None = None) -> int:
         except ConfigError as exc:
             print(f"Configuration error: {exc}", file=sys.stderr)
             return 1
+        created = not os.path.exists(project_dir)
         os.makedirs(project_dir, exist_ok=True)
+        if created:
+            record_created_project(cfg.projects_dir, args.project)
         cfg = replace(cfg, workspace=project_dir)
         print(f"Project workspace: {cfg.workspace}")
+
+    certo_made = args.project is not None and was_created_by_certo(cfg.projects_dir, args.project)
+    if not cfg.no_worktree_warning and not certo_made:
+        warning = worktree_warning(cfg.workspace)
+        if warning:
+            print(warning, file=sys.stderr)
 
     if args.agents_md is not None:
         write_project_context(cfg.workspace, args.agents_md)
