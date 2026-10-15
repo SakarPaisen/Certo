@@ -8,11 +8,12 @@ Made by `certo init`. Run every command below from this folder.
 certo check
 ```
 
-Your model settings are in `.env`. `certo check` makes one small call to
-your model and confirms it can call tools, which Certo's agent needs. If it
-reports a problem, fix `.env` as it says and run it again. To switch
-provider later, comment out the two active lines in `.env` and uncomment
-the two for the provider you want.
+Your model settings are in SETTINGS_FILE. `certo check` shows where each
+setting comes from, then makes one small call to your model and confirms it
+can call tools, which Certo's agent needs. If it reports a problem, fix the
+settings as it says and run it again. To switch provider later, comment out
+the two active lines in that file and uncomment the two for the provider
+you want.
 
 ## 2. Run a task
 

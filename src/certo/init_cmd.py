@@ -33,6 +33,9 @@ from .config import ConfigError, load_config, user_settings_path
 from .llm_check import check_tool_calling, explain
 
 DEFAULT_FOLDER = "certo-workspace"
+# Where `certo init` saves the settings.
+USER_SCOPE = "user"
+FOLDER_SCOPE = "folder"
 README_TITLE = "# Certo workspace"
 
 _STARTER = resources.files("certo").joinpath("starter")
@@ -365,16 +368,19 @@ def _merge_gitignore(path: str, template: str) -> None:
             f.write("\n")
 
 
-def write_workspace(folder: str, env_text: str) -> list[str]:
+def write_workspace(folder: str, env_text: str | None, settings_file: str = "`.env`") -> list[str]:
     """Create FOLDER's files. Returns notes about files kept as they were.
 
-    The caller has already decided overwriting is allowed. A README.md that
-    isn't one `certo init` wrote is kept, since FOLDER may be an existing
-    repo; `.gitignore` only gains the entries it lacks.
+    `env_text` None writes no `.env`: the settings live in the user file,
+    which `settings_file` then names in the README. The caller has already
+    decided overwriting is allowed. A README.md that isn't one `certo init`
+    wrote is kept, since FOLDER may be an existing repo; `.gitignore` only
+    gains the entries it lacks.
     """
     notes = []
     os.makedirs(os.path.join(folder, "tasks"), exist_ok=True)
-    _write_private(os.path.join(folder, ".env"), env_text)
+    if env_text is not None:
+        _write_private(os.path.join(folder, ".env"), env_text)
     _merge_gitignore(
         os.path.join(folder, ".gitignore"),
         _STARTER.joinpath("gitignore").read_text(encoding="utf-8"),
@@ -390,9 +396,29 @@ def write_workspace(folder: str, env_text: str) -> list[str]:
         if not ours:
             notes.append("Kept your existing README.md; Certo's notes were not written.")
             return notes
+    text = _STARTER.joinpath("README.md").read_text(encoding="utf-8")
     with open(readme, "w", encoding="utf-8") as f:
-        f.write(_STARTER.joinpath("README.md").read_text(encoding="utf-8"))
+        f.write(text.replace("SETTINGS_FILE", settings_file))
     return notes
+
+
+def write_user_settings(path: str, env_text: str) -> None:
+    """Write the user settings file (600), creating its folder."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    _write_private(path, env_text)
+
+
+def describe_settings_file(path: str) -> str:
+    """'Anthropic (Claude), model anthropic/x' for an existing settings
+    file. Reads only the model line: the key is never read or shown."""
+    from dotenv import dotenv_values
+
+    model = (dotenv_values(path, interpolate=False).get("CERTO_LLM_MODEL") or "").strip()
+    if not model:
+        return "no model set"
+    provider = _provider_for_model(load_providers(), model)
+    label = provider.label if provider.id != "other" else "another provider"
+    return f"{label}, model {model}"
 
 
 def _provider_name(model: str) -> str | None:
@@ -479,17 +505,18 @@ def build_init_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="certo init",
         description=(
-            "Create a ready-to-use Certo workspace: a minimal .env with your model "
-            "settings, sample tasks, and a README with the next steps. On a "
-            "terminal it asks a few questions; each flag below skips one."
+            "Save your model settings, for all projects on this computer or for "
+            "one folder, and create a folder with sample tasks and a README with "
+            "the next steps. On a terminal it asks a few questions; each flag "
+            "below skips one."
         ),
         epilog=(
             "There is no --api-key flag, on purpose: a key typed on the command "
             "line is saved in your shell history. Type it at the hidden prompt, "
             "or export the provider's own variable (OPENAI_API_KEY, "
             "ANTHROPIC_API_KEY or GEMINI_API_KEY) first and init offers to use it. "
-            "Without a terminal and without flags, nothing is asked and .env is "
-            "written with every provider commented out for you to fill in."
+            "Without a terminal and without flags, nothing is asked and FOLDER/.env "
+            "is written with every provider commented out for you to fill in."
         ),
     )
     parser.add_argument(
@@ -501,7 +528,11 @@ def build_init_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Write into a folder that isn't empty, replacing an existing .env and sample tasks.",
+        help=(
+            "Write into a folder that isn't empty, replacing an existing .env and "
+            "sample tasks. Without a terminal, or with --yes, also needed to "
+            "replace an existing user settings file."
+        ),
     )
     parser.add_argument(
         "--provider",
@@ -519,6 +550,30 @@ def build_init_parser() -> argparse.ArgumentParser:
         default=None,
         help="Server address, for Ollama or a self-hosted model; skips that question.",
     )
+    scope = parser.add_mutually_exclusive_group()
+    scope.add_argument(
+        "--global",
+        dest="scope",
+        action="store_const",
+        const=USER_SCOPE,
+        help=(
+            "Save the settings for all projects on this computer, in the user "
+            "settings file (~/.config/certo/.env, or under $XDG_CONFIG_HOME); "
+            "skips that question. The default with --yes."
+        ),
+    )
+    scope.add_argument(
+        "--local",
+        dest="scope",
+        action="store_const",
+        const=FOLDER_SCOPE,
+        help="Save the settings in FOLDER/.env, for that folder only; skips that question.",
+    )
+    parser.add_argument(
+        "--no-samples",
+        action="store_true",
+        help="With --global: don't create the folder with sample tasks.",
+    )
     parser.add_argument(
         "--no-check",
         action="store_true",
@@ -528,7 +583,10 @@ def build_init_parser() -> argparse.ArgumentParser:
         "--yes",
         "-y",
         action="store_true",
-        help="Ask nothing and accept every default. A key is used only from the environment.",
+        help=(
+            "Ask nothing and accept every default: settings for all projects, "
+            "plus the sample folder. A key is used only from the environment."
+        ),
     )
     return parser
 
@@ -540,30 +598,35 @@ def init_main(
     env: Mapping[str, str] | None = None,
     interactive: bool | None = None,
     fetch_models: Callable[[str], list[str]] = fetch_ollama_models,
+    user_path: str | None = None,
 ) -> int:
+    """`certo init`. `user_path` defaults to `user_settings_path()`."""
     prompter = prompter or Prompter()
     out = prompter.out
     env = os.environ if env is None else env
     interactive = sys.stdin.isatty() if interactive is None else interactive
+    user_path = user_settings_path() if user_path is None else user_path
     args = build_init_parser().parse_args(argv)
     folder = args.folder
+    ask = interactive and not args.yes
+    # Today's behaviour without a terminal: settings in FOLDER/.env, unless
+    # a flag says otherwise. --yes means "all projects", the recommended one.
+    scope = args.scope or (USER_SCOPE if args.yes else None if ask else FOLDER_SCOPE)
 
     if os.path.exists(folder) and not os.path.isdir(folder):
         print(f"Error: {folder} exists and is not a folder.", file=sys.stderr)
         return 1
-    if not args.force:
-        if os.path.exists(os.path.join(folder, ".env")):
-            print(
-                f"Error: {folder}/.env already exists. Use --force to replace it.",
-                file=sys.stderr,
-            )
-            return 1
-        if _folder_has_files(folder):
-            print(
-                f"Error: {folder} is not empty. Use --force to write into it anyway.",
-                file=sys.stderr,
-            )
-            return 1
+    blocked = _folder_blocked(folder, args.force)
+    if blocked and scope == FOLDER_SCOPE:
+        print(f"Error: {blocked}", file=sys.stderr)
+        return 1
+    if scope == USER_SCOPE and not ask and os.path.exists(user_path) and not args.force:
+        print(
+            f"Error: {user_path} already exists ({describe_settings_file(user_path)}). "
+            "Use --force to replace it.",
+            file=sys.stderr,
+        )
+        return 1
 
     providers = load_providers()
     try:
@@ -575,56 +638,136 @@ def init_main(
             interactive=interactive,
             fetch_models=fetch_models,
         )
+        if scope is None:
+            scope = _ask_scope(prompter)
+        if scope == FOLDER_SCOPE and blocked:
+            print(f"Error: {blocked} Nothing was written.", file=sys.stderr)
+            return 1
+        save = True
+        if scope == USER_SCOPE and ask and os.path.exists(user_path):
+            prompter.say(
+                f"You already have settings for all projects in {user_path}: "
+                f"{describe_settings_file(user_path)}."
+            )
+            save = prompter.confirm("Replace them?")
+        samples = scope == FOLDER_SCOPE or _want_samples(args, prompter, ask, blocked)
     except Cancelled:
         print("\nCancelled. Nothing was written.", file=out)
         return 130
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
-    notes = write_workspace(folder, render_env(providers, settings))
+    if ask:
+        prompter.say()
 
-    checkable = settings is not None and (settings.has_key or settings.base_url)
+    env_text = render_env(providers, settings)
+    if scope == USER_SCOPE:
+        settings_path = user_path
+        if save:
+            write_user_settings(user_path, env_text)
+        notes = (
+            write_workspace(folder, None, f"the user settings file, `{user_path}`")
+            if samples
+            else []
+        )
+    else:
+        settings_path = os.path.join(folder, ".env")
+        notes = write_workspace(folder, env_text)
+
     checked_ok = None
+    checkable = save and settings is not None and (settings.has_key or settings.base_url)
     if checkable and not args.no_check:
         checked_ok = run_check(_settings_env(settings, env), out)
         if not checked_ok:
+            where = "" if scope == USER_SCOPE else " in that folder"
             print(
-                f"Your settings are saved in {os.path.join(folder, '.env')}. Fix them "
-                "as described, then run certo check in that folder.",
+                f"Your settings are saved in {settings_path}. Fix them as described, "
+                f"then run certo check{where}.",
                 file=out,
             )
         print(file=out)
 
-    if settings is not None and interactive and not args.yes:
-        print(file=out)
-    shown = folder.rstrip("/") + "/"
-    print(f"Created {shown}", file=out)
-    print("  .env          your settings (not committed to git)", file=out)
-    print("  tasks/        sample tasks to try", file=out)
-    print("  README.md     what to do next", file=out)
-    for note in notes:
-        print(note, file=out)
-    if shutil.which("node") is None:
+    if scope == USER_SCOPE:
+        if save:
+            print(f"Saved your settings for all projects in {settings_path}", file=out)
+        else:
+            print(
+                f"Kept your settings in {settings_path}; your new answers were not saved.", file=out
+            )
+    if samples:
+        shown = folder.rstrip("/") + "/"
+        print(f"Created {shown}", file=out)
+        if scope == FOLDER_SCOPE:
+            print("  .env          your settings (not committed to git)", file=out)
+        print("  tasks/        sample tasks to try", file=out)
+        print("  README.md     what to do next", file=out)
+        for note in notes:
+            print(note, file=out)
+        if shutil.which("node") is None:
+            print(
+                "\ntasks/asteroids.md needs Node 18 or newer, which isn't installed here. "
+                "Start with Wordle.",
+                file=out,
+            )
+    elif blocked and scope == USER_SCOPE and not args.no_samples:
         print(
-            "\ntasks/asteroids.md needs Node 18 or newer, which isn't installed here. "
-            "Start with Wordle.",
+            f"Skipped the sample folder: {blocked} The settings don't need it.",
             file=out,
         )
-    if settings is None:
+    if save and settings is None:
         print(
-            "\nNo terminal, so nothing was asked: .env has no model set yet. Open it "
-            "and uncomment the lines for your provider.",
+            f"\nNo terminal, so nothing was asked: {settings_path} has no model set yet. "
+            "Open it and uncomment the lines for your provider.",
             file=out,
         )
-    elif not settings.has_key and settings.provider.id != "ollama" and not settings.base_url:
+    elif (
+        save and not settings.has_key and settings.provider.id != "ollama" and not settings.base_url
+    ):
         print(
-            "\nNo API key yet. Open .env and paste it after CERTO_LLM_API_KEY=.",
+            f"\nNo API key yet. Open {settings_path} and paste it after CERTO_LLM_API_KEY=.",
             file=out,
         )
+
     print("\nNext:", file=out)
-    if os.path.abspath(folder) != os.getcwd():
+    if samples and os.path.abspath(folder) != os.getcwd():
         print(f"  cd {folder}", file=out)
     if checked_ok is not True:
         print("  certo check", file=out)
-    print("  certo tasks/wordle.md --project wordle", file=out)
+    if samples:
+        print("  certo tasks/wordle.md --project wordle", file=out)
+    if scope == USER_SCOPE:
+        print(
+            '\nYou can now run certo "<task>" in any project folder: the settings apply '
+            "to every folder on this computer.",
+            file=out,
+        )
     return 0
+
+
+def _folder_blocked(folder: str, force: bool) -> str | None:
+    """Why `init` mustn't write into FOLDER, or None when it may."""
+    if force:
+        return None
+    if os.path.exists(os.path.join(folder, ".env")):
+        return f"{folder}/.env already exists. Use --force to replace it."
+    if _folder_has_files(folder):
+        return f"{folder} is not empty. Use --force to write into it anyway."
+    return None
+
+
+def _ask_scope(prompter: Prompter) -> str:
+    index = prompter.choose(
+        "Save these settings for:",
+        ["All projects on this computer (recommended)", "This folder only"],
+    )
+    return (USER_SCOPE, FOLDER_SCOPE)[index]
+
+
+def _want_samples(
+    args: argparse.Namespace, prompter: Prompter, ask: bool, blocked: str | None
+) -> bool:
+    if args.no_samples or blocked:
+        return False
+    if not ask:
+        return True
+    return prompter.confirm("Create a folder with sample tasks to try?")

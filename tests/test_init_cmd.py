@@ -86,9 +86,16 @@ def checks(monkeypatch):
     return seen
 
 
-def _run(tmp_path, monkeypatch, argv, script=None, *, env=None, interactive=True, models=None):
+def _run(
+    tmp_path, monkeypatch, argv, script=None, *, env=None, interactive=True, models=None, local=True
+):
+    """Run init in tmp_path. Unless `local` is False or argv picks a scope
+    itself, adds --local: most tests here are about FOLDER/.env."""
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
     script = script or Script()
+    if local and not {"--global", "--local", "--yes", "-y"} & set(argv):
+        argv = [*argv, "--local"]
 
     def fetch(_url):
         if isinstance(models, Exception):
@@ -299,10 +306,205 @@ def test_yes_accepts_every_default_without_asking(tmp_path, monkeypatch, checks)
 
     assert code == 0
     assert script.prompts == []
-    assert _active(tmp_path / "w") == [
+    assert _active_lines(_user_file(tmp_path)) == [
         "CERTO_LLM_MODEL=gemini/gemini-3.8-flash",
         "CERTO_LLM_API_KEY=${GEMINI_API_KEY}",
     ]
+    assert not (tmp_path / "w" / ".env").exists()
+    assert (tmp_path / "w" / "tasks" / "wordle.md").exists()
+
+
+def test_yes_with_local_writes_the_folder_env(tmp_path, monkeypatch, checks):
+    code, _ = _run(tmp_path, monkeypatch, ["w", "--yes", "--local"], env={"GEMINI_API_KEY": SECRET})
+
+    assert code == 0
+    assert _active(tmp_path / "w")[0] == "CERTO_LLM_MODEL=gemini/gemini-3.8-flash"
+    assert not _user_file(tmp_path).exists()
+
+
+# --- where the settings are saved ---------------------------------------------
+
+
+def _user_file(tmp_path):
+    return tmp_path / "xdg" / "certo" / ".env"
+
+
+def _active_lines(path):
+    return [line for line in path.read_text().splitlines() if line and not line.startswith("#")]
+
+
+def test_all_projects_writes_the_user_file_and_a_sample_folder_without_env(
+    tmp_path, monkeypatch, checks
+):
+    script = Script(answers=["2", "", "", ""], secrets=[SECRET])
+
+    code, script = _run(tmp_path, monkeypatch, ["w"], script, local=False)
+
+    assert code == 0
+    assert script.prompts == [
+        "Choice [1]: ",
+        "Model [anthropic/claude-sonnet-5-5]: ",
+        "API key (hidden): ",
+        "Choice [1]: ",
+        "Create a folder with sample tasks to try? [Y/n]: ",
+    ]
+    assert "Save these settings for:\n  1. All projects on this computer (recommended)\n" \
+        "  2. This folder only\n" in script.text  # fmt: skip
+    user = _user_file(tmp_path)
+    assert stat.S_IMODE(os.stat(user).st_mode) == 0o600
+    assert dotenv_values(user)["CERTO_LLM_API_KEY"] == SECRET
+    folder = tmp_path / "w"
+    assert sorted(p.name for p in folder.iterdir()) == [".gitignore", "README.md", "tasks"]
+    readme = (folder / "README.md").read_text()
+    assert str(user) in readme
+    assert "SETTINGS_FILE" not in readme
+    assert f"Saved your settings for all projects in {user}" in script.text
+    assert "  .env " not in script.text
+    assert "cd w\n" in script.text
+    assert 'certo "<task>" in any project folder' in script.text
+    assert SECRET not in script.text
+
+
+def test_all_projects_without_samples_creates_no_folder(tmp_path, monkeypatch, checks):
+    script = Script(answers=["2", "", "1", "n"], secrets=[SECRET])
+
+    code, script = _run(tmp_path, monkeypatch, ["w"], script, local=False)
+
+    assert code == 0
+    assert _user_file(tmp_path).exists()
+    assert not (tmp_path / "w").exists()
+    next_steps = script.text.split("Next:", 1)[1]
+    assert "cd w" not in next_steps
+    assert "wordle" not in next_steps
+    assert 'You can now run certo "<task>" in any project folder' in next_steps
+
+
+def test_this_folder_only_is_todays_behaviour(tmp_path, monkeypatch, checks):
+    script = Script(answers=["2", "", "2"], secrets=[SECRET])
+
+    code, script = _run(tmp_path, monkeypatch, ["w"], script, local=False)
+
+    assert code == 0
+    assert _active(tmp_path / "w")[0] == "CERTO_LLM_MODEL=anthropic/claude-sonnet-5-5"
+    assert not _user_file(tmp_path).exists()
+    assert "sample tasks to try? [Y/n]" not in script.text
+    assert "any project folder" not in script.text
+
+
+def _existing_user_file(tmp_path):
+    user = _user_file(tmp_path)
+    user.parent.mkdir(parents=True)
+    user.write_text(f"CERTO_LLM_MODEL=openai/old-model\nCERTO_LLM_API_KEY={SECRET}\n")
+    return user
+
+
+def test_an_existing_user_file_is_shown_without_its_key_and_kept_on_no(
+    tmp_path, monkeypatch, no_check
+):
+    user = _existing_user_file(tmp_path)
+    before = user.read_text()
+    script = Script(answers=["3", "", "1", "n", "n"], secrets=["other-key"])
+
+    code, script = _run(tmp_path, monkeypatch, ["w"], script, local=False)
+
+    assert code == 0
+    assert "OpenAI, model openai/old-model" in script.text
+    assert "Replace them? [Y/n]: " in script.prompts
+    assert SECRET not in script.text
+    assert user.read_text() == before
+    assert "your new answers were not saved" in script.text
+
+
+def test_an_existing_user_file_is_replaced_on_yes(tmp_path, monkeypatch, checks):
+    user = _existing_user_file(tmp_path)
+    script = Script(answers=["3", "", "1", "y", "n"], secrets=["other-key"])
+
+    code, _ = _run(tmp_path, monkeypatch, ["w"], script, local=False)
+
+    assert code == 0
+    assert _active_lines(user)[0] == "CERTO_LLM_MODEL=gemini/gemini-3.8-flash"
+    assert stat.S_IMODE(os.stat(user).st_mode) == 0o600
+
+
+def test_without_asking_an_existing_user_file_needs_force(tmp_path, monkeypatch, no_check, capsys):
+    user = _existing_user_file(tmp_path)
+    before = user.read_text()
+
+    code, _ = _run(tmp_path, monkeypatch, ["w", "--yes", "--no-check"], interactive=False)
+
+    err = capsys.readouterr().err
+    assert code == 1
+    assert "openai/old-model" in err
+    assert "--force" in err
+    assert SECRET not in err
+    assert user.read_text() == before
+    assert not (tmp_path / "w").exists()
+
+    code, _ = _run(
+        tmp_path, monkeypatch, ["w", "--yes", "--no-check", "--force"], interactive=False
+    )
+    assert code == 0
+    assert user.read_text() != before
+
+
+def test_global_with_a_used_sample_folder_saves_settings_and_skips_samples(
+    tmp_path, monkeypatch, no_check
+):
+    (tmp_path / "w").mkdir()
+    (tmp_path / "w" / "notes.txt").write_text("mine")
+
+    code, script = _run(
+        tmp_path, monkeypatch, ["w", "--global", "--provider", "ollama", "--no-check"],
+        interactive=False,
+    )  # fmt: skip
+
+    assert code == 0
+    assert _active_lines(_user_file(tmp_path))[0] == "CERTO_LLM_MODEL=ollama/qwen3-coder:30b"
+    assert sorted(os.listdir(tmp_path / "w")) == ["notes.txt"]
+    assert "Skipped the sample folder" in script.text
+
+
+def test_choosing_this_folder_for_a_used_folder_is_refused(tmp_path, monkeypatch, no_check, capsys):
+    (tmp_path / "w").mkdir()
+    (tmp_path / "w" / "notes.txt").write_text("mine")
+    script = Script(answers=["4", "", "", "2"], secrets=[])
+
+    code, _ = _run(tmp_path, monkeypatch, ["w"], script, local=False, models=OSError("down"))
+
+    assert code == 1
+    assert "not empty" in capsys.readouterr().err
+    assert sorted(os.listdir(tmp_path / "w")) == ["notes.txt"]
+    assert not _user_file(tmp_path).exists()
+
+
+def test_no_terminal_without_flags_still_writes_the_folder_env(tmp_path, monkeypatch, no_check):
+    code, _ = _run(tmp_path, monkeypatch, ["w"], interactive=False, local=False)
+
+    assert code == 0
+    assert (tmp_path / "w" / ".env").exists()
+    assert not _user_file(tmp_path).exists()
+
+
+def test_ctrl_c_at_the_scope_question_writes_nothing(tmp_path, monkeypatch, no_check):
+    script = Script(answers=["2", ""], secrets=[SECRET])  # runs out at the scope question
+
+    def stop(prompt):
+        if script.answers:
+            return script._input(prompt)
+        raise EOFError
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    code = init_main(
+        ["w"],
+        prompter=Prompter(input_fn=stop, secret_fn=script._secret, out=script.out),
+        env={},
+        interactive=True,
+    )
+
+    assert code == 130
+    assert not (tmp_path / "w").exists()
+    assert not _user_file(tmp_path).exists()
 
 
 def test_ctrl_c_during_questions_writes_nothing(tmp_path, monkeypatch, no_check):
