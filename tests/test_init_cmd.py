@@ -1,0 +1,728 @@
+"""`certo init` and `certo check` (init_cmd.py), plus the tool-calling check
+and its plain-language messages (llm_check.py).
+
+No network and no real model: questions go through a scripted Prompter,
+the Ollama model list is a fake function, and the model check is either
+monkeypatched or sent to a local fake Ollama server.
+"""
+
+from __future__ import annotations
+
+import io
+import json
+import logging
+import os
+import stat
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from types import SimpleNamespace
+from typing import ClassVar
+
+import pytest
+from dotenv import dotenv_values
+from openhands.sdk.llm.message import MessageToolCall
+
+from certo import cli, init_cmd, llm_check
+from certo.config import load_config
+from certo.init_cmd import Prompter, init_main
+from certo.llm_check import LLMCheckResult, explain
+
+SECRET = "sk-test-SECRET-value-1234"
+
+
+class Script:
+    """A scripted terminal: answers in order, records every prompt."""
+
+    def __init__(self, answers=(), secrets=()):
+        self.answers = list(answers)
+        self.secrets = list(secrets)
+        self.prompts = []
+        self.out = io.StringIO()
+
+    def _input(self, prompt):
+        self.prompts.append(prompt)
+        self.out.write(prompt)
+        if not self.answers:
+            raise AssertionError(f"unexpected question: {prompt!r}")
+        return self.answers.pop(0)
+
+    def _secret(self, prompt):
+        self.prompts.append(prompt)
+        self.out.write(prompt + "\n")  # getpass echoes nothing
+        if not self.secrets:
+            raise AssertionError(f"unexpected secret prompt: {prompt!r}")
+        return self.secrets.pop(0)
+
+    def prompter(self):
+        return Prompter(input_fn=self._input, secret_fn=self._secret, out=self.out)
+
+    @property
+    def text(self):
+        return self.out.getvalue()
+
+
+def _ok(cfg, **_kw):
+    return LLMCheckResult(ok=True, model=cfg.model, base_url=cfg.base_url, latency_seconds=0.1)
+
+
+@pytest.fixture
+def no_check(monkeypatch):
+    """Fail the test if a model check is attempted."""
+    monkeypatch.setattr(
+        init_cmd, "check_tool_calling", lambda *a, **k: pytest.fail("no check expected")
+    )
+
+
+@pytest.fixture
+def checks(monkeypatch):
+    """Record model checks and pass them."""
+    seen = []
+
+    def fake(cfg, **kw):
+        seen.append(cfg)
+        return _ok(cfg)
+
+    monkeypatch.setattr(init_cmd, "check_tool_calling", fake)
+    return seen
+
+
+def _run(tmp_path, monkeypatch, argv, script=None, *, env=None, interactive=True, models=None):
+    monkeypatch.chdir(tmp_path)
+    script = script or Script()
+
+    def fetch(_url):
+        if isinstance(models, Exception):
+            raise models
+        return list(models or [])
+
+    code = init_main(
+        argv,
+        prompter=script.prompter(),
+        env=env or {},
+        interactive=interactive,
+        fetch_models=fetch,
+    )
+    return code, script
+
+
+def _active(folder):
+    """The uncommented settings of folder/.env, uninterpolated."""
+    lines = (folder / ".env").read_text().splitlines()
+    return [line for line in lines if line and not line.startswith("#")]
+
+
+# --- the question flow -------------------------------------------------------
+
+
+def test_interactive_anthropic_flow_writes_only_the_chosen_settings(tmp_path, monkeypatch, checks):
+    script = Script(answers=["2", ""], secrets=[SECRET])
+
+    code, script = _run(tmp_path, monkeypatch, ["my-certo"], script)
+
+    assert code == 0
+    assert script.prompts == [
+        "Choice [1]: ",
+        "Model [anthropic/claude-sonnet-5-5]: ",
+        "API key (hidden): ",
+    ]
+    folder = tmp_path / "my-certo"
+    assert _active(folder) == [
+        "CERTO_LLM_MODEL=anthropic/claude-sonnet-5-5",
+        f"CERTO_LLM_API_KEY='{SECRET}'",
+    ]
+    assert dotenv_values(folder / ".env")["CERTO_LLM_API_KEY"] == SECRET
+    assert "ok: reachable, tool calling works." in script.text
+    assert "cd my-certo" in script.text
+    assert checks[0].model == "anthropic/claude-sonnet-5-5"
+    assert checks[0].api_key == SECRET
+
+
+def test_provider_menu_lists_the_five_choices_in_order(tmp_path, monkeypatch, checks):
+    _code, script = _run(tmp_path, monkeypatch, [], Script(answers=["", ""], secrets=[SECRET]))
+
+    menu = script.text.split("Which model provider do you want to use?\n", 1)[1]
+    assert menu.splitlines()[:5] == [
+        "  1. OpenAI",
+        "  2. Anthropic (Claude)",
+        "  3. Google Gemini",
+        "  4. Ollama (local models, no API key)",
+        "  5. Other (any LiteLLM model id)",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("choice", "model", "other_presets"),
+    [
+        ("1", "openai/gpt-6.1-sol", ["Anthropic (Claude)", "Google Gemini", "Ollama"]),
+        ("2", "anthropic/claude-sonnet-5-5", ["OpenAI", "Google Gemini", "Ollama"]),
+        ("3", "gemini/gemini-3.8-flash", ["OpenAI", "Anthropic (Claude)", "Ollama"]),
+    ],
+)
+def test_cloud_provider_env(tmp_path, monkeypatch, checks, choice, model, other_presets):
+    _run(tmp_path, monkeypatch, ["w"], Script(answers=[choice, ""], secrets=[SECRET]))
+
+    text = (tmp_path / "w" / ".env").read_text()
+    assert _active(tmp_path / "w") == [f"CERTO_LLM_MODEL={model}", f"CERTO_LLM_API_KEY='{SECRET}'"]
+    for label in other_presets:
+        assert f"# {label}" in text
+    # The chosen provider's preset isn't repeated below.
+    assert text.count(model) == 1
+    # Every preset is two lines a user uncomments.
+    assert (
+        "# CERTO_LLM_MODEL=ollama/qwen3-coder:30b\n# CERTO_LLM_BASE_URL=http://localhost:11434"
+        in (text)
+    )
+
+
+def test_a_typed_model_without_prefix_gets_the_providers(tmp_path, monkeypatch, checks):
+    _run(tmp_path, monkeypatch, ["w"], Script(answers=["2", "claude-haiku-5-5"], secrets=[SECRET]))
+
+    assert _active(tmp_path / "w")[0] == "CERTO_LLM_MODEL=anthropic/claude-haiku-5-5"
+
+
+def test_ollama_lists_installed_models_and_preselects_a_coder(tmp_path, monkeypatch, checks):
+    script = Script(answers=["4", "gpu-box:11434", ""])
+
+    _run(tmp_path, monkeypatch, ["w"], script, models=["llama3.2:3b", "qwen3-coder:30b"])
+
+    assert script.prompts == [
+        "Choice [1]: ",
+        "Ollama address [http://localhost:11434]: ",
+        "Choice [2]: ",
+    ]
+    assert _active(tmp_path / "w") == [
+        "CERTO_LLM_MODEL=ollama/qwen3-coder:30b",
+        "CERTO_LLM_BASE_URL=http://gpu-box:11434",
+    ]
+    assert "local model may take a minute" in script.text
+    assert "Anthropic (Claude)" in (tmp_path / "w" / ".env").read_text()
+
+
+def test_ollama_unreachable_says_so_and_still_writes(tmp_path, monkeypatch, no_check):
+    script = Script(answers=["4", "", ""])
+
+    _run(tmp_path, monkeypatch, ["w", "--no-check"], script, models=OSError("refused"))
+
+    assert "Couldn't reach Ollama at http://localhost:11434" in script.text
+    assert "OLLAMA_HOST=0.0.0.0" in script.text
+    assert _active(tmp_path / "w") == [
+        "CERTO_LLM_MODEL=ollama/qwen3-coder:30b",
+        "CERTO_LLM_BASE_URL=http://localhost:11434",
+    ]
+
+
+def test_ollama_without_models_prints_the_pull_commands(tmp_path, monkeypatch, no_check):
+    script = Script(answers=["4", "", ""])
+
+    _run(tmp_path, monkeypatch, ["w", "--no-check"], script, models=[])
+
+    assert "ollama pull qwen3-coder:30b" in script.text
+    assert "ollama pull qwen2.5-coder:7b" in script.text
+
+
+def test_other_asks_for_any_litellm_id_and_optional_key_and_url(tmp_path, monkeypatch, checks):
+    script = Script(answers=["5", "deepseek/deepseek-chat", ""], secrets=[SECRET])
+
+    _run(tmp_path, monkeypatch, ["w"], script)
+
+    assert _active(tmp_path / "w") == [
+        "CERTO_LLM_MODEL=deepseek/deepseek-chat",
+        f"CERTO_LLM_API_KEY='{SECRET}'",
+    ]
+    text = (tmp_path / "w" / ".env").read_text()
+    for label in ("OpenAI", "Anthropic (Claude)", "Google Gemini", "Ollama"):
+        assert f"# {label}" in text
+
+
+def test_found_environment_key_preselects_its_provider_and_is_referenced(
+    tmp_path, monkeypatch, checks
+):
+    script = Script(answers=["", "", ""])
+
+    _run(tmp_path, monkeypatch, ["w"], script, env={"ANTHROPIC_API_KEY": SECRET})
+
+    assert script.prompts == [
+        "Choice [2]: ",
+        "Model [anthropic/claude-sonnet-5-5]: ",
+        "Found ANTHROPIC_API_KEY in your environment. Use it? [Y/n]: ",
+    ]
+    assert _active(tmp_path / "w")[1] == "CERTO_LLM_API_KEY=${ANTHROPIC_API_KEY}"
+    assert SECRET not in (tmp_path / "w" / ".env").read_text()
+    assert checks[0].api_key == SECRET
+
+
+def test_declining_the_environment_key_asks_for_one(tmp_path, monkeypatch, checks):
+    script = Script(answers=["", "", "n"], secrets=["sk-other"])
+
+    _run(tmp_path, monkeypatch, ["w"], script, env={"OPENAI_API_KEY": SECRET})
+
+    assert script.prompts[-1] == "API key (hidden): "
+    assert _active(tmp_path / "w")[1] == "CERTO_LLM_API_KEY='sk-other'"
+
+
+def test_no_key_entered_leaves_the_line_to_fill_and_skips_the_check(
+    tmp_path, monkeypatch, no_check
+):
+    _code, script = _run(tmp_path, monkeypatch, ["w"], Script(answers=["1", ""], secrets=[""]))
+
+    assert _active(tmp_path / "w")[1] == "CERTO_LLM_API_KEY="
+    assert "platform.openai.com/api-keys" in (tmp_path / "w" / ".env").read_text()
+    assert "No API key yet" in script.text
+    assert "  certo check" in script.text
+
+
+def test_flags_skip_their_questions(tmp_path, monkeypatch, checks):
+    script = Script(secrets=[SECRET])
+
+    _run(tmp_path, monkeypatch, ["w", "--provider", "gemini", "--model", "gemini-x"], script)
+
+    assert script.prompts == ["API key (hidden): "]
+    assert _active(tmp_path / "w")[0] == "CERTO_LLM_MODEL=gemini/gemini-x"
+
+
+def test_model_flag_alone_infers_the_provider(tmp_path, monkeypatch, no_check):
+    _run(
+        tmp_path,
+        monkeypatch,
+        ["w", "--model", "ollama/qwen2.5-coder:7b", "--base-url", "http://h:1", "--no-check"],
+        interactive=False,
+    )
+
+    assert _active(tmp_path / "w") == [
+        "CERTO_LLM_MODEL=ollama/qwen2.5-coder:7b",
+        "CERTO_LLM_BASE_URL=http://h:1",
+    ]
+
+
+def test_yes_accepts_every_default_without_asking(tmp_path, monkeypatch, checks):
+    code, script = _run(tmp_path, monkeypatch, ["w", "--yes"], env={"GEMINI_API_KEY": SECRET})
+
+    assert code == 0
+    assert script.prompts == []
+    assert _active(tmp_path / "w") == [
+        "CERTO_LLM_MODEL=gemini/gemini-3.8-flash",
+        "CERTO_LLM_API_KEY=${GEMINI_API_KEY}",
+    ]
+
+
+def test_ctrl_c_during_questions_writes_nothing(tmp_path, monkeypatch, no_check):
+    def interrupted(_prompt):
+        raise KeyboardInterrupt
+
+    monkeypatch.chdir(tmp_path)
+    out = io.StringIO()
+    code = init_main(
+        ["w"], prompter=Prompter(input_fn=interrupted, out=out), env={}, interactive=True
+    )
+
+    assert code == 130
+    assert "Nothing was written" in out.getvalue()
+    assert not (tmp_path / "w").exists()
+
+
+def test_invalid_choice_is_asked_again(tmp_path, monkeypatch, checks):
+    script = Script(answers=["9", "x", "1", ""], secrets=[SECRET])
+
+    _run(tmp_path, monkeypatch, ["w"], script)
+
+    assert script.text.count("Please enter a number from 1 to 5.") == 2
+
+
+# --- no terminal ---------------------------------------------------------------
+
+
+def test_no_terminal_asks_nothing_and_comments_out_every_preset(tmp_path, monkeypatch, no_check):
+    code, script = _run(tmp_path, monkeypatch, ["w"], interactive=False)
+
+    assert code == 0
+    assert script.prompts == []
+    assert _active(tmp_path / "w") == []
+    text = (tmp_path / "w" / ".env").read_text()
+    for model in ("openai/", "anthropic/", "gemini/", "ollama/"):
+        assert f"# CERTO_LLM_MODEL={model}" in text
+    assert "No terminal, so nothing was asked" in script.text
+
+
+def test_no_terminal_other_without_model_is_an_error(tmp_path, monkeypatch, no_check, capsys):
+    code, _script = _run(tmp_path, monkeypatch, ["w", "--provider", "other"], interactive=False)
+
+    assert code == 1
+    assert "--provider other needs --model" in capsys.readouterr().err
+    assert not (tmp_path / "w").exists()
+
+
+# --- files and overwrite protection --------------------------------------------
+
+
+def test_creates_the_workspace_files(tmp_path, monkeypatch, no_check):
+    _run(tmp_path, monkeypatch, [], interactive=False)
+
+    folder = tmp_path / "certo-workspace"
+    assert stat.S_IMODE(os.stat(folder / ".env").st_mode) == 0o600
+    assert (folder / ".gitignore").read_text().splitlines()[1:] == [
+        ".env",
+        "# What Certo builds and records.",
+        "projects/",
+        "artifacts/",
+    ]
+    assert sorted(p.name for p in (folder / "tasks").iterdir()) == ["asteroids.md", "wordle.md"]
+    readme = (folder / "README.md").read_text()
+    assert readme.startswith(init_cmd.README_TITLE)
+    for needle in ("certo check", "certo verify", "cost", "OLLAMA_CONTEXT_LENGTH", "projects/"):
+        assert needle in readme
+
+
+def test_existing_non_empty_folder_is_refused(tmp_path, monkeypatch, no_check, capsys):
+    (tmp_path / "w").mkdir()
+    (tmp_path / "w" / "notes.txt").write_text("mine")
+
+    code, _ = _run(tmp_path, monkeypatch, ["w"], interactive=False)
+
+    assert code == 1
+    assert "not empty" in capsys.readouterr().err
+    assert sorted(os.listdir(tmp_path / "w")) == ["notes.txt"]
+
+
+def test_existing_env_is_refused_before_any_question(tmp_path, monkeypatch, no_check, capsys):
+    (tmp_path / "w").mkdir()
+    (tmp_path / "w" / ".env").write_text("CERTO_LLM_MODEL=mine\n")
+
+    code, script = _run(tmp_path, monkeypatch, ["w"])
+
+    assert code == 1
+    assert script.prompts == []
+    assert "--force" in capsys.readouterr().err
+    assert (tmp_path / "w" / ".env").read_text() == "CERTO_LLM_MODEL=mine\n"
+
+
+def test_empty_existing_folder_is_fine(tmp_path, monkeypatch, no_check):
+    (tmp_path / "w").mkdir()
+
+    code, _ = _run(tmp_path, monkeypatch, ["w"], interactive=False)
+
+    assert code == 0
+
+
+def test_force_replaces_env_but_keeps_a_foreign_readme_and_merges_gitignore(
+    tmp_path, monkeypatch, no_check
+):
+    folder = tmp_path / "w"
+    folder.mkdir()
+    (folder / ".env").write_text("OLD=1\n")
+    (folder / "README.md").write_text("# My project\n")
+    (folder / ".gitignore").write_text("node_modules/\n.env\n")
+
+    code, script = _run(tmp_path, monkeypatch, ["w", "--force"], interactive=False)
+
+    assert code == 0
+    assert "OLD=1" not in (folder / ".env").read_text()
+    assert stat.S_IMODE(os.stat(folder / ".env").st_mode) == 0o600
+    assert (folder / "README.md").read_text() == "# My project\n"
+    assert "Kept your existing README.md" in script.text
+    assert (folder / ".gitignore").read_text() == "node_modules/\n.env\nprojects/\nartifacts/\n"
+
+
+def test_force_refreshes_a_readme_init_wrote(tmp_path, monkeypatch, no_check):
+    _run(tmp_path, monkeypatch, ["w"], interactive=False)
+    (tmp_path / "w" / "README.md").write_text(init_cmd.README_TITLE + "\nold\n")
+
+    _run(tmp_path, monkeypatch, ["w", "--force"], interactive=False)
+
+    assert "certo check" in (tmp_path / "w" / "README.md").read_text()
+
+
+def test_missing_node_is_mentioned(tmp_path, monkeypatch, no_check):
+    monkeypatch.setattr(init_cmd.shutil, "which", lambda _name: None)
+
+    _code, script = _run(tmp_path, monkeypatch, ["w"], interactive=False)
+
+    assert "asteroids.md needs Node 18 or newer" in script.text
+    assert (tmp_path / "w" / "tasks" / "asteroids.md").exists()
+
+
+# --- the key never leaks -------------------------------------------------------
+
+
+def test_key_never_appears_in_output_or_logs(tmp_path, monkeypatch, caplog, capsys):
+    def failing_check(cfg, **_kw):
+        logging.getLogger("certo").debug("checking %s", cfg.model)
+        return llm_check._failure(cfg, RuntimeError(f"denied for key {SECRET}"), 0.0)
+
+    monkeypatch.setattr(init_cmd, "check_tool_calling", failing_check)
+    caplog.set_level(logging.DEBUG)
+    script = Script(answers=["2", ""], secrets=[SECRET])
+
+    code, script = _run(tmp_path, monkeypatch, ["w"], script)
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert SECRET not in script.text
+    assert SECRET not in captured.out + captured.err
+    assert SECRET not in caplog.text
+    assert "***" in script.text  # scrubbed, not dropped
+    assert SECRET not in repr(init_cmd.Settings(init_cmd.load_providers()[0], "m", api_key=SECRET))
+
+
+# --- the model check -----------------------------------------------------------
+
+
+def test_failed_check_keeps_the_files_and_points_to_certo_check(tmp_path, monkeypatch):
+    def bad_key(cfg, **_kw):
+        return LLMCheckResult(
+            ok=False, model=cfg.model, base_url=None, latency_seconds=0.1,
+            error_kind="authentication", error="AuthenticationError: invalid x-api-key",
+        )  # fmt: skip
+
+    monkeypatch.setattr(init_cmd, "check_tool_calling", bad_key)
+
+    _code, script = _run(tmp_path, monkeypatch, ["w"], Script(answers=["2", ""], secrets=[SECRET]))
+
+    assert "Anthropic rejected the API key" in script.text
+    assert "then run certo check in that folder" in script.text
+    assert (tmp_path / "w" / ".env").exists()
+    assert "  certo check" in script.text
+
+
+def test_no_check_flag_skips_the_call(tmp_path, monkeypatch, no_check):
+    code, _ = _run(
+        tmp_path, monkeypatch, ["w", "--no-check"], Script(answers=["2", ""], secrets=[SECRET])
+    )
+
+    assert code == 0
+
+
+def _result(kind=None, error="", model="anthropic/claude-sonnet-5-5", base_url=None):
+    return LLMCheckResult(
+        ok=False, model=model, base_url=base_url, latency_seconds=0.1,
+        error_kind=kind, error=error,
+    )  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    ("result", "expected"),
+    [
+        (_result("authentication", "invalid x-api-key"), "Anthropic rejected the API key"),
+        (_result("rate_limit", "429"), "out of credit, or it is being rate limited"),
+        (
+            _result("bad_request", "Your credit balance is too low to access the API"),
+            "out of credit",
+        ),
+        (_result("bad_request", "insufficient_quota"), "out of credit"),
+        (
+            _result("model_not_found", "NotFoundError: model: claude-x"),
+            "doesn't know the model anthropic/claude-sonnet-5-5",
+        ),
+        (
+            _result(
+                "unavailable",
+                'model "qwen3-coder:30b" not found, try pulling it first',
+                model="ollama/qwen3-coder:30b",
+                base_url="http://h:11434",
+            ),
+            "ollama pull qwen3-coder:30b",
+        ),
+        (
+            _result("unavailable", "Connection refused", base_url="http://h:11434"),
+            "Couldn't reach the server at http://h:11434",
+        ),
+        (_result("timeout", "timed out"), "Couldn't reach Anthropic"),
+        (
+            _result("bad_request", "registry.ollama.ai/library/llama2 does not support tools"),
+            "doesn't support tool calling",
+        ),
+        (_result("no_tool_call", "no tool call"), "answered, but without calling a tool"),
+        (_result("setup", "context window too small"), "can't use this model"),
+        (_result("error", "boom"), "The check failed: boom"),
+    ],
+)
+def test_explain_names_the_problem_and_the_fix(result, expected):
+    assert expected in explain(result, "Anthropic")
+
+
+def test_explain_ok():
+    ok = LLMCheckResult(ok=True, model="m", base_url=None, latency_seconds=0.1)
+    assert explain(ok) == "ok: reachable, tool calling works."
+
+
+def _tool_response(calls):
+    return SimpleNamespace(
+        message=SimpleNamespace(tool_calls=calls),
+        metrics=SimpleNamespace(accumulated_token_usage=None, accumulated_cost=0.0),
+    )
+
+
+@pytest.mark.parametrize(("calls", "ok"), [(None, False), ([], False), (["call"], True)])
+def test_check_tool_calling_passes_only_on_a_tool_call(monkeypatch, calls, ok):
+    sent = {}
+    if calls:
+        calls = [MessageToolCall(id="1", name="finish", arguments="{}", origin="completion")]
+
+    class FakeLLM:
+        def model_copy(self, *, update):
+            sent["update"] = update
+            return self
+
+    def fake_completion(llm, messages, tools):
+        sent["tools"] = [t.name for t in tools]
+        return _tool_response(calls)
+
+    monkeypatch.setattr(llm_check, "build_llm", lambda cfg, usage_id: FakeLLM())
+    monkeypatch.setattr(llm_check, "make_llm_completion", fake_completion)
+
+    result = llm_check.check_tool_calling(
+        load_config({"CERTO_LLM_MODEL": "x/y", "CERTO_LLM_API_KEY": "k"})
+    )
+
+    assert result.ok is ok
+    assert sent["tools"] == ["finish"]
+    assert sent["update"]["num_retries"] == 0
+    assert result.error_kind == (None if ok else "no_tool_call")
+
+
+class _FakeOllama(BaseHTTPRequestHandler):
+    """LiteLLM's `ollama/` route posts to /api/generate with the tools in the
+    prompt and parses a JSON function call out of the reply."""
+
+    mode: ClassVar[str] = "tool"
+
+    def log_message(self, *args):
+        pass
+
+    def do_POST(self):
+        body = json.loads(self.rfile.read(int(self.headers["Content-Length"])) or b"{}")
+        model = body.get("model")
+        if self.path == "/api/show":
+            return self._send(200, {"model_info": {"general.architecture": "qwen3"}})
+        if self.mode == "missing":
+            return self._send(404, {"error": f'model "{model}" not found, try pulling it first'})
+        if self.mode == "notools":
+            return self._send(
+                400, {"error": f"registry.ollama.ai/library/{model} does not support tools"}
+            )
+        reply = (
+            json.dumps({"name": "finish", "arguments": {"message": "OK"}})
+            if self.mode == "tool"
+            else "OK"
+        )
+        done = {"done": True, "done_reason": "stop", "prompt_eval_count": 1, "eval_count": 1}
+        return self._send(
+            200, {"model": model, "created_at": "2026-01-01T00:00:00Z", "response": reply, **done}
+        )
+
+    def _send(self, code, payload):
+        data = json.dumps(payload).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+
+@pytest.fixture
+def fake_ollama():
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _FakeOllama)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{server.server_address[1]}"
+    server.shutdown()
+    server.server_close()
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected"),
+    [
+        ("tool", "ok: reachable, tool calling works."),
+        ("text", "answered, but without calling a tool"),
+        ("missing", "Ollama has no model named qwen3-coder:30b"),
+        ("notools", "doesn't support tool calling"),
+    ],
+)
+def test_tool_check_through_the_sdk_against_a_fake_ollama(fake_ollama, monkeypatch, mode, expected):
+    # The real SDK + LiteLLM request path, against a local server.
+    monkeypatch.setattr(_FakeOllama, "mode", mode)
+    cfg = load_config(
+        {"CERTO_LLM_MODEL": "ollama/qwen3-coder:30b", "CERTO_LLM_BASE_URL": fake_ollama}
+    )
+
+    result = llm_check.check_tool_calling(cfg, timeout=10)
+
+    assert expected in explain(result, "Ollama")
+
+
+def test_tool_check_reports_an_unreachable_server():
+    cfg = load_config(
+        {"CERTO_LLM_MODEL": "ollama/qwen3-coder:30b", "CERTO_LLM_BASE_URL": "http://127.0.0.1:9"}
+    )
+
+    result = llm_check.check_tool_calling(cfg, timeout=10)
+
+    assert "Couldn't reach the server at http://127.0.0.1:9" in explain(result, "Ollama")
+
+
+# --- certo check -------------------------------------------------------------
+
+
+def test_certo_check_without_settings_says_where_to_run_it(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("CERTO_LLM_MODEL", raising=False)
+    out = io.StringIO()
+
+    assert init_cmd.check_main([], out=out) == 1
+    assert "this folder has no .env" in out.getvalue()
+
+
+def test_certo_check_reads_the_folders_env(tmp_path, monkeypatch, checks):
+    monkeypatch.chdir(tmp_path)
+    for name in ("CERTO_LLM_MODEL", "CERTO_LLM_API_KEY", "CERTO_LLM_BASE_URL"):
+        monkeypatch.delenv(name, raising=False)
+    (tmp_path / ".env").write_text("CERTO_LLM_MODEL=gemini/g\nCERTO_LLM_API_KEY=k\n")
+    out = io.StringIO()
+
+    assert init_cmd.check_main([], out=out) == 0
+    assert checks[0].model == "gemini/g"
+    assert "ok: reachable" in out.getvalue()
+
+
+def test_certo_check_failure_exits_nonzero(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CERTO_LLM_MODEL", "openai/x")
+    monkeypatch.setenv("CERTO_LLM_API_KEY", "k")
+    monkeypatch.setattr(
+        init_cmd,
+        "check_tool_calling",
+        lambda cfg, **_kw: _result("authentication", "bad", model=cfg.model),
+    )
+    out = io.StringIO()
+
+    assert init_cmd.check_main([], out=out) == 1
+    assert "OpenAI rejected the API key" in out.getvalue()
+    assert "then run: certo check" in out.getvalue()
+
+
+# --- CLI dispatch --------------------------------------------------------------
+
+
+def test_init_and_check_dispatch_only_on_the_exact_first_argument(monkeypatch):
+    seen = []
+    monkeypatch.setattr(cli, "init_main", lambda argv: seen.append(("init", argv)) or 0)
+    monkeypatch.setattr(cli, "check_main", lambda argv: seen.append(("check", argv)) or 0)
+
+    assert cli.main(["init", "x", "--yes"]) == 0
+    assert cli.main(["check"]) == 0
+    assert seen == [("init", ["x", "--yes"]), ("check", [])]
+
+
+@pytest.mark.parametrize("task", ["init a git repo here", "check the tests", "Init"])
+def test_a_task_mentioning_init_or_check_is_still_a_task(monkeypatch, task):
+    monkeypatch.setattr(cli, "init_main", lambda _argv: pytest.fail("init must not run"))
+    monkeypatch.setattr(cli, "check_main", lambda _argv: pytest.fail("check must not run"))
+    # Reaching load_config means main() took the task path.
+    monkeypatch.setattr(cli, "load_config", lambda: pytest.fail("task path"))
+
+    with pytest.raises(pytest.fail.Exception, match="task path"):
+        cli.main([task])
+
+
+def test_load_dotenv_from_litellm_is_disabled():
+    # LiteLLM's import-time load_dotenv() searched upward from its install
+    # folder and could load a ~/.env (see certo/__init__.py).
+    assert os.environ.get("LITELLM_MODE") == "PRODUCTION"

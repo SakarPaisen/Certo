@@ -132,6 +132,24 @@ def test_wheel_ships_the_builtin_skill_catalog(built):
     assert any(n.startswith("lifecycle/") for n in shipped)
 
 
+def test_wheel_ships_the_certo_init_starter_files(built):
+    # `certo init` works offline: everything it writes comes from the package.
+    names = set(_wheel_names(built["wheel"]))
+    repo = {
+        "certo/starter/" + p.relative_to(_REPO_ROOT / "src/certo/starter").as_posix()
+        for p in (_REPO_ROOT / "src/certo/starter").rglob("*")
+        if p.is_file() and "__pycache__" not in p.parts
+    }
+    assert {
+        "certo/starter/providers.toml",
+        "certo/starter/README.md",
+        "certo/starter/gitignore",
+        "certo/starter/tasks/wordle.md",
+        "certo/starter/tasks/asteroids.md",
+    } <= repo
+    assert repo <= names
+
+
 def test_wheel_installs_exactly_the_certo_console_scripts(built):
     with zipfile.ZipFile(built["wheel"]) as zf:
         (ep_name,) = [n for n in zf.namelist() if n.endswith(".dist-info/entry_points.txt")]

@@ -795,6 +795,10 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   that `publish` uploads. There is no pull-request CI workflow to attach it
   to yet. The dependency fixture asserts its package is *not* importable
   from Certo's tool env, so a pass can't come from Certo's own packages.
+  Since 0.1.4 it also runs `certo init --yes --no-check` (provider keys
+  unset) and checks the files, the overwrite refusal, `certo check`'s
+  missing-key message and the no-terminal `.env`: `init` reads package
+  data, which only an installed wheel proves is shipped.
 - **Versioning: every feature bumps the third digit, in the same commit**
   (user's rule; full text in CLAUDE.md). The first two digits move only on
   the user's decision. The version is written literally in

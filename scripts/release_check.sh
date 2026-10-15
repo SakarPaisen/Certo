@@ -10,6 +10,11 @@
 # empty temp directory, so no repo file and no .env is picked up. Checks:
 #
 #   - `certo --help` works;
+#   - `certo init --yes --no-check` in an empty directory creates the
+#     workspace (.env with mode 600, .gitignore, tasks/, README.md), a
+#     second init there is refused, `certo check` in it reports the
+#     missing key without a traceback, and `certo init` with no terminal
+#     and no flags writes every preset commented out;
 #   - `certo verify` on three fixture projects, with no LLM:
 #       pass  - a Python project with passing tests      -> verified, exit 0
 #       fail  - a Python project with a failing test     -> failed,   exit 1
@@ -89,6 +94,33 @@ run version 0 "certo $wheel_version" "$certo" --version
 echo "== certo --help"
 run help 0 "" "$certo" --help
 echo "$last_output" | grep -q "certo verify \[PATH\]" && pass "help mentions certo verify" || fail "help doesn't mention certo verify"
+
+echo "$last_output" | grep -q "certo init" && pass "help mentions certo init" || fail "help doesn't mention certo init"
+
+echo "== certo init"
+# No provider key may leak in from the caller: --yes would use it.
+noenv=(env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u CERTO_LLM_MODEL -u CERTO_LLM_API_KEY -u CERTO_LLM_BASE_URL)
+run init 0 "  certo tasks/wordle.md --project wordle" "${noenv[@]}" "$certo" init --yes --no-check </dev/null
+ws="$work/cwd-init/certo-workspace"
+for f in .env .gitignore README.md tasks/wordle.md tasks/asteroids.md; do
+  [ -f "$ws/$f" ] && pass "init wrote $f" || fail "init did not write $f"
+done
+perms="$(stat -f '%Lp' "$ws/.env" 2>/dev/null || stat -c '%a' "$ws/.env")"
+[ "$perms" = 600 ] && pass ".env has mode 600" || fail ".env has mode $perms, expected 600"
+grep -qx "CERTO_LLM_MODEL=openai/.*" "$ws/.env" && pass ".env selects the OpenAI default" || fail ".env has no active CERTO_LLM_MODEL"
+grep -qx ".env" "$ws/.gitignore" && pass ".gitignore covers .env" || fail ".gitignore misses .env"
+out="$(cd "$work/cwd-init" && "$certo" init --yes --no-check </dev/null 2>&1)" \
+  && fail "a second init overwrote the workspace" || pass "a second init is refused: $out"
+out="$(cd "$ws" && "${noenv[@]}" "$certo" check 2>&1)" && code=0 || code=$?
+echo "$out" | sed 's/^/    /'
+{ [ "$code" = 1 ] && echo "$out" | grep -q "CERTO_LLM_API_KEY is required" && ! echo "$out" | grep -q Traceback; } \
+  && pass "certo check reports the missing key" || fail "certo check (exit $code) didn't report the missing key"
+run init-notty 0 "" "${noenv[@]}" "$certo" init plain </dev/null
+if grep -q "^CERTO_LLM_" "$work/cwd-init-notty/plain/.env"; then
+  fail "init without a terminal set a value"
+else
+  pass "init without a terminal left every preset commented out"
+fi
 
 echo "== Fixtures"
 fixtures="$work/fixtures"

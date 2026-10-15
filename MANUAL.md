@@ -1834,6 +1834,14 @@ and `certo verify` on three fixture projects:
 | failing Python project | `Verification: failed`, exit `1` |
 | tests import a package installed only in the project's own `.venv` (no pytest there) | `verified`, exit `0`; pytest installed into that `.venv`; Certo's own environment still has no pytest |
 
+It also runs `certo init --yes --no-check` in an empty directory (with no
+provider key in the environment) and checks the files it creates: `.env`
+with mode `600` selecting the OpenAI default, `.gitignore`, `README.md` and
+both sample tasks. Then it checks that a second `init` there is refused,
+that `certo check` in the workspace reports the missing key, and that
+`certo init` without a terminal or flags leaves every preset commented
+out.
+
 `--with-llm` also runs `certo "Create hello.py that prints hello, plus a
 pytest test for it" --project smoke` with whatever `CERTO_LLM_*` variables are
 exported (no `.env` is read, since it runs from an empty directory) and
