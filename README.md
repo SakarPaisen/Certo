@@ -25,7 +25,15 @@ cd certo-workspace
 certo tasks/wordle.md --project wordle
 ```
 
-`certo init` asks which provider you use (OpenAI, Anthropic, Gemini, a local Ollama, or any LiteLLM model), takes your API key at a hidden prompt, writes a minimal `.env`, and makes one real call to check the model works. It also leaves two sample tasks in `tasks/`: a terminal Wordle in Python and a browser Asteroids game (which needs Node 18+). With a cloud model a run uses your credits, and Certo prints the cost at the end.
+`certo init` asks which provider you use (OpenAI, Anthropic, Gemini, a local Ollama, or any LiteLLM model), takes your API key at a hidden prompt, saves the settings, and makes one real call to check the model works. It also leaves two sample tasks in `tasks/`: a terminal Wordle in Python and a browser Asteroids game (which needs Node 18+). With a cloud model a run uses your credits, and Certo prints the cost at the end.
+
+Or work on one project at a time, new or existing:
+
+```bash
+cd any-project && certo "Add a --verbose flag, with a test"
+```
+
+This works in any folder when `certo init` saved your settings for "all projects on this computer", its default.
 
 The generated project lands in `projects/wordle`. The last line of output is the verdict:
 
@@ -33,11 +41,11 @@ The generated project lands in `projects/wordle`. The last line of output is the
 Verification: verified
 ```
 
-`certo check` re-runs the model check after you edit `.env`.
+`certo check` shows where each setting comes from and re-runs the model check. Before the agent edits a folder that already has files, Certo prints a one-line warning if it has uncommitted git changes, or isn't a git repository.
 
 ### Without `certo init`
 
-Set two variables instead, in your shell or in a `.env` in the folder you run `certo` from:
+Set two variables instead, in your shell, in a `.env` in the folder you run `certo` from, or in `~/.config/certo/.env` for every folder ([details](https://github.com/alessioricco/certo/blob/main/MANUAL.md#where-settings-come-from)):
 
 ```bash
 export CERTO_LLM_MODEL=anthropic/claude-sonnet-5-5   # or openai/..., gemini/..., deepseek/...

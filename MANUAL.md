@@ -39,14 +39,21 @@ reference — how to actually run and configure the thing.
 
 ```bash
 pip install certo                 # or: uv tool install certo
-certo init                        # asks a few questions, writes ./certo-workspace
+certo init                        # asks a few questions
 cd certo-workspace
 certo tasks/wordle.md --project wordle
 ```
 
-`certo init` writes a minimal `.env`, checks the model with one real call,
-and leaves sample tasks to run. See
-[`certo init`](#certo-init-folder--a-ready-to-use-workspace).
+`certo init` saves your model settings, by default for every project on
+this computer, checks the model with one real call, and leaves sample
+tasks to run. See
+[`certo init`](#certo-init-folder--a-ready-to-use-workspace). With the
+settings saved for all projects, any folder works too:
+
+```bash
+cd any-project
+certo "Add a --verbose flag, with a test"
+```
 
 Or set the variables yourself:
 
@@ -57,8 +64,9 @@ certo "Build a CLI todo app in Python, with tests" --project todo
 ```
 
 No `.env` file is needed: exported `CERTO_*` variables are read
-directly, and a `.env` in the current directory is loaded too if present
-(already-exported values win). The built-in skill catalog ships inside the
+directly, then a `.env` in the current directory and the user settings
+file if present (see [Where settings come from](#where-settings-come-from)).
+The built-in skill catalog ships inside the
 package, so it loads from any directory. Relative defaults such as
 `CERTO_PROJECTS_DIR=./projects` resolve against the directory you run
 `certo` from. Extras: `pip install "certo[server]"`, `"certo[sandbox]"`,
@@ -95,9 +103,32 @@ install/upgrade both together at the same version (see `pyproject.toml`).
 
 ## Configuration reference
 
-All configuration is env vars, loaded from `.env` by `src/certo/config.py`
-(`load_config()`). `.env` is git-ignored; `.env.example` is the checked-in
-template with every variable documented inline.
+All configuration is env vars, read by `src/certo/config.py`
+(`load_config()`) from the three places below. `.env` is git-ignored;
+`.env.example` is the checked-in template with every variable documented
+inline.
+
+### Where settings come from
+
+| Order | Source | Written by |
+|---|---|---|
+| 1 | Variables exported in your shell | you |
+| 2 | `.env` in the current folder | you, or `certo init` with "This folder only" (`--local`) |
+| 3 | The user settings file: `$XDG_CONFIG_HOME/certo/.env`, or `~/.config/certo/.env` when `XDG_CONFIG_HOME` is unset or relative (on every platform, macOS and Windows included) | `certo init` with "All projects on this computer" (`--global`, the default) |
+
+Each variable is resolved on its own: the first source that sets it wins,
+and a later source only fills what no earlier one set. So a project's
+`.env` can set only `CERTO_LLM_MODEL` and still take `CERTO_LLM_API_KEY`
+from the user file, and an exported variable beats both files. A blank
+value (`CERTO_LLM_API_KEY=`) counts as unset, so it doesn't hide a value
+from a later source. `${VAR}` in either file is filled from the
+environment first, as python-dotenv's `load_dotenv` does. `certo check`
+prints which source each LLM setting came from. When `CERTO_LLM_MODEL`
+isn't set anywhere, the error lists all three places.
+
+The user file holds an API key, so `certo init` writes it with permissions
+`600`. Keeping the key there, rather than in a `.env` in every project, is
+also what keeps it out of each project's git history.
 
 Every policy variable is named `CERTO_*`. **Deprecated fallback (one
 release):** the pre-rename `HARNESS_*` spelling of the same variable (e.g.
@@ -137,6 +168,7 @@ name is set, the error names it and the rename to make (never its value).
 | `CERTO_MODEL_SELECTION` | `manual` | `manual` \| `auto` — pick the best-fit model per task from a hand-curated catalog instead of always using `CERTO_LLM_MODEL`. See [Automatic model selection](#automatic-model-selection). |
 | `CERTO_MODELS_FILE` | `./models.yaml` | Path to the model catalog, only read when `CERTO_MODEL_SELECTION=auto`. |
 | `CERTO_ARTIFACTS_DIR` | *(empty — disabled)* | Per-run metadata/transcript/token-cost directory. See [Run artifacts](#run-artifacts). |
+| `CERTO_NO_WORKTREE_WARNING` | `false` | `true`/`1` silences the note the CLI prints before the agent edits a folder that already has files. See [Before the agent edits an existing folder](#before-the-agent-edits-an-existing-folder). Set it in the user file to silence it everywhere. |
 | `CERTO_TASK_STORE` | `memory` | `memory` \| `redis` \| `sqlite` \| `mysql` \| `postgres` — server-mode task registry backend, consulted only by `certo-server`/`certo-admin`. See [Task registry persistence](#task-registry-persistence). |
 | `CERTO_TASK_TTL_SECONDS` | `0` | Seconds a completed/failed task record is kept before it's eligible for purge; `0` means keep forever. |
 | `CERTO_TASK_STORE_SQLITE_PATH` | `./certo_tasks.db` | sqlite backend only. |
@@ -277,17 +309,34 @@ an agent. To run the one-word task `verify`, write `certo -- verify`.
 ### `certo init [FOLDER]` — a ready-to-use workspace
 
 ```bash
-certo init                         # creates ./certo-workspace
-certo init my-certo                # any folder
+certo init                         # asks, then saves for all projects or one folder
+certo init my-certo                # sample folder name
 certo init --provider anthropic    # skip the provider question
+certo init --global --no-samples   # settings for all projects, no sample folder
+certo init --local                 # settings in ./certo-workspace/.env only
 certo init --yes --no-check        # ask nothing, make no call
 ```
 
-Creates `FOLDER` (default `./certo-workspace`) with:
+It saves your settings in one of two places (see [Where settings come
+from](#where-settings-come-from)):
+
+- **All projects on this computer** (recommended, the default): the user
+  settings file, `~/.config/certo/.env` (or `$XDG_CONFIG_HOME/certo/.env`).
+  Then `certo "<task>"` works in any folder.
+- **This folder only:** `FOLDER/.env`, read only when you run `certo` from
+  `FOLDER`.
+
+The settings file, either one, holds only the settings you chose
+(`CERTO_LLM_MODEL`, plus `CERTO_LLM_API_KEY` or `CERTO_LLM_BASE_URL`),
+then every other provider's two lines commented out. To switch provider,
+comment out the active lines and uncomment two others. Permissions `600`.
+
+It also creates `FOLDER` (default `./certo-workspace`), optional for all
+projects, with:
 
 | File | What it is |
 |---|---|
-| `.env` | Only the settings you chose (`CERTO_LLM_MODEL`, plus `CERTO_LLM_API_KEY` or `CERTO_LLM_BASE_URL`), then every other provider's two lines commented out. To switch provider, comment out the active lines and uncomment two others. Permissions `600`. |
+| `.env` | Only with "This folder only": the settings file above. |
 | `.gitignore` | `.env`, `projects/`, `artifacts/`. An existing `.gitignore` only gains the missing entries. |
 | `tasks/` | `wordle.md` (terminal Wordle, Python) and `asteroids.md` (browser game, needs Node 18+). |
 | `README.md` | The next steps. A `README.md` that `certo init` didn't write is never replaced, even with `--force`. |
@@ -311,25 +360,47 @@ On a terminal it asks, in order:
    server can't be reached, or has no models, init says so and prints the
    `ollama pull` commands.
 5. **Other:** the LiteLLM model id, then an optional key and base URL.
+6. **Where to save:**
 
-Then it makes the [model check](#certo-check--does-the-model-work). A failed
-check deletes nothing: fix `.env` and run `certo check`.
+   ```
+   Save these settings for:
+     1. All projects on this computer (recommended)
+     2. This folder only
+   Choice [1]:
+   ```
+
+   For all projects, if the user file already exists, init shows its
+   provider and model (never the key) and asks before replacing it; on a
+   no, the file is kept and your new answers are dropped. Then it asks
+   `Create a folder with sample tasks to try? [Y/n]`. That folder gets no
+   `.env`. If `FOLDER` already has files, init skips it and says so.
+
+Nothing is written until the last answer, so Ctrl-C at any question leaves
+everything as it was. Then it makes the [model
+check](#certo-check--does-the-model-work). A failed check deletes nothing:
+fix the settings file and run `certo check`. The closing "Next:" lines fit
+the choice; for all projects it adds that `certo "<task>"` now works in any
+project folder.
 
 | Flag | Effect |
 |---|---|
 | `--provider {openai,anthropic,gemini,ollama,other}` | Skip the provider question. |
 | `--model ID` | Skip the model question (the provider is inferred from the prefix if `--provider` is absent). |
 | `--base-url URL` | Skip the Ollama address question; also sets `CERTO_LLM_BASE_URL` for any provider. |
-| `--yes`, `-y` | Ask nothing, accept every default. A key is taken only from the provider's exported variable. |
+| `--global` | Save for all projects (the user file); skip the "Save these settings for" question. |
+| `--local` | Save in `FOLDER/.env` only; skip that question. |
+| `--no-samples` | For all projects: don't create the sample folder. |
+| `--yes`, `-y` | Ask nothing, accept every default: all projects (unless `--local`), plus the sample folder. A key is taken only from the provider's exported variable. |
 | `--no-check` | Don't make the check call. |
-| `--force` | Write into a folder that isn't empty, or over an existing `.env`. Without it, init refuses both. |
+| `--force` | Write into a folder that isn't empty, or over an existing `FOLDER/.env`. With nothing asked (`--yes`, or no terminal), also needed to replace an existing user file. Without it, init refuses all three. |
 
 There is no `--api-key` flag, on purpose: a key typed on the command line
 is saved in your shell history.
 
 With no terminal (stdin isn't a TTY) and none of `--provider`, `--model` or
-`--yes`, init asks nothing and writes `.env` with every preset commented
-out, and says so.
+`--yes`, init asks nothing and writes `FOLDER/.env` with every preset
+commented out, and says so. Without a terminal the settings go to
+`FOLDER/.env` unless `--global` or `--yes` is given.
 
 `init` is a subcommand only as the exact, whole first argument, like
 `verify`: `certo "init a git repo here"` still runs an agent.
@@ -337,12 +408,23 @@ out, and says so.
 ### `certo check` — does the model work?
 
 ```bash
-cd certo-workspace
-certo check
+certo check        # from any folder
 ```
 
-Reads the settings as a run does (exported `CERTO_LLM_*`, then `./.env`)
-and sends one request through the agent's own call path, offering it the
+Reads the settings as a run does (exported `CERTO_LLM_*`, then `./.env`,
+then the user file) and first prints where each one came from. The key is
+shown only as `set` or `not set`:
+
+```
+Settings:
+  CERTO_LLM_MODEL             anthropic/claude-sonnet-5-5, from user settings (/home/me/.config/certo/.env)
+  CERTO_LLM_API_KEY           set, from user settings (/home/me/.config/certo/.env)
+  CERTO_LLM_BASE_URL          not set
+```
+
+`CERTO_LLM_REASONING_EFFORT` is listed only when set. The source is
+`environment variable`, `./.env (<path>)` or `user settings (<path>)`.
+Then it sends one request through the agent's own call path, offering it the
 SDK's `finish` tool. It passes only if the model answers with a tool call,
 since the agent works only through tool calls. The answer is one line:
 
@@ -358,6 +440,29 @@ since the agent works only through tool calls. The answer is one line:
 Exit code `0` on ok, `1` otherwise. `--timeout N` sets the wait (default
 120 seconds, since a local model may have to load first).
 `certo-admin check-llm` is the older, plain-text variant with no tool call.
+
+### Before the agent edits an existing folder
+
+The agent edits files in place. Before a task starts in a folder that
+already has files, the CLI prints one line to stderr:
+
+```
+Warning: /path/to/repo has uncommitted changes (3 files). The agent will edit files here; commit or stash first if you want to be able to roll back.
+```
+
+for a git repository with uncommitted changes (untracked files included)
+under the task's folder, or
+
+```
+Note: /path/to/folder isn't a git repository, so the agent's changes there can't be rolled back with git.
+```
+
+for a folder outside git. A clean repository gets nothing. It never asks
+and never stops the task, with or without a terminal. There's no line for
+an empty folder or for a `--project` folder Certo created itself: those
+are listed in `CERTO_PROJECTS_DIR/.certo-created-projects`, one name per
+line. `certo verify`, `init` and `check` never print it.
+`CERTO_NO_WORKTREE_WARNING=1` turns it off.
 
 ### Task source resolution
 
@@ -1402,7 +1507,8 @@ registration points, not one — see [Custom tools](#custom-tools).
 
 ## Switching LLM provider / model
 
-Edit **only** `CERTO_LLM_MODEL` in `.env` — no code changes, ever. Nothing in
+Edit **only** `CERTO_LLM_MODEL` in your settings (`.env`, the user
+settings file, or the environment) — no code changes, ever. Nothing in
 `src/` hardcodes a model, provider, or base URL (verified via
 `grep -rniE "gpt-|claude-|anthropic/|openai/|gemini/|ollama/" src/` — the only
 hits are example strings in error messages and docstrings). The one
@@ -1834,13 +1940,17 @@ and `certo verify` on three fixture projects:
 | failing Python project | `Verification: failed`, exit `1` |
 | tests import a package installed only in the project's own `.venv` (no pytest there) | `verified`, exit `0`; pytest installed into that `.venv`; Certo's own environment still has no pytest |
 
-It also runs `certo init --yes --no-check` in an empty directory (with no
-provider key in the environment) and checks the files it creates: `.env`
-with mode `600` selecting the OpenAI default, `.gitignore`, `README.md` and
-both sample tasks. Then it checks that a second `init` there is refused,
-that `certo check` in the workspace reports the missing key, and that
-`certo init` without a terminal or flags leaves every preset commented
-out.
+Every command runs with `XDG_CONFIG_HOME` set to a throwaway folder, so
+your own user settings file is never read or written. It runs `certo init
+--yes --no-check` in an empty directory (with no provider key in the
+environment) and checks what it creates: the user settings file, with mode
+`600` and selecting the OpenAI default, and the sample folder with
+`.gitignore`, `README.md`, both sample tasks and no `.env`. Then it checks
+that a second `init --yes` is refused, that `certo check` from an
+unrelated folder names the user file as the source of `CERTO_LLM_MODEL`
+and reports the missing key, that `certo init --yes --local` writes
+`FOLDER/.env` with mode `600`, and that `certo init` without a terminal
+or flags leaves every preset commented out.
 
 `--with-llm` also runs `certo "Create hello.py that prints hello, plus a
 pytest test for it" --project smoke` with whatever `CERTO_LLM_*` variables are

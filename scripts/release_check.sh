@@ -10,11 +10,14 @@
 # empty temp directory, so no repo file and no .env is picked up. Checks:
 #
 #   - `certo --help` works;
-#   - `certo init --yes --no-check` in an empty directory creates the
-#     workspace (.env with mode 600, .gitignore, tasks/, README.md), a
-#     second init there is refused, `certo check` in it reports the
-#     missing key without a traceback, and `certo init` with no terminal
-#     and no flags writes every preset commented out;
+#   - `certo init --yes --no-check` in an empty directory writes the user
+#     settings file under a throwaway XDG_CONFIG_HOME (mode 600) and the
+#     sample folder with no .env in it, a second one is refused, and
+#     `certo check` from an unrelated folder names the user file as the
+#     source and reports the missing key without a traceback;
+#     `certo init --yes --local` writes FOLDER/.env (mode 600) instead, and
+#     `certo init` with no terminal and no flags writes every preset
+#     commented out;
 #   - `certo verify` on three fixture projects, with no LLM:
 #       pass  - a Python project with passing tests      -> verified, exit 0
 #       fail  - a Python project with a failing test     -> failed,   exit 1
@@ -49,6 +52,9 @@ work="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/certo-release-check.XXXXXX")" && pwd)"
 trap 'rm -rf "$work"' EXIT
 # Nothing from the caller's virtualenv should leak into the checks.
 unset VIRTUAL_ENV CONDA_PREFIX || true
+# Nor from their user settings file: Certo reads $XDG_CONFIG_HOME/certo/.env.
+export XDG_CONFIG_HOME="$work/xdg"
+user_env="$XDG_CONFIG_HOME/certo/.env"
 
 failures=0
 pass() { echo "  ok    $1"; }
@@ -100,21 +106,30 @@ echo "$last_output" | grep -q "certo init" && pass "help mentions certo init" ||
 echo "== certo init"
 # No provider key may leak in from the caller: --yes would use it.
 noenv=(env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u CERTO_LLM_MODEL -u CERTO_LLM_API_KEY -u CERTO_LLM_BASE_URL)
+mode() { stat -f '%Lp' "$1" 2>/dev/null || stat -c '%a' "$1"; }
 run init 0 "  certo tasks/wordle.md --project wordle" "${noenv[@]}" "$certo" init --yes --no-check </dev/null
+[ -f "$user_env" ] && pass "init --yes wrote the user settings file" || fail "init --yes did not write $user_env"
+[ "$(mode "$user_env")" = 600 ] && pass "the user file has mode 600" || fail "the user file has mode $(mode "$user_env"), expected 600"
+grep -qx "CERTO_LLM_MODEL=openai/.*" "$user_env" && pass "the user file selects the OpenAI default" || fail "the user file has no active CERTO_LLM_MODEL"
 ws="$work/cwd-init/certo-workspace"
-for f in .env .gitignore README.md tasks/wordle.md tasks/asteroids.md; do
+for f in .gitignore README.md tasks/wordle.md tasks/asteroids.md; do
   [ -f "$ws/$f" ] && pass "init wrote $f" || fail "init did not write $f"
 done
-perms="$(stat -f '%Lp' "$ws/.env" 2>/dev/null || stat -c '%a' "$ws/.env")"
-[ "$perms" = 600 ] && pass ".env has mode 600" || fail ".env has mode $perms, expected 600"
-grep -qx "CERTO_LLM_MODEL=openai/.*" "$ws/.env" && pass ".env selects the OpenAI default" || fail ".env has no active CERTO_LLM_MODEL"
+[ ! -e "$ws/.env" ] && pass "the sample folder has no .env" || fail "init --yes wrote $ws/.env"
 grep -qx ".env" "$ws/.gitignore" && pass ".gitignore covers .env" || fail ".gitignore misses .env"
 out="$(cd "$work/cwd-init" && "$certo" init --yes --no-check </dev/null 2>&1)" \
-  && fail "a second init overwrote the workspace" || pass "a second init is refused: $out"
-out="$(cd "$ws" && "${noenv[@]}" "$certo" check 2>&1)" && code=0 || code=$?
+  && fail "a second init replaced the user file" || pass "a second init is refused: $out"
+mkdir -p "$work/elsewhere"
+out="$(cd "$work/elsewhere" && "${noenv[@]}" "$certo" check 2>&1)" && code=0 || code=$?
 echo "$out" | sed 's/^/    /'
+echo "$out" | grep -q "^  CERTO_LLM_MODEL .*from user settings ($user_env)" \
+  && pass "certo check elsewhere names the user file as the source" || fail "certo check didn't name $user_env"
 { [ "$code" = 1 ] && echo "$out" | grep -q "CERTO_LLM_API_KEY is required" && ! echo "$out" | grep -q Traceback; } \
   && pass "certo check reports the missing key" || fail "certo check (exit $code) didn't report the missing key"
+run init-local 0 "" "${noenv[@]}" "$certo" init --yes --local --no-check </dev/null
+local_env="$work/cwd-init-local/certo-workspace/.env"
+[ -f "$local_env" ] && [ "$(mode "$local_env")" = 600 ] \
+  && pass "init --local wrote the folder's .env with mode 600" || fail "init --local: no $local_env with mode 600"
 run init-notty 0 "" "${noenv[@]}" "$certo" init plain </dev/null
 if grep -q "^CERTO_LLM_" "$work/cwd-init-notty/plain/.env"; then
   fail "init without a terminal set a value"

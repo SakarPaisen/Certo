@@ -44,6 +44,11 @@ decisions log below for *why* a given design was chosen.
   default `1800`) is the task-level wall-clock budget `runner.py` enforces
   across every phase. `interactive` (`CERTO_INTERACTIVE`) opts into the
   initial-run interactive checkpoint and drops `_AUTONOMOUS_SUFFIX`.
+  `load_settings_files()` fills `os.environ` from `./.env`, then the user
+  file (`user_settings_path()`: `$XDG_CONFIG_HOME/certo/.env`, else
+  `~/.config/certo/.env`), and returns each variable's `SettingSource`;
+  `load_config()` calls it when no `env` mapping is passed.
+  `no_worktree_warning` (`CERTO_NO_WORKTREE_WARNING`) silences `worktree.py`.
 - **`acceptance.py`** — optional, caller-supplied machine-checkable
   acceptance criteria, scoped to `file_exists`/`file_contains` only (no
   command-exec kind — see decisions log). Own path-containment check
@@ -126,7 +131,14 @@ decisions log below for *why* a given design was chosen.
   then existing local file, then literal text — CLI-only). `--require-verification`
   makes an `inconclusive` result exit nonzero too (default behavior
   unchanged otherwise). `--auto-model` sets `cfg.model_selection="auto"`;
-  prompts for a choice only when `--interactive` is also set.
+  prompts for a choice only when `--interactive` is also set. Before
+  `run_task` it prints `worktree.worktree_warning()` to stderr, unless
+  silenced or the `--project` folder is one Certo created.
+- **`worktree.py`** — stdlib only. `worktree_warning(path)`: None for an
+  empty folder or a clean repository, a warning for uncommitted changes
+  under `path` (`git status --porcelain -- .`, untracked included), a note
+  outside git. `record_created_project`/`was_created_by_certo` keep
+  `CERTO_PROJECTS_DIR/.certo-created-projects`, one name per line.
 - **`model_catalog.py`** — pure data/scoring for `models.yaml`, no SDK
   imports: `load_model_catalog()`, `classify_task()` (keyword triggers, same
   pattern as skills), `score_entry`/`rank_candidates` (weighted sum over a
@@ -161,7 +173,10 @@ decisions log below for *why* a given design was chosen.
   go through an injectable `Prompter`; `gather_settings()` returns
   `Settings` (key never in its repr) or `None` (no terminal, no flags:
   every preset commented out). `render_env()` writes the chosen lines
-  plus the other providers' presets. Package data in
+  plus the other providers' presets, to the user file
+  (`write_user_settings`) or `FOLDER/.env`, as the scope question
+  (`--global`/`--local`) decides. `check_main()` prints
+  `print_setting_sources()` before `run_check()`. Package data in
   `src/certo/starter/`: `providers.toml` (menu order, default models),
   the workspace `README.md`, `gitignore`, and `tasks/wordle.md`/
   `asteroids.md`.
@@ -798,7 +813,10 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   Since 0.1.4 it also runs `certo init --yes --no-check` (provider keys
   unset) and checks the files, the overwrite refusal, `certo check`'s
   missing-key message and the no-terminal `.env`: `init` reads package
-  data, which only an installed wheel proves is shipped.
+  data, which only an installed wheel proves is shipped. Since 0.1.5 the
+  whole script runs with a throwaway `XDG_CONFIG_HOME`; `init --yes` must
+  write the user file and `certo check` from another folder must name it
+  as the source, and `init --yes --local` covers `FOLDER/.env`.
 - **Versioning: every feature bumps the third digit, in the same commit**
   (user's rule; full text in CLAUDE.md). The first two digits move only on
   the user's decision. The version is written literally in
@@ -847,3 +865,32 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   never lands in shell history; use `CERTO_LLM_API_KEY=... certo-admin check-llm`.
   Retries are disabled so a bad key/endpoint fails in seconds, not after
   the SDK's 5 backoff retries.
+- **A user-level settings file, `$XDG_CONFIG_HOME/certo/.env`** (0.1.5).
+  Without it, working one project at a time meant copying a `.env` with
+  the key into every project, which is how keys end up committed, or
+  exporting variables in every terminal. XDG with a `~/.config` fallback
+  on every platform, not each OS's own config folder, so there is one
+  path to document and to type. `certo init` saves there by default and
+  `--yes` picks it; without a terminal it still writes `FOLDER/.env`, as
+  before.
+- **Precedence: environment, then `./.env`, then the user file, each
+  variable on its own** (0.1.5). Specific beats general, so one project
+  can change only `CERTO_LLM_MODEL` and keep the shared key. Implemented
+  as fill-only (a source never replaces a value an earlier one set),
+  which is also `load_dotenv(override=False)`'s rule, so nothing can
+  silently win over a higher source. A blank value counts as unset, as in
+  `_read`: `init` writes `CERTO_LLM_API_KEY=` as a placeholder, and that
+  mustn't hide the user file's key. Tests set `XDG_CONFIG_HOME` in
+  `conftest.py` at import time (some modules call `load_config()` at
+  collection) and restore `os.environ` after each test, since loading
+  writes to it.
+- **The "existing folder" warning never blocks or asks** (0.1.5). It runs
+  before every CLI task, including scripts and CI where nobody can
+  answer, and a question there would hang or fail a run that was fine.
+  The decision to commit first is the user's; Certo only says when there's
+  no way back. Only changes under the task's folder count. Certo-created
+  `--project` folders are listed beside the projects, in
+  `CERTO_PROJECTS_DIR/.certo-created-projects`, rather than marked inside
+  them, so a generated project carries no Certo file. Silenced with
+  `CERTO_NO_WORKTREE_WARNING`, a setting rather than a flag, so the user
+  file can turn it off everywhere.
