@@ -33,6 +33,7 @@ from urllib.parse import urlparse
 
 from . import __version__
 from .bench_config import DEFAULT_BENCH_FILE, Arm, BenchConfig, BenchConfigError, load_bench_config
+from .bench_report import arm_rows, write_report
 from .bench_strategies import STRATEGIES, RunContext
 from .bench_tasks import (
     BUILTIN_TASKS_DIR,
@@ -535,7 +536,7 @@ def bench_main(
     interactive: bool | None = None,
 ) -> int:
     args = build_bench_parser().parse_args(argv)
-    interactive = sys.stdin.isatty() if interactive is None else interactive
+    on_terminal = sys.stdin.isatty() if interactive is None else interactive
     try:
         if args.list_tasks:
             return _list_tasks(_tasks_dir_from(args.config))
@@ -564,7 +565,7 @@ def bench_main(
     _print_plan(cfg, todo, len(planned), out_dir)
     if not todo:
         print("Every run is already recorded.")
-    elif not _confirm(args.yes, interactive):
+    elif not _confirm(args.yes, on_terminal):
         return 1
     _init_out_dir(cfg, out_dir)
 
@@ -598,10 +599,14 @@ def bench_main(
 
 
 def finish_report(cfg: BenchConfig, out_dir: Path, records: list[dict[str, Any]]) -> None:
-    """Summarise the recorded runs (results.md and results.csv come later)."""
-    total = len(plan_runs(cfg))
-    print(f"\n{len(records)}/{total} runs recorded in {out_dir}")
-    for arm in cfg.arms:
-        mine = [r for r in records if r["arm"] == arm.name]
-        passed = sum(r["hidden_tests"]["passed"] for r in mine)
-        print(f"  {arm.name}: hidden tests passed {passed}/{len(mine)}")
+    """Write results.md and results.csv, and print the per-arm summary."""
+    meta = json.loads((out_dir / "meta.json").read_text(encoding="utf-8"))
+    markdown = write_report(out_dir)
+    print(f"\n{len(records)}/{len(plan_runs(cfg))} runs recorded.")
+    for row in arm_rows(meta, records):
+        print(
+            f"  {row['Arm']}: hidden tests passed {row['Hidden tests passed']}, verified "
+            f"{row['Verified']}, fooled {row['Fooled']}, caught {row['Caught']}, "
+            f"cost {row['Cost']}"
+        )
+    print(f"Results: {markdown} (and results.csv)")

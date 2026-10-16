@@ -117,6 +117,8 @@ def test_a_run_is_isolated_graded_and_recorded(tmp_path, project_venv, capsys):
     assert not (snapshot / ".venv").exists()
     meta = json.loads((out / "meta.json").read_text())
     assert meta["task_set"]["source"] == "bundled"
+    assert "| a | single | cloud-a" in (out / "results.md").read_text()
+    assert (out / "results.csv").read_text().startswith("run_id,arm,")
     assert (
         "[1/1] a · temperature-table · r1: verified; hidden tests passed" in capsys.readouterr().out
     )

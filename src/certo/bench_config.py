@@ -57,6 +57,7 @@ class BenchConfig:
             "tasks": [t.name for t in self.tasks],
             "repeats": self.repeats,
             "arms": [{"name": a.name, "strategy": a.strategy, **a.params} for a in self.arms],
+            "arm_models": {a.name: a.models for a in self.arms},
             "models": {name: self.catalog[name].model for a in self.arms for name in a.models},
         }
 
