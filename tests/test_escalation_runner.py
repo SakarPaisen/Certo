@@ -1,0 +1,425 @@
+"""The escalation loop in runner.py, with fake conversations and fake models:
+no SDK run loop, no network."""
+
+from __future__ import annotations
+
+import uuid
+from contextlib import nullcontext
+from types import SimpleNamespace
+from typing import ClassVar
+
+import pytest
+from openhands.sdk import ConversationExecutionStatus
+from openhands.sdk.conversation.exceptions import ConversationRunError
+from openhands.sdk.llm.exceptions.types import LLMRateLimitError
+
+from certo import runner
+from certo.config import Config
+from certo.custom_tools.run_tests_tool import CheckOutcome
+from certo.escalation import ladder_from_models, resolve_ladder
+from certo.model_catalog import load_model_catalog
+
+_CATALOG = """
+models:
+  - name: local
+    model: ollama/qwen3-coder:30b
+    base_url: http://localhost:11434
+    ratings: {code: 2, cost: 5}
+  - name: mid
+    model: openai/gpt-5.6-luna
+    api_key: k
+    ratings: {code: 4, cost: 4}
+  - name: strong
+    model: anthropic/claude-sonnet-5-5
+    api_key: k
+    ratings: {code: 5, cost: 2}
+escalation:
+  ladders:
+    default:
+      - model: local
+        retries: 1
+      - model: mid
+        reasoning_effort: low
+      - model: strong
+    careful:
+      escalate_on_acceptance_failed: true
+      rungs: [{model: local}, {model: strong}]
+"""
+
+
+def _cfg(tmp_path, **overrides) -> Config:
+    base = {
+        "model": "openai/not-used",
+        "api_key": "env-key",
+        "base_url": None,
+        "workspace": str(tmp_path),
+        "max_iterations": 10,
+        "confirm_mode": "never",
+        "execution": "local",
+    }
+    base.update(overrides)
+    return Config(**base)
+
+
+def _ladder(tmp_path, name=None, models=None):
+    path = tmp_path / "models.yaml"
+    path.write_text(_CATALOG)
+    catalog = load_model_catalog(str(path))
+    if models is not None:
+        return ladder_from_models(catalog, models, "task")
+    return resolve_ladder(catalog, "task", name)
+
+
+def _check(name="pytest", status="failed", output="E   assert 2 == 3"):
+    return CheckOutcome(
+        name=name,
+        command="pytest -q",
+        primary=True,
+        status=status,
+        exit_code=1 if status == "failed" else 0,
+        project_root="/x",
+        summary=f"{name} {status}",
+        output=output,
+    )
+
+
+def _outcome(verdict, retries=0, checks=()):
+    return runner.TaskOutcome(
+        verification_state=verdict,
+        completion_contract=runner.CompletionContract(
+            goal="task", acceptance_criteria=[], verification_checks=[], limitations=[]
+        ),
+        checks=tuple(checks),
+        retries_used=retries,
+    )
+
+
+class _Conversation:
+    instances: ClassVar[list] = []
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+        self.state = SimpleNamespace(
+            execution_status=ConversationExecutionStatus.FINISHED, events=[]
+        )
+        _Conversation.instances.append(self)
+
+    def set_confirmation_policy(self, policy):
+        self.policy = policy
+
+
+def _provider_failure():
+    return ConversationRunError(uuid.uuid4(), LLMRateLimitError("slow down"))
+
+
+@pytest.fixture
+def fake_run(monkeypatch, tmp_path):
+    """Script each rung: (verdict | exception, cost, files to write)."""
+    _Conversation.instances = []
+    calls: list[dict] = []
+    script: list[tuple] = []
+
+    monkeypatch.setattr(runner, "Conversation", _Conversation)
+    monkeypatch.setattr(
+        runner, "build_agent", lambda cfg, **kw: {"usage_id": kw["usage_id"], "cfg": cfg}
+    )
+    monkeypatch.setattr(runner, "build_workspace", lambda cfg: nullcontext("the-workspace"))
+
+    def phases(conversation, cfg, emit, task, *args):
+        deadline, first_message = args[2], args[6]
+        calls.append({"cfg": cfg, "first_message": first_message, "deadline": deadline})
+        verdict, cost, files = script[len(calls) - 1]
+        conversation.cost = cost
+        for name, text in files.items():
+            (tmp_path / name).write_text(text)
+        if isinstance(verdict, BaseException):
+            raise verdict
+        checks = (_check(),) if verdict not in ("verified", "inconclusive") else ()
+        return _outcome(verdict, retries=1, checks=checks)
+
+    def metrics(conversation):
+        agent = conversation.kwargs["agent"]
+        return {
+            agent["usage_id"]: {
+                "accumulated_cost": conversation.cost,
+                "accumulated_token_usage": {
+                    "model": agent["cfg"].model,
+                    "prompt_tokens": 1000,
+                    "completion_tokens": 100,
+                },
+            }
+        }
+
+    monkeypatch.setattr(runner, "_run_stream_task_phases", phases)
+    monkeypatch.setattr(runner, "_per_model_metrics", metrics)
+    return SimpleNamespace(calls=calls, script=script)
+
+
+def _run(tmp_path, ladder, **kwargs):
+    emitted: list = []
+    progress: list[str] = []
+    cfg = kwargs.pop("cfg", None) or _cfg(tmp_path)
+    outcome = runner.stream_task(
+        "Build the thing",
+        cfg=cfg,
+        on_message=emitted.append,
+        ladder=ladder,
+        on_progress=progress.append,
+        **kwargs,
+    )
+    return outcome, progress
+
+
+def test_verified_on_the_first_rung_stops_there(tmp_path, fake_run):
+    fake_run.script[:] = [("verified", 0.0, {})]
+    outcome, progress = _run(tmp_path, _ladder(tmp_path))
+
+    assert outcome.verification_state == "verified"
+    assert outcome.final_rung == 1
+    assert [r.name for r in outcome.rungs] == ["local"]
+    assert len(_Conversation.instances) == 1
+    assert progress[0].startswith("Escalation: explicit ladder 'default', 3 rung(s):")
+
+
+@pytest.mark.parametrize(
+    "verdict", ["retry_exhausted", "no_progress", "timed_out", "incomplete", "stuck"]
+)
+def test_these_verdicts_climb_to_the_next_rung(tmp_path, fake_run, verdict):
+    fake_run.script[:] = [(verdict, 0.0, {}), ("verified", 0.01, {})]
+    outcome, progress = _run(tmp_path, _ladder(tmp_path))
+
+    assert [r.verdict for r in outcome.rungs] == [verdict, "verified"]
+    assert outcome.final_rung == 2
+    assert outcome.verification_state == "verified"
+    assert (
+        f"Certo: local ended {verdict} after 1 fix attempt; escalating to mid (rung 2 of 3)."
+        in progress
+    )
+
+
+@pytest.mark.parametrize(
+    "verdict", ["inconclusive", "budget_exhausted", "confirmation_required", "acceptance_failed"]
+)
+def test_these_verdicts_stop_the_climb(tmp_path, fake_run, verdict):
+    fake_run.script[:] = [(verdict, 0.0, {})]
+    outcome, _ = _run(tmp_path, _ladder(tmp_path))
+
+    assert outcome.verification_state == verdict
+    assert len(outcome.rungs) == 1
+
+
+def test_inconclusive_says_escalation_needs_something_to_check(tmp_path, fake_run):
+    fake_run.script[:] = [("inconclusive", 0.0, {})]
+    _, progress = _run(tmp_path, _ladder(tmp_path))
+    assert any("Escalation needs a project with something to check" in p for p in progress)
+
+
+def test_acceptance_failed_climbs_when_the_ladder_opts_in(tmp_path, fake_run):
+    fake_run.script[:] = [("acceptance_failed", 0.0, {}), ("verified", 0.0, {})]
+    outcome, _ = _run(tmp_path, _ladder(tmp_path, "careful"))
+    assert [r.name for r in outcome.rungs] == ["local", "strong"]
+
+
+def test_the_last_rung_verdict_is_final(tmp_path, fake_run):
+    fake_run.script[:] = [("no_progress", 0, {}), ("stuck", 0, {}), ("retry_exhausted", 0, {})]
+    outcome, progress = _run(tmp_path, _ladder(tmp_path))
+
+    assert outcome.verification_state == "retry_exhausted"
+    assert outcome.final_rung == 3
+    assert progress[-1] == (
+        "Certo: strong ended retry_exhausted; escalation stops: it was the last rung (3 of 3)."
+    )
+
+
+def test_each_rung_is_a_fresh_conversation_with_its_own_model_and_settings(tmp_path, fake_run):
+    fake_run.script[:] = [("no_progress", 0, {}), ("verified", 0, {})]
+    _run(tmp_path, _ladder(tmp_path))
+
+    first, second = _Conversation.instances
+    assert first is not second
+    assert first.kwargs["workspace"] == second.kwargs["workspace"] == "the-workspace"
+    assert first.kwargs["agent"]["usage_id"] == "certo:rung1:local"
+    assert second.kwargs["agent"]["usage_id"] == "certo:rung2:mid"
+    rung1, rung2 = (c["cfg"] for c in fake_run.calls)
+    assert (rung1.model, rung1.api_key, rung1.base_url) == (
+        "ollama/qwen3-coder:30b",
+        None,
+        "http://localhost:11434",
+    )
+    assert rung1.max_verify_retries == 1  # the rung's own retries
+    assert rung2.model == "openai/gpt-5.6-luna"
+    assert rung2.reasoning_effort == "low"  # the rung's own reasoning effort
+    assert rung2.max_verify_retries == 2  # CERTO_MAX_VERIFY_RETRIES
+
+
+def test_the_time_budget_is_shared_by_every_rung(tmp_path, fake_run):
+    fake_run.script[:] = [("no_progress", 0, {}), ("verified", 0, {})]
+    _run(tmp_path, _ladder(tmp_path))
+    assert fake_run.calls[0]["deadline"] == fake_run.calls[1]["deadline"]
+
+
+def test_a_spent_time_budget_stops_the_climb(tmp_path, fake_run):
+    fake_run.script[:] = [("no_progress", 0, {})]
+    outcome, progress = _run(tmp_path, _ladder(tmp_path), cfg=_cfg(tmp_path, max_task_seconds=0))
+
+    assert outcome.verification_state == "no_progress"
+    assert "time budget (CERTO_MAX_TASK_SECONDS=0) is spent" in progress[-1]
+
+
+def test_the_cost_cap_stops_the_climb(tmp_path, fake_run):
+    fake_run.script[:] = [("no_progress", 0.5, {})]
+    outcome, progress = _run(tmp_path, _ladder(tmp_path), cfg=_cfg(tmp_path, max_task_cost=0.4))
+
+    assert len(outcome.rungs) == 1
+    assert "the cost so far, $0.5000, has reached CERTO_MAX_TASK_COST=0.4" in progress[-1]
+
+
+def test_unknown_prices_count_as_zero_for_the_cost_cap(tmp_path, fake_run):
+    # The local model reports tokens but no cost: unknown, counted as 0.
+    fake_run.script[:] = [("no_progress", 0.0, {}), ("verified", 0.0, {})]
+    outcome, _ = _run(tmp_path, _ladder(tmp_path), cfg=_cfg(tmp_path, max_task_cost=0.1))
+    assert len(outcome.rungs) == 2
+    assert outcome.rungs[0].cost_known is False
+
+
+def test_a_provider_failure_moves_to_the_next_rung(tmp_path, fake_run):
+    fake_run.script[:] = [(_provider_failure(), 0, {}), ("verified", 0, {})]
+    outcome, progress = _run(tmp_path, _ladder(tmp_path))
+
+    assert outcome.verification_state == "verified"
+    first = outcome.rungs[0]
+    assert first.verdict is None
+    assert first.failure == "LLMRateLimitError: slow down"
+    assert any("failed at the provider or run level" in p for p in progress)
+    assert (
+        "Result: provider or run failure (LLMRateLimitError: slow down)"
+        in (fake_run.calls[1]["first_message"])
+    )
+
+
+def test_a_provider_failure_on_the_last_rung_is_raised(tmp_path, fake_run):
+    fake_run.script[:] = [("no_progress", 0, {}), ("stuck", 0, {}), (_provider_failure(), 0, {})]
+    with pytest.raises(ConversationRunError):
+        _run(tmp_path, _ladder(tmp_path))
+
+
+def test_any_other_run_error_is_raised_at_once_locally(tmp_path, fake_run):
+    fake_run.script[:] = [(ConversationRunError(uuid.uuid4(), RuntimeError("bug")), 0, {})]
+    with pytest.raises(ConversationRunError):
+        _run(tmp_path, _ladder(tmp_path))
+    assert len(fake_run.calls) == 1
+
+
+def test_in_docker_any_run_error_ends_the_rung(tmp_path, fake_run):
+    fake_run.script[:] = [
+        (ConversationRunError(uuid.uuid4(), RuntimeError("server said ERROR")), 0, {}),
+        ("verified", 0, {}),
+    ]
+    outcome, _ = _run(tmp_path, _ladder(tmp_path), cfg=_cfg(tmp_path, execution="docker"))
+    assert [r.verdict for r in outcome.rungs] == [None, "verified"]
+
+
+def test_the_handoff_message_is_built_from_facts(tmp_path, fake_run):
+    (tmp_path / "README.md").write_text("old")
+    fake_run.script[:] = [
+        ("no_progress", 0, {"wordle.py": "def score(): ...", "README.md": "new text"}),
+        ("verified", 0, {}),
+    ]
+    _run(tmp_path, _ladder(tmp_path))
+
+    message = fake_run.calls[1]["first_message"]
+    assert fake_run.calls[0]["first_message"] is None  # rung 1 gets the task itself
+    assert "This summary was written by Certo from what it recorded, not by a model." in message
+    assert "- Model: local (ollama/qwen3-coder:30b)" in message
+    assert "- Result: no_progress" in message
+    assert "- Fix attempts after failed checks: 1" in message
+    assert "- Files it created: wordle.py" in message
+    assert "- Files it changed: README.md" in message
+    assert "- Checks failing when it stopped: pytest (`pytest -q`)" in message
+    assert "The task:\n\nBuild the thing" in message
+    assert "E   assert 2 == 3" in message  # the real failing output
+
+
+def test_a_third_rung_hears_about_both_earlier_ones(tmp_path, fake_run):
+    fake_run.script[:] = [("no_progress", 0, {}), ("stuck", 0, {}), ("verified", 0, {})]
+    _run(tmp_path, _ladder(tmp_path))
+    message = fake_run.calls[2]["first_message"]
+    assert "- Model: mid (openai/gpt-5.6-luna)" in message
+    assert "- Earlier models on this task: local: no_progress" in message
+
+
+def test_interactive_yes_climbs_and_shows_the_cost(tmp_path, fake_run):
+    fake_run.script[:] = [("no_progress", 0.0, {}), ("verified", 0.02, {})]
+    questions: list[str] = []
+
+    def answer(question):
+        questions.append(question)
+        return True
+
+    outcome, _ = _run(
+        tmp_path, _ladder(tmp_path), cfg=_cfg(tmp_path, interactive=True), on_escalate=answer
+    )
+
+    assert len(outcome.rungs) == 2
+    assert questions[0].startswith("local couldn't finish (no_progress). Try mid next?")
+    assert "Cost so far: $0.0000 (no known price for local: counted as 0)." in questions[0]
+
+
+def test_interactive_no_stops_with_the_current_verdict(tmp_path, fake_run):
+    fake_run.script[:] = [("no_progress", 0, {})]
+    outcome, progress = _run(
+        tmp_path,
+        _ladder(tmp_path),
+        cfg=_cfg(tmp_path, interactive=True),
+        on_escalate=lambda q: False,
+    )
+    assert outcome.verification_state == "no_progress"
+    assert "you chose not to try the next model" in progress[-1]
+
+
+def test_without_interactive_the_question_is_never_asked(tmp_path, fake_run):
+    fake_run.script[:] = [("no_progress", 0, {}), ("verified", 0, {})]
+    outcome, _ = _run(tmp_path, _ladder(tmp_path), on_escalate=lambda q: pytest.fail("asked"))
+    assert len(outcome.rungs) == 2
+
+
+def test_per_rung_results_and_the_combined_summary(tmp_path, fake_run):
+    fake_run.script[:] = [("no_progress", 0.0, {}), ("verified", 0.25, {})]
+    outcome, _ = _run(tmp_path, _ladder(tmp_path))
+
+    first, second = outcome.rungs
+    assert (first.number, first.name, first.retries_used) == (1, "local", 1)
+    assert first.summary.total_tokens == 1100
+    assert second.cost == 0.25
+    assert outcome.run_summary.total_cost == 0.25
+    assert {m.model for m in outcome.run_summary.models} == {
+        "ollama/qwen3-coder:30b",
+        "openai/gpt-5.6-luna",
+    }
+
+
+def test_the_escalate_setting_resolves_the_ladder_itself(tmp_path, fake_run):
+    (tmp_path / "models.yaml").write_text(_CATALOG)
+    fake_run.script[:] = [("verified", 0, {})]
+    cfg = _cfg(
+        tmp_path,
+        model_selection="escalate",
+        escalation_ladder="careful",
+        models_file=str(tmp_path / "models.yaml"),
+    )
+    outcome, progress = _run(tmp_path, None, cfg=cfg)
+    assert progress[0].startswith("Escalation: explicit ladder 'careful'")
+    assert outcome.final_rung == 1
+
+
+def test_a_single_model_run_never_escalates(tmp_path, fake_run, monkeypatch):
+    monkeypatch.setattr(
+        runner, "_stream_escalation", lambda *a, **k: pytest.fail("escalation without a ladder")
+    )
+    fake_run.script[:] = [("no_progress", 0, {})]
+    outcome = runner.stream_task("Build the thing", cfg=_cfg(tmp_path))
+
+    assert outcome.verification_state == "no_progress"
+    assert outcome.rungs == ()
+    assert outcome.final_rung is None
+    assert len(_Conversation.instances) == 1

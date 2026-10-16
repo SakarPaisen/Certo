@@ -34,15 +34,26 @@ from .acceptance import AcceptanceCheck, AcceptanceCheckResult, evaluate_accepta
 from .agent import build_agent
 from .artifacts import write_run_artifacts
 from .catalog_check import load_checked_catalog
-from .config import Config, load_config
+from .config import Config, load_config, override_llm
 from .custom_tools.run_tests_tool import (
     CheckOutcome,
     VerificationRun,
     detect_project,
     run_full_verification,
 )
-from .escalation import EscalationError, ResolvedLadder
+from .escalation import (
+    FileChanges,
+    ResolvedLadder,
+    Rung,
+    RungResult,
+    climb_line,
+    describe_ladder,
+    handoff_message,
+    load_ladder,
+    workspace_listing,
+)
 from .model_catalog import classify_task, rank_candidates
+from .model_pricing import estimate_run_cost
 from .model_selection import (
     ModelChain,
     ModelDecisionRecord,
@@ -179,6 +190,10 @@ class TaskOutcome:
     # Wall-clock time, models used, tokens, and cost for the whole task —
     # see run_summary.py. Always set by stream_task.
     run_summary: RunSummary | None = None
+    # Only set by escalation (see escalation.py): one entry per rung that
+    # ran, in order, and the number of the rung whose verdict this is.
+    rungs: tuple[RungResult, ...] = ()
+    final_rung: int | None = None
 
     @property
     def success(self) -> bool:
@@ -1108,6 +1123,8 @@ def stream_task(
     resume_from: RunRecord | None = None,
     resume_instruction: str | None = None,
     ladder: ResolvedLadder | None = None,
+    on_escalate: OnEscalate | None = None,
+    on_progress: Callable[[str], None] | None = None,
 ) -> TaskOutcome:
     """Run a task, invoking `on_message` with each message as it's produced,
     and return the terminal `TaskOutcome` once verification has settled.
@@ -1141,6 +1158,12 @@ def stream_task(
     benchmark runs leave no such folder. `resume_from` continues the run that
     record describes: `task` must be its task, and `resume_instruction` is an
     optional extra message from the user. A resume always saves state.
+
+    `ladder` (or `cfg.model_selection == "escalate"`, which resolves one from
+    `cfg.models_file`) runs the task as an escalation: see
+    `_stream_escalation`. `on_escalate` is asked before each climb when
+    `cfg.interactive` is set; `on_progress` receives the escalation lines
+    (the ladder, each climb) for a terminal.
     """
     # Total running time covers the whole task, model selection and
     # verification included (and any interactive waits — it is wall clock).
@@ -1148,8 +1171,6 @@ def stream_task(
     started_at = datetime.now(UTC).isoformat()
     if cfg is None:
         cfg = load_config()
-    if ladder is not None or cfg.model_selection == "escalate":
-        raise EscalationError("Escalation isn't available in this build yet.")
     emit = on_message or (lambda _msg: None)
     checkpoint_buffer: list[Message] = []
     all_messages: list[Message] = []
@@ -1160,6 +1181,36 @@ def stream_task(
             checkpoint_buffer.append(message)
             all_messages.append(message)
             emit(message)
+
+    if ladder is None and cfg.model_selection == "escalate":
+        ladder = load_ladder(
+            cfg.models_file,
+            task,
+            cfg.escalation_ladder or None,
+            on_warning=lambda w: _emit_notice(emit, f"Certo: models.yaml: {w}"),
+        )
+    if ladder is not None:
+        return _stream_escalation(
+            task,
+            cfg,
+            ladder,
+            _EscalationIO(
+                emit=emit,
+                on_event=on_event,
+                checkpoint_buffer=checkpoint_buffer,
+                all_messages=all_messages,
+                on_confirm=on_confirm,
+                on_awaiting_input=on_awaiting_input,
+                on_escalate=on_escalate,
+                on_progress=on_progress,
+            ),
+            acceptance_checks=acceptance_checks,
+            run_id=run_id,
+            project=project,
+            save_state=save_state,
+            run_started=run_started,
+            started_at=started_at,
+        )
 
     # CERTO_MODEL_SELECTION=auto: pick the best-fit catalog candidate for
     # this task before the Agent/Conversation is even built. The rest of
@@ -1516,6 +1567,270 @@ def _run_stream_task_phases(
     return outcome
 
 
+# Asked before each climb under CERTO_INTERACTIVE: the question (who
+# couldn't finish, the next model, the cost so far and an estimate) ->
+# whether to climb. cli.py prompts at the terminal; server.py never asks.
+OnEscalate = Callable[[str], bool]
+
+
+@dataclass
+class _EscalationIO:
+    """The callbacks and message buffers `stream_task` shares with
+    `_stream_escalation`."""
+
+    emit: Callable[[Message], None]
+    on_event: Callable[[Event], None]
+    checkpoint_buffer: list[Message]
+    all_messages: list[Message]
+    on_confirm: ConfirmCallback | None
+    on_awaiting_input: OnAwaitingInput | None
+    on_escalate: OnEscalate | None
+    on_progress: Callable[[str], None] | None
+
+    def notify(self, text: str) -> None:
+        """An escalation line: a notice in the transcript, and printed."""
+        _emit_notice(self.emit, text)
+        if self.on_progress is not None:
+            self.on_progress(text)
+
+
+def _rung_config(cfg: Config, rung: Rung) -> Config:
+    """`cfg` with the rung's model, and its own reasoning effort and
+    fix-attempt budget when the ladder sets them."""
+    rung_cfg = config_for_entry(cfg, rung.entry)
+    if rung.reasoning_effort:
+        rung_cfg = override_llm(rung_cfg, reasoning_effort=rung.reasoning_effort)
+    if rung.retries is not None:
+        rung_cfg = replace(rung_cfg, max_verify_retries=rung.retries)
+    return rung_cfg
+
+
+def _is_rung_failure(exc: ConversationRunError, cfg: Config) -> bool:
+    """Whether a run error ends the rung (and moves to the next one) rather
+    than the whole task. Locally only a provider failure (the SDK's
+    `LLMError`) does; a remote (Docker) conversation wraps every failure in
+    a server error, so there any run error counts."""
+    if cfg.execution != "local":
+        return True
+    return isinstance(exc.original_exception, LLMError)
+
+
+def _failing(outcome: TaskOutcome | None) -> list[CheckOutcome]:
+    if outcome is None:
+        return []
+    return [c for c in outcome.checks if c.status in ("failed", "timed_out")]
+
+
+def _cost_note(rungs: Sequence[RungResult]) -> str:
+    spent = sum(r.cost for r in rungs)
+    unpriced = [r.name for r in rungs if not r.cost_known]
+    note = f"${spent:.4f}"
+    if unpriced:
+        note += f" (no known price for {', '.join(unpriced)}: counted as 0)"
+    return note
+
+
+def _escalation_stop_reason(cfg: Config, deadline: float, rungs: Sequence[RungResult]) -> str:
+    """Why the next rung must not start, or "" when it may."""
+    if time.monotonic() >= deadline:
+        return f"the task's time budget (CERTO_MAX_TASK_SECONDS={cfg.max_task_seconds}) is spent"
+    if cfg.max_task_cost is not None and sum(r.cost for r in rungs) >= cfg.max_task_cost:
+        return (
+            f"the cost so far, {_cost_note(rungs)}, has reached CERTO_MAX_TASK_COST="
+            f"{cfg.max_task_cost:g}"
+        )
+    return ""
+
+
+def _escalation_question(previous: RungResult, nxt: Rung, rungs: Sequence[RungResult]) -> str:
+    estimate = estimate_run_cost(nxt.entry)
+    if estimate is None:
+        price = "no price known"
+    elif estimate == 0:
+        price = "local, no cost"
+    else:
+        price = f"roughly ${estimate:.2f} for a run, from LiteLLM's prices"
+    return (
+        f"{previous.name} couldn't finish ({previous.ended}). Try {nxt.name} next? "
+        f"Cost so far: {_cost_note(rungs)}. {nxt.name}: {price}."
+    )
+
+
+def _stream_escalation(
+    task: str,
+    cfg: Config,
+    ladder: ResolvedLadder,
+    io: _EscalationIO,
+    *,
+    acceptance_checks: Sequence[AcceptanceCheck] | None,
+    run_id: str | None,
+    project: str | None,
+    save_state: bool,
+    run_started: float,
+    started_at: str,
+) -> TaskOutcome:
+    """Run `task` up `ladder`: each rung is the normal run (verification,
+    retries, to-do enforcement) in a fresh conversation with its own model,
+    in the same workspace. Stops at the first verdict that doesn't escalate
+    (see `ResolvedLadder.escalates_on`), at the last rung, when the shared
+    time budget or `CERTO_MAX_TASK_COST` is spent, or when the user declines
+    a climb. The final verdict is the last rung's.
+
+    The next rung gets the files as they are, the original task, the real
+    output of the checks that were failing, and a note Certo writes from
+    recorded facts (`escalation.handoff_message`), never the previous
+    conversation: it can be huge, and replaying it to an expensive model
+    costs money and adds noise. A provider failure ends a rung as well, and
+    is recorded as such; on the last rung, or when the climb stops after
+    it, the error is raised as in a single-model run.
+    """
+    io.notify("\n".join(describe_ladder(ladder)))
+    rungs: list[RungResult] = []
+    per_model_metrics: dict[str, dict] = {}
+    final_outcome: TaskOutcome | None = None
+    final_rung: int | None = None
+    last_error: BaseException | None = None
+    failing_output = ""
+    total = len(ladder.rungs)
+
+    with build_workspace(cfg) as workspace:
+        runner = _command_runner(cfg, workspace)
+        project_env = _prepare_agent_env(task, cfg, runner, io.emit)
+        # One budget for every rung together, as for every retry.
+        deadline = time.monotonic() + cfg.max_task_seconds
+        for number, rung in enumerate(ladder.rungs, start=1):
+            rung_cfg = _rung_config(cfg, rung)
+            usage_id = f"certo:rung{number}:{rung.name}"
+
+            def new_conversation(
+                rung_cfg: Config = rung_cfg, usage_id: str = usage_id, **persistence: Any
+            ) -> Conversation:
+                return Conversation(
+                    agent=build_agent(
+                        rung_cfg,
+                        usage_id=usage_id,
+                        project_env=project_env,
+                        terminal_env=terminal_env(project_env, runner),
+                    ),
+                    callbacks=[io.on_event],
+                    workspace=workspace,
+                    max_iteration_per_run=rung_cfg.max_iterations,
+                    **persistence,
+                )
+
+            state_writer: _ProjectStateWriter | None = None
+            if save_state:
+                conversation, state_writer, _ = _open_saved_conversation(
+                    new_conversation, rung_cfg, task, rung.entry.model, None, None, io.emit
+                )
+            else:
+                conversation = new_conversation()
+            if cfg.confirm_mode == "always":
+                conversation.set_confirmation_policy(AlwaysConfirm())
+
+            first_message = None if number == 1 else handoff_message(task, rungs, failing_output)
+            before = workspace_listing(cfg.workspace)
+            rung_started = time.monotonic()
+            io.checkpoint_buffer.clear()
+            outcome: TaskOutcome | None = None
+            failure: str | None = None
+            try:
+                outcome = _run_stream_task_phases(
+                    conversation,
+                    rung_cfg,
+                    io.emit,
+                    task,
+                    io.on_confirm,
+                    io.on_awaiting_input,
+                    deadline,
+                    None,
+                    io.checkpoint_buffer,
+                    runner,
+                    first_message,
+                    state_writer.on_verification if state_writer is not None else None,
+                )
+                outcome = _apply_acceptance_checks(outcome, cfg, io.emit, acceptance_checks)
+            except ConversationRunError as exc:
+                if not _is_rung_failure(exc, cfg):
+                    if state_writer is not None:
+                        state_writer.fail(exc)
+                    raise
+                original = exc.original_exception or exc
+                failure = f"{type(original).__name__}: {original}"
+                last_error = exc
+            except BaseException as exc:
+                if state_writer is not None:
+                    state_writer.fail(exc)
+                raise
+            rung_metrics = _per_model_metrics(conversation)
+            per_model_metrics.update(rung_metrics)
+            failing = _failing(outcome)
+            result = RungResult(
+                number=number,
+                name=rung.name,
+                model=rung.entry.model,
+                verdict=outcome.verification_state if outcome is not None else None,
+                retries_used=outcome.retries_used if outcome is not None else 0,
+                duration_seconds=time.monotonic() - rung_started,
+                summary=summarize_run(time.monotonic() - rung_started, rung_metrics),
+                failure=failure,
+                changes=FileChanges.between(before, workspace_listing(cfg.workspace)),
+                failing_checks=tuple(f"{c.name} (`{c.command}`)" for c in failing),
+            )
+            rungs.append(result)
+            if state_writer is not None:
+                if outcome is not None:
+                    state_writer.finish(outcome)
+                else:
+                    state_writer.fail(RuntimeError(failure))
+            if outcome is not None:
+                final_outcome, final_rung = outcome, number
+
+            if outcome is not None and not ladder.escalates_on(outcome.verification_state):
+                if outcome.verification_state == "inconclusive":
+                    io.notify(
+                        f"Certo: {rung.name} ended inconclusive: nothing in the project could "
+                        "be checked, so there is no signal to escalate on. Escalation needs a "
+                        "project with something to check, such as tests or a build."
+                    )
+                break
+            stop = (
+                f"it was the last rung ({number} of {total})"
+                if number == total
+                else _escalation_stop_reason(cfg, deadline, rungs)
+            )
+            nxt = ladder.rungs[number] if number < total else None
+            if (
+                not stop
+                and nxt is not None
+                and cfg.interactive
+                and io.on_escalate is not None
+                and not io.on_escalate(_escalation_question(result, nxt, rungs))
+            ):
+                stop = "you chose not to try the next model"
+            if stop:
+                io.notify(f"Certo: {rung.name} ended {result.ended}; escalation stops: {stop}.")
+                if outcome is None:
+                    raise last_error  # type: ignore[misc]
+                break
+            io.notify(climb_line(result, nxt, number + 1, total))
+            failing_output = "\n\n---\n\n".join(_check_followup(c) for c in failing)
+
+    if final_outcome is None:
+        # Every rung that ran ended in a provider failure.
+        raise last_error  # type: ignore[misc]
+    if final_rung != rungs[-1].number:
+        # The last rung failed at the provider level after an earlier verdict:
+        # that is the error to report, not the older verdict.
+        raise last_error  # type: ignore[misc]
+    return replace(
+        final_outcome,
+        rungs=tuple(rungs),
+        final_rung=final_rung,
+        run_summary=summarize_run(time.monotonic() - run_started, per_model_metrics),
+    )
+
+
 def run_task(
     task: str,
     cfg: Config | None = None,
@@ -1529,6 +1844,8 @@ def run_task(
     resume_from: RunRecord | None = None,
     resume_instruction: str | None = None,
     ladder: ResolvedLadder | None = None,
+    on_escalate: OnEscalate | None = None,
+    on_progress: Callable[[str], None] | None = None,
 ) -> TaskResult:
     messages: list = []
     outcome = stream_task(
@@ -1545,5 +1862,7 @@ def run_task(
         resume_from=resume_from,
         resume_instruction=resume_instruction,
         ladder=ladder,
+        on_escalate=on_escalate,
+        on_progress=on_progress,
     )
     return TaskResult(messages, outcome)  # last message is the final assistant output

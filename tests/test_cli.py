@@ -1700,3 +1700,22 @@ def test_escalate_without_a_catalog_says_what_to_do(monkeypatch, tmp_path, capsy
 
     assert cli.main(["do it", "--escalate"]) == 1
     assert "Escalation needs a model catalog" in capsys.readouterr().err
+
+
+def test_escalate_prints_progress_and_asks_only_when_interactive(monkeypatch, tmp_path):
+    calls: list = []
+    monkeypatch.setattr(cli, "load_config", lambda: _escalation_cfg(tmp_path))
+    monkeypatch.setattr(cli, "run_task", _recording_run_task(calls))
+
+    cli.main(["do it", "--escalate"])
+    cli.main(["do it", "--escalate", "--interactive"])
+
+    assert calls[0]["on_progress"] is cli._print_progress
+    assert calls[0]["on_escalate"] is None
+    assert calls[1]["on_escalate"] is cli._confirm_escalation
+
+
+@pytest.mark.parametrize(("answer", "climbs"), [("", True), ("y", True), ("n", False)])
+def test_the_escalation_prompt(monkeypatch, answer, climbs):
+    monkeypatch.setattr("builtins.input", lambda prompt: answer)
+    assert cli._confirm_escalation("Try mid next?") is climbs

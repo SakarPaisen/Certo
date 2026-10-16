@@ -25,6 +25,7 @@ import math
 import os
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from .catalog_check import load_checked_catalog, usable_rungs
 from .model_catalog import (
@@ -35,6 +36,7 @@ from .model_catalog import (
     capability,
     classify_task,
 )
+from .run_summary import RunSummary, format_duration
 
 # Final verdicts that mean "this model couldn't finish the job": the next
 # rung gets the task. Never `inconclusive` (nothing to act on), and never
@@ -217,4 +219,171 @@ def describe_ladder(ladder: ResolvedLadder) -> list[str]:
         lines.append(f"  Skipped: {', '.join(ladder.skipped)}")
     if len(ladder.rungs) == 1:
         lines.append("  Only one rung: this task can't escalate.")
+    return lines
+
+
+# --- One rung's result, and the handoff to the next ------------------------------
+
+# Folders left out of the before/after listing: tools' caches and
+# environments, and Certo's own state.
+_LISTING_SKIP_DIRS = {
+    ".git",
+    ".certo",
+    ".venv",
+    "venv",
+    "node_modules",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
+    ".tox",
+    "dist",
+    "build",
+}
+_MAX_LISTED_FILES = 30
+
+
+def workspace_listing(root: str) -> dict[str, tuple[int, int]]:
+    """Every file under `root` (relative path -> size and modification time),
+    skipping caches, environments and `.certo/`."""
+    listing: dict[str, tuple[int, int]] = {}
+    for dirpath, dirs, files in os.walk(root):
+        dirs[:] = sorted(d for d in dirs if d not in _LISTING_SKIP_DIRS)
+        for name in files:
+            path = os.path.join(dirpath, name)
+            try:
+                info = os.stat(path)
+            except OSError:
+                continue
+            listing[os.path.relpath(path, root)] = (info.st_size, info.st_mtime_ns)
+    return listing
+
+
+@dataclass(frozen=True)
+class FileChanges:
+    created: tuple[str, ...] = ()
+    modified: tuple[str, ...] = ()
+    deleted: tuple[str, ...] = ()
+
+    @classmethod
+    def between(
+        cls, before: dict[str, tuple[int, int]], after: dict[str, tuple[int, int]]
+    ) -> FileChanges:
+        return cls(
+            created=tuple(sorted(set(after) - set(before))),
+            modified=tuple(sorted(p for p in set(after) & set(before) if after[p] != before[p])),
+            deleted=tuple(sorted(set(before) - set(after))),
+        )
+
+
+@dataclass(frozen=True)
+class RungResult:
+    """What one rung did, from facts Certo recorded, never from the model."""
+
+    number: int
+    name: str
+    model: str
+    verdict: str | None  # None when the rung ended in a provider or run failure
+    retries_used: int
+    duration_seconds: float
+    summary: RunSummary | None
+    failure: str | None = None  # the provider or run failure, when there was one
+    changes: FileChanges = FileChanges()
+    failing_checks: tuple[str, ...] = ()  # "name (`command`)"
+
+    @property
+    def cost(self) -> float:
+        return self.summary.total_cost if self.summary is not None else 0.0
+
+    @property
+    def cost_known(self) -> bool:
+        return self.summary.cost_complete if self.summary is not None else True
+
+    @property
+    def ended(self) -> str:
+        return self.verdict or "provider or run failure"
+
+    def to_dict(self) -> dict[str, Any]:
+        summary = self.summary
+        return {
+            "rung": self.number,
+            "name": self.name,
+            "model": self.model,
+            "verdict": self.verdict,
+            "failure": self.failure,
+            "fix_attempts": self.retries_used,
+            "duration_seconds": round(self.duration_seconds, 3),
+            "tokens": summary.total_tokens if summary else 0,
+            "cost": self.cost,
+            "cost_known": self.cost_known,
+            "files_created": list(self.changes.created),
+            "files_modified": list(self.changes.modified),
+            "files_deleted": list(self.changes.deleted),
+            "failing_checks": list(self.failing_checks),
+        }
+
+
+def _files(paths: tuple[str, ...]) -> str:
+    if not paths:
+        return "none"
+    shown = ", ".join(paths[:_MAX_LISTED_FILES])
+    more = len(paths) - _MAX_LISTED_FILES
+    return shown + (f" and {more} more" if more > 0 else "")
+
+
+def _attempts(n: int) -> str:
+    return f"{n} fix attempt" + ("" if n == 1 else "s")
+
+
+def handoff_message(task: str, previous: Sequence[RungResult], failing_output: str) -> str:
+    """The first message of a rung after the first: the original task, a
+    note Certo writes from recorded facts, and the real output of the checks
+    that were failing. The files stay in the folder as they were left."""
+    last = previous[-1]
+    lines = [
+        (
+            "Another model already worked on this task in this folder and couldn't "
+            "finish it. Its files are still here, exactly as it left them: look at them "
+            "first, keep what works, and complete the task. This summary was written by "
+            "Certo from what it recorded, not by a model."
+        ),
+        "",
+        f"- Model: {last.name} ({last.model})",
+        f"- Result: {last.ended}" + (f" ({last.failure})" if last.failure else ""),
+        f"- Fix attempts after failed checks: {last.retries_used}",
+        f"- Files it created: {_files(last.changes.created)}",
+        f"- Files it changed: {_files(last.changes.modified)}",
+        f"- Files it deleted: {_files(last.changes.deleted)}",
+        f"- Checks failing when it stopped: {', '.join(last.failing_checks) or 'none'}",
+    ]
+    if len(previous) > 1:
+        earlier = "; ".join(f"{r.name}: {r.ended}" for r in previous[:-1])
+        lines.append(f"- Earlier models on this task: {earlier}")
+    lines += ["", "The task:", "", task.strip()]
+    if failing_output:
+        lines += ["", "Output of the checks that were failing:", "", failing_output]
+    return "\n".join(lines)
+
+
+def climb_line(previous: RungResult, nxt: Rung, number: int, total: int) -> str:
+    if previous.verdict is None:
+        why = f"failed at the provider or run level ({previous.failure})"
+    else:
+        why = f"ended {previous.verdict} after {_attempts(previous.retries_used)}"
+    return f"Certo: {previous.name} {why}; escalating to {nxt.name} (rung {number} of {total})."
+
+
+def format_rung_lines(rungs: Sequence[RungResult], final_rung: int | None) -> list[str]:
+    """The per-rung part of the run summary."""
+    lines = ["Rungs:"]
+    for r in rungs:
+        tokens = r.summary.total_tokens if r.summary else 0
+        cost = f"${r.cost:.4f}" if r.cost_known else f"${r.cost:.4f} + unknown"
+        lines.append(
+            f"  {r.number}. {r.name} ({r.model}): {r.ended}, {_attempts(r.retries_used)}, "
+            f"{format_duration(r.duration_seconds)}, {tokens:,} tokens, {cost}"
+        )
+    if final_rung is not None:
+        final = next(r for r in rungs if r.number == final_rung)
+        lines.append(f"Final result from rung {final_rung} ({final.name}).")
     return lines

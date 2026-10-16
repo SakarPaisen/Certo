@@ -13,6 +13,7 @@ provider, model, or base URL.
 from __future__ import annotations
 
 import logging
+import math
 import os
 import platform as _platform
 from collections.abc import Mapping, MutableMapping
@@ -200,6 +201,10 @@ class Config:
     # from models.yaml to climb; blank: `default`, else a derived one
     # (see escalation.py).
     escalation_ladder: str = ""
+    # CERTO_MAX_TASK_COST: a USD cap on an escalation run. Before a rung
+    # starts, the cost recorded so far is compared with it; unknown prices
+    # count as 0. None (unset) means no cap.
+    max_task_cost: float | None = None
 
     # Opt-in per-run artifacts directory (see artifacts.py): metadata, the
     # full message transcript, and token/cost metrics for each task run,
@@ -333,6 +338,20 @@ def _parse_nonnegative_int(env: Mapping[str, str], suffix: str, *, default: int)
         raise ConfigError(f"{name} must be an integer, got {value!r}.") from None
     if parsed < 0:
         raise ConfigError(f"{name} must be zero or a positive integer, got {parsed}.")
+    return parsed
+
+
+def _parse_optional_cost(env: Mapping[str, str], suffix: str) -> float | None:
+    value, name = _read(env, suffix)
+    cleaned = _clean(value)
+    if cleaned is None:
+        return None
+    try:
+        parsed = float(cleaned)
+    except ValueError:
+        raise ConfigError(f"{name} must be an amount in US dollars, got {value!r}.") from None
+    if parsed < 0 or math.isnan(parsed):
+        raise ConfigError(f"{name} must be zero or more, got {value!r}.")
     return parsed
 
 
@@ -594,6 +613,7 @@ def load_config(
     )
     models_file = _get(env, "MODELS_FILE") or DEFAULT_MODELS_FILE
     escalation_ladder = _get(env, "ESCALATION_LADDER") or ""
+    max_task_cost = _parse_optional_cost(env, "MAX_TASK_COST")
     artifacts_dir = _get(env, "ARTIFACTS_DIR") or ""
     no_worktree_warning = _parse_bool(env, "NO_WORKTREE_WARNING", default=False)
     save_state = _parse_bool(env, "SAVE_STATE", default=True)
@@ -639,6 +659,7 @@ def load_config(
         model_selection=model_selection,
         models_file=models_file,
         escalation_ladder=escalation_ladder,
+        max_task_cost=max_task_cost,
         artifacts_dir=artifacts_dir,
         no_worktree_warning=no_worktree_warning,
         save_state=save_state,

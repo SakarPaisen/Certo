@@ -89,6 +89,20 @@ def _prompt_for_model_choice(
     return recommended_index
 
 
+def _confirm_escalation(question: str) -> bool:
+    """Interactive terminal handler for an escalation climb: Enter or yes
+    climbs, anything else stops with the current verdict."""
+    try:
+        answer = input(f"\n{question} [Y/n] ").strip().lower()
+    except EOFError:
+        return False
+    return answer in ("", "y", "yes")
+
+
+def _print_progress(line: str) -> None:
+    print(line, flush=True)
+
+
 def resolve_task_source(value: str) -> str:
     """Resolve the `task` argument to actual task text.
 
@@ -557,6 +571,8 @@ def main(argv: list[str] | None = None) -> int:
             resume_from=resume_from,
             resume_instruction=task if resume_from is not None else None,
             ladder=ladder,
+            on_escalate=_confirm_escalation if cfg.interactive else None,
+            on_progress=_print_progress if ladder is not None else None,
         )
     except KeyboardInterrupt:
         print("\nInterrupted.", file=sys.stderr)

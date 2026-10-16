@@ -897,3 +897,14 @@ def test_escalate_is_a_model_selection_mode_with_an_optional_ladder():
     )
     assert (cfg.model_selection, cfg.escalation_ladder) == ("escalate", "local-only")
     assert load_config(_base_env()).escalation_ladder == ""
+
+
+@pytest.mark.parametrize(("value", "expected"), [("", None), ("2.5", 2.5), ("0", 0.0)])
+def test_max_task_cost(value, expected):
+    assert load_config(_base_env(CERTO_MAX_TASK_COST=value)).max_task_cost == expected
+
+
+@pytest.mark.parametrize("value", ["-1", "lots", "nan"])
+def test_max_task_cost_rejects_bad_values(value):
+    with pytest.raises(ConfigError, match="CERTO_MAX_TASK_COST"):
+        load_config(_base_env(CERTO_MAX_TASK_COST=value))
