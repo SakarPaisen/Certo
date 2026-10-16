@@ -38,6 +38,8 @@ The stories behind each of these checks are in
   every action" mode.
 - Run the agent in a Docker container, or as an HTTP server.
 - Keep a record of each run: the full transcript, tokens and cost.
+- Resume a task that was interrupted or failed, with the agent's earlier
+  conversation: `certo --resume`.
 - Benchmark models on bundled tasks graded by hidden tests: `certo bench`.
 
 ## Where to go next
@@ -59,6 +61,7 @@ takes you from install to your first verified project.
 | Run the agent inside a container | [Run in Docker](guides/run-in-docker.md) |
 | Call Certo over HTTP | [Run as a server](guides/run-as-a-server.md) |
 | See what a run did and what it cost | [Run records and costs](guides/run-records-and-costs.md) |
+| Continue a task after an interruption or a failed verdict | [Resume an interrupted run](guides/resume-a-run.md) |
 | Teach the agent my conventions, or give it new tools | [Add skills and tools](guides/add-skills-and-tools.md) |
 | Measure which models and strategies really deliver | [Benchmark models and strategies](guides/benchmark.md) |
 
@@ -110,6 +113,9 @@ takes you from install to your first verified project.
   verified.** `node --test` and some other runners exit successfully when
   there is nothing to run. See
   [Verification by language](reference/verification-by-language.md#node-in-detail).
+- **Resume in Docker mode starts a new conversation**: the agent gets the
+  task, Certo's status record and the files, but not its earlier
+  conversation. See [Resume an interrupted run](guides/resume-a-run.md#when-the-conversation-cant-be-resumed).
 - **A task that is exactly the name of an existing file** in the current
   folder is read from that file.
 - **Interactive mode covers only the first part of a task**, and neither it

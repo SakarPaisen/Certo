@@ -49,9 +49,10 @@ def was_created_by_certo(projects_dir: str, project: str) -> bool:
 
 
 def _has_files(path: str) -> bool:
+    """Anything besides Certo's own `.certo/` state folder."""
     try:
         with os.scandir(path) as entries:
-            return any(True for _ in entries)
+            return any(entry.name != ".certo" for entry in entries)
     except OSError:
         return False
 

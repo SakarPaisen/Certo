@@ -19,9 +19,10 @@ certo TASK [--project NAME] [--execution {local,docker}] [--model MODEL]
            [--api-key KEY] [--base-url URL] [--reasoning-effort LEVEL]
            [--agents-md TEXT] [--interactive] [--auto-model]
            [--require-verification] [--acceptance-checks JSON_OR_FILE]
+certo --resume [TASK] [same options]
 ```
 
-**`TASK`** (required) is one of, checked in this order:
+**`TASK`** (required, except with `--resume`) is one of, checked in this order:
 
 1. an `http://` or `https://` URL: the page is downloaded (15-second
    limit) and used as the task;
@@ -46,18 +47,24 @@ current folder, the file is read instead.
 | `--auto-model` | off (`CERTO_MODEL_SELECTION`) | Pick the model from `models.yaml`. See [Pick models automatically](../guides/pick-models-automatically.md). |
 | `--require-verification` | off | Exit 1 for `inconclusive` too. |
 | `--acceptance-checks JSON_OR_FILE` | none | Extra file checks for this task, as inline JSON or a JSON file. See [Acceptance checks](../guides/acceptance-checks.md). |
+| `--resume` | off | Continue the last run in this folder (or in `--project NAME`) from the state in its `.certo/` folder. `TASK` is optional and is sent as an extra instruction. Errors when there is no saved state; does nothing (exit 0) when the last run ended `verified` and no `TASK` is given. See [Resume an interrupted run](../guides/resume-a-run.md). |
 
 **Output.** With `--project`, the first line is
 `Project workspace: <path>`. A warning about uncommitted changes may
 follow (see [Work on an existing project](../guides/work-on-an-existing-project.md)).
 At the end: the agent's last message (or Certo's last note), the
 `Model used:` line with `--auto-model`, then `Verification: <verdict>`,
-any limitations as `-` lines, and the run summary.
+any limitations as `-` lines, and the run summary. After a failing
+verdict, a last line names `.certo/STATUS.md` and the `certo --resume`
+command (unless `CERTO_SAVE_STATE` is off).
+
+**State.** Every run keeps its state in the project's `.certo/` folder,
+which git ignores. See [Resume an interrupted run](../guides/resume-a-run.md#the-certo-folder).
 
 **Exit code.** 0 for `verified` and `inconclusive`; 1 for every other
 verdict, for a configuration error (`Configuration error: ...`) and for a
-run-time error (`Error: ...`). With `--require-verification`,
-`inconclusive` exits 1. See [Verdicts](verdicts.md).
+run-time error (`Error: ...`); 130 when you stop it with Ctrl-C. With
+`--require-verification`, `inconclusive` exits 1. See [Verdicts](verdicts.md).
 
 `verify`, `init`, `check` and `bench` are subcommands only when they are
 the whole first argument. `certo "verify the login flow"` runs a task. To

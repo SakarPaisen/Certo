@@ -33,6 +33,7 @@ setting comes from and makes one small call to the model.
   [pytest unavailable](#pytest-is-unavailable),
   [`no_progress`](#no_progress), [`retry_exhausted`](#retry_exhausted),
   [`budget_exhausted`](#budget_exhausted),
+  [nothing to resume](#nothing-to-resume),
   [Rust fails on `cargo clippy`](#a-rust-project-fails-on-cargo-clippy)
 - Benchmark: [no bench.yaml or models.yaml](#certo-bench-no-benchyaml-or-modelsyaml),
   [unknown model](#certo-bench-unknown-model),
@@ -385,10 +386,11 @@ questions:
 - Is the task too hard for this model? Try a stronger model with
   `--model`.
 
-Then fix it by hand, or run a new task with a precise instruction, for
-example `certo "test_board.py::test_invalid_move expects a move that is
-legal. Fix the test, not the code."`. `certo verify` checks the result for
-free.
+Then fix it by hand, or resume with a precise instruction, for example
+`certo --resume "test_board.py::test_invalid_move expects a move that is
+legal. Fix the test, not the code."`: the agent keeps everything it already
+tried (see [Resume an interrupted run](guides/resume-a-run.md)).
+`certo verify` checks the result for free.
 
 ### `retry_exhausted`
 
@@ -399,9 +401,10 @@ manual attention.`
 **Cause:** the agent kept trying different fixes, and the checks still
 failed after the allowed attempts.
 
-**Fix:** read the failure (`certo verify` prints it in full), then fix by
-hand or run a more precise task. `CERTO_MAX_VERIFY_RETRIES` allows more
-attempts, at more cost.
+**Fix:** read the failure (`certo verify` prints it in full, and
+`.certo/STATUS.md` keeps its end), then fix by hand, or continue with
+`certo --resume`, adding an instruction or a stronger `--model`.
+`CERTO_MAX_VERIFY_RETRIES` allows more attempts, at more cost.
 
 ### `budget_exhausted`
 
@@ -412,7 +415,21 @@ minutes by default).
 
 **Fix:** if the model is slow, see [very slow steps](#every-step-is-very-slow).
 Otherwise split the task into smaller ones, or raise
-`CERTO_MAX_TASK_SECONDS`. The work done so far stays in the folder.
+`CERTO_MAX_TASK_SECONDS`. The work done so far stays in the folder, and
+`certo --resume` continues it with a fresh time budget.
+
+### Nothing to resume
+
+**You see:** `Error: nothing to resume in /path: Certo keeps the last run's
+state in .certo/, and there is none here (or it can't be read).`
+
+**Cause:** `certo --resume` ran in a folder without a `.certo/` state: a
+different folder or `--project` name than the task used, a run made with
+`CERTO_SAVE_STATE=0`, or a deleted `.certo/` folder.
+
+**Fix:** run it where the task ran (or with the same `--project`). If the
+state is gone, start a new task; the files the agent wrote are still
+there.
 
 ### A Rust project fails on `cargo clippy`
 

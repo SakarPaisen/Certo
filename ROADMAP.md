@@ -171,6 +171,21 @@ decisions log below for *why* a given design was chosen.
   prompt is passed to `stream_task`, not copied into the workspace, so an
   empty-starter Python task keeps the normal "empty folder + task names
   Python → environment up front" behaviour.
+- **`project_state.py`** + `certo --resume` — stdlib only. The CLI
+  passes `save_state=True` (`CERTO_SAVE_STATE`, default on) to
+  `stream_task`, which then builds the `Conversation` with
+  `persistence_dir=<workspace>/.certo/conversations` and its own
+  `conversation_id` (local runs only: the SDK raises for a remote one) and
+  keeps `run.json`/`STATUS.md` current via `_ProjectStateWriter` (start,
+  each verification pass through a new `on_verification` hook, the final
+  outcome after acceptance checks, or `interrupted`/`error` from the
+  `finally`). `--resume` loads `run.json`, reopens the same conversation
+  id (the SDK's `ConversationState.create` resumes it; tools may only be
+  added, everything else, LLM included, may change) and sends
+  `resume_message()` as the first message while `task` stays the goal for
+  verification. When the conversation can't be reopened (Docker, folder
+  gone, SDK refuses), a fresh conversation gets the task and `STATUS.md`
+  instead. Server and bench never pass `save_state`.
 - **`run_summary.py`** — pure: `summarize_run(duration, {usage_id:
   Metrics.get()})` → `RunSummary` (wall-clock time, models that actually
   made calls, tokens, cost; zero cost with nonzero tokens = "unknown",
@@ -956,6 +971,25 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   Maintainer-only notes ("verified live", SDK line references) stay here,
   not in `docs/`. `MANUAL.md` became a redirect table so old links and
   code comments that name a manual section still lead somewhere.
+- **Command-line resume state lives in the project's `.certo/`, built on
+  the SDK's own conversation persistence** (0.1.7, user's choice of
+  location). The task store was server-only, so an interrupted CLI run
+  lost the agent's context whatever backend was configured. Reusing
+  `Conversation(persistence_dir=, conversation_id=)` (golden rule 1)
+  gives exact context back; verified in-session that a second
+  `Conversation` with the same id reloads the events, accepts a different
+  model, and writes no API key (secrets are redacted without a cipher).
+  `STATUS.md` is written by Certo, not the agent, so it is trustworthy and
+  doubles as the fallback memory when the conversation can't be reopened.
+  Supersedes, for this one folder, the 0.1.5 "a generated project carries
+  no Certo file" rule: `.certo/` holds a `.gitignore` of `*`, so git (and
+  the worktree warning, which also skips it when checking for an empty
+  folder) ignores it without editing the user's `.gitignore`. Only the
+  last run is kept (each conversation can be megabytes; artifacts keep
+  history). The server keeps its `TaskStore`: concurrent tasks, queries
+  and TTLs need a real store, not Markdown files. Not done: a resume
+  after a kill mid-tool-call relies on the SDK handling the unmatched
+  action; not exercised against a live model.
 - **`certo bench` grades with hidden tests, takes models from
   `models.yaml` by name, and puts strategies in a registry** (0.1.6).
   Hidden tests, because the agent's own tests share its misunderstandings

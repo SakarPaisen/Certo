@@ -58,6 +58,17 @@ from .project_env import (
     terminal_env,
     wants_python_env,
 )
+from .project_state import (
+    RunRecord,
+    checks_from_outcomes,
+    conversations_dir,
+    drop_other_conversations,
+    ensure_state_dir,
+    has_saved_conversation,
+    now,
+    resume_message,
+    save_record,
+)
 from .run_summary import RunSummary, summarize_run
 from .workspace import build_workspace
 
@@ -684,6 +695,7 @@ def _verify_and_report(
     deadline: float = float("inf"),
     model_chain: ModelChain | None = None,
     runner: CommandRunner | None = None,
+    on_verification: Callable[[VerificationRun], None] | None = None,
 ) -> TaskOutcome:
     """Post-hoc safety net for agent.py's `_VERIFY_BEFORE_FINISH_SUFFIX`: run
     the project's own checks ourselves instead of trusting the agent's
@@ -723,6 +735,8 @@ def _verify_and_report(
     retries_used = 0
     run = _run_verification(working_dir, runner)
     _emit_verification_notices(emit, run)
+    if on_verification is not None:
+        on_verification(run)
 
     while run.state in _RETRIABLE_STATES:
         if attempts_left <= 0:
@@ -793,6 +807,8 @@ def _verify_and_report(
             )
         run = _run_verification(working_dir, runner)
         _emit_verification_notices(emit, run)
+        if on_verification is not None:
+            on_verification(run)
 
         # A fix attempt that changes literally nothing observable is a
         # different, cheaper-to-detect problem than "still failing" — stop
@@ -1086,6 +1102,9 @@ def stream_task(
     on_model_choice: OnModelChoice | None = None,
     run_id: str | None = None,
     project: str | None = None,
+    save_state: bool = False,
+    resume_from: RunRecord | None = None,
+    resume_instruction: str | None = None,
 ) -> TaskOutcome:
     """Run a task, invoking `on_message` with each message as it's produced,
     and return the terminal `TaskOutcome` once verification has settled.
@@ -1113,6 +1132,12 @@ def stream_task(
     already-resolved workspace path), so a caller that knows it passes it
     again here, purely to bucket this run's artifacts folder the same way
     `CERTO_PROJECTS_DIR` is bucketed.
+
+    `save_state` keeps the run's state in the workspace's `.certo/` folder
+    (see project_state.py); only `cli.py` sets it, so server tasks and
+    benchmark runs leave no such folder. `resume_from` continues the run that
+    record describes: `task` must be its task, and `resume_instruction` is an
+    optional extra message from the user. A resume always saves state.
     """
     # Total running time covers the whole task, model selection and
     # verification included (and any interactive waits — it is wall clock).
@@ -1158,21 +1183,34 @@ def stream_task(
     with build_workspace(cfg) as workspace:
         runner = _command_runner(cfg, workspace)
         project_env = _prepare_agent_env(task, cfg, runner, emit)
-        conversation = Conversation(
-            agent=build_agent(
-                agent_cfg,
-                usage_id=agent_usage_id,
-                project_env=project_env,
-                terminal_env=terminal_env(project_env, runner),
-            ),
-            callbacks=[on_event],
-            workspace=workspace,
-            # Previously unset (SDK default 500), so CERTO_MAX_ITERATIONS
-            # was parsed/validated but silently had no effect — found while
-            # bounding the verify-and-retry loop above, which reuses the same
-            # conversation.run() and needed this to actually mean something.
-            max_iteration_per_run=cfg.max_iterations,
-        )
+
+        def new_conversation(**persistence: Any) -> Conversation:
+            return Conversation(
+                agent=build_agent(
+                    agent_cfg,
+                    usage_id=agent_usage_id,
+                    project_env=project_env,
+                    terminal_env=terminal_env(project_env, runner),
+                ),
+                callbacks=[on_event],
+                workspace=workspace,
+                # Previously unset (SDK default 500), so CERTO_MAX_ITERATIONS
+                # was parsed/validated but silently had no effect — found while
+                # bounding the verify-and-retry loop above, which reuses the same
+                # conversation.run() and needed this to actually mean something.
+                max_iteration_per_run=cfg.max_iterations,
+                **persistence,
+            )
+
+        state_writer: _ProjectStateWriter | None = None
+        first_message: str | None = None
+        if save_state or resume_from is not None:
+            model_name = model_chain.current.model if model_chain is not None else agent_cfg.model
+            conversation, state_writer, first_message = _open_saved_conversation(
+                new_conversation, cfg, task, model_name, resume_from, resume_instruction, emit
+            )
+        else:
+            conversation = new_conversation()
         if cfg.confirm_mode == "always":
             # Previously parsed/validated in config.py but never attached to
             # an actual ConfirmationPolicyBase, so it was a silent no-op —
@@ -1208,11 +1246,15 @@ def stream_task(
                 model_chain,
                 checkpoint_buffer,
                 runner,
+                first_message,
+                state_writer.on_verification if state_writer is not None else None,
             )
         except BaseException as exc:  # recorded for artifacts.py, then always re-raised as-is
             captured_error = exc
             raise
         finally:
+            if state_writer is not None and captured_error is not None:
+                state_writer.fail(captured_error)
             # Written even when a phase raises (e.g. every candidate in an
             # auto-selection chain failed at the API level) — that's exactly
             # when the escalation history matters most for debugging. See
@@ -1245,7 +1287,137 @@ def stream_task(
         outcome = _apply_acceptance_checks(outcome, cfg, emit, acceptance_checks)
         if model_chain is not None:
             outcome = replace(outcome, model_decisions=tuple(model_chain.decisions))
+        if state_writer is not None:
+            state_writer.finish(outcome)
         return replace(outcome, run_summary=run_summary)
+
+
+class _ProjectStateWriter:
+    """Keeps `.certo/` up to date during one run (see project_state.py).
+
+    Every write is best effort: a full disk or a read-only folder is logged
+    and must never change the run's own outcome.
+    """
+
+    def __init__(self, workspace: str, record: RunRecord) -> None:
+        self.workspace = workspace
+        self.record = record
+
+    def save(self) -> None:
+        try:
+            save_record(self.workspace, self.record)
+        except OSError:
+            logger.warning("Could not save the run state in .certo/", exc_info=True)
+
+    def on_verification(self, run: VerificationRun) -> None:
+        self.record.checks = checks_from_outcomes(run.checks)
+        self.save()
+
+    def finish(self, outcome: TaskOutcome) -> None:
+        self.record.status = "finished"
+        self.record.verdict = outcome.verification_state
+        self.record.retries_used = outcome.retries_used
+        if outcome.checks:
+            self.record.checks = checks_from_outcomes(outcome.checks)
+        self.record.limitations = list(outcome.completion_contract.limitations)
+        self.save()
+
+    def fail(self, exc: BaseException) -> None:
+        if isinstance(exc, KeyboardInterrupt):
+            self.record.status = "interrupted"
+        else:
+            self.record.status = "error"
+            self.record.error = str(exc) or type(exc).__name__
+        self.save()
+
+
+def _open_saved_conversation(
+    new_conversation: Callable[..., Conversation],
+    cfg: Config,
+    task: str,
+    model: str,
+    resume_from: RunRecord | None,
+    instruction: str | None,
+    emit: Callable[[Message], None],
+) -> tuple[Conversation, _ProjectStateWriter | None, str | None]:
+    """The conversation for a run that saves its state, the writer that
+    keeps `.certo/` current, and the first message when resuming.
+
+    A resume reloads the SDK's saved conversation when it can, so the agent
+    keeps its context. When it can't (Docker, where the SDK takes no
+    persistence folder; a missing folder; a conversation the SDK refuses to
+    load), it starts a new conversation whose first message carries the task
+    and `STATUS.md` instead.
+    """
+    workspace = cfg.workspace
+    try:
+        ensure_state_dir(workspace)
+    except OSError as exc:
+        if resume_from is not None:
+            raise
+        _emit_notice(emit, f"Certo: can't save the run state in .certo/ ({exc}); continuing.")
+        return new_conversation(), None, None
+    persist = cfg.execution == "local"
+    conversation: Conversation | None = None
+    has_context = False
+    if resume_from is not None:
+        saved_id = resume_from.conversation_id
+        if not persist:
+            reason = "Docker runs don't save the conversation"
+        elif not has_saved_conversation(workspace, saved_id):
+            reason = "it isn't in .certo/ any more"
+        else:
+            reason = ""
+            try:
+                conversation = new_conversation(
+                    persistence_dir=conversations_dir(workspace),
+                    conversation_id=uuid.UUID(hex=saved_id),
+                )
+                has_context = True
+            except Exception as exc:  # noqa: BLE001 - any load failure falls back to STATUS.md
+                reason = f"it couldn't be loaded: {exc}"
+        if reason:
+            _emit_notice(
+                emit,
+                f"Certo: resuming without the earlier conversation ({reason}); "
+                "the agent gets the task, .certo/STATUS.md and the files.",
+            )
+    if conversation is None:
+        new_id = uuid.uuid4()
+        conversation = (
+            new_conversation(persistence_dir=conversations_dir(workspace), conversation_id=new_id)
+            if persist
+            else new_conversation()
+        )
+        conversation_id = new_id.hex
+    else:
+        conversation_id = resume_from.conversation_id
+
+    first_message = None
+    if resume_from is not None:
+        record = replace(resume_from)  # a copy: the caller's record stays as it was
+        first_message = resume_message(record, instruction, has_context=has_context)
+        record.status = "running"
+        record.verdict = None
+        record.error = None
+        record.retries_used = 0
+        record.resumes += 1
+        record.conversation_id = conversation_id
+        record.model = model
+        record.execution = cfg.execution
+    else:
+        record = RunRecord(
+            task=task,
+            conversation_id=conversation_id,
+            model=model,
+            execution=cfg.execution,
+            started_at=now(),
+            updated_at=now(),
+        )
+    drop_other_conversations(workspace, keep=conversation_id)
+    writer = _ProjectStateWriter(workspace, record)
+    writer.save()
+    return conversation, writer, first_message
 
 
 def _per_model_metrics(conversation: Conversation) -> dict[str, dict]:
@@ -1275,13 +1447,17 @@ def _run_stream_task_phases(
     model_chain: ModelChain | None,
     checkpoint_buffer: list[Message],
     runner: CommandRunner | None = None,
+    first_message: str | None = None,
+    on_verification: Callable[[VerificationRun], None] | None = None,
 ) -> TaskOutcome:
     """The initial run, the interactive checkpoint loop, and the two
     autonomous retry phases — split out of `stream_task` purely so the
     `finally: write_model_decisions(...)` wrapping it can run regardless of
     which phase raises, without an extra indent level for all of it.
     """
-    conversation.send_message(task)
+    # `first_message` is a resume's message; `task` stays the goal that
+    # verification and the completion contract are judged against.
+    conversation.send_message(first_message or task)
     run_result = _run_with_confirmation(conversation, cfg, emit, on_confirm, deadline, model_chain)
     outcome = _outcome_for_run_result(run_result, task, cfg)
 
@@ -1320,7 +1496,15 @@ def _run_stream_task_phases(
         )
     if outcome is None:
         outcome = _verify_and_report(
-            conversation, cfg, emit, task, on_confirm, deadline, model_chain, runner
+            conversation,
+            cfg,
+            emit,
+            task,
+            on_confirm,
+            deadline,
+            model_chain,
+            runner,
+            on_verification,
         )
     return outcome
 
@@ -1334,6 +1518,9 @@ def run_task(
     on_model_choice: OnModelChoice | None = None,
     run_id: str | None = None,
     project: str | None = None,
+    save_state: bool = False,
+    resume_from: RunRecord | None = None,
+    resume_instruction: str | None = None,
 ) -> TaskResult:
     messages: list = []
     outcome = stream_task(
@@ -1346,5 +1533,8 @@ def run_task(
         on_model_choice=on_model_choice,
         run_id=run_id,
         project=project,
+        save_state=save_state,
+        resume_from=resume_from,
+        resume_instruction=resume_instruction,
     )
     return TaskResult(messages, outcome)  # last message is the final assistant output

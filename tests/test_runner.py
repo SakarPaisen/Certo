@@ -2252,3 +2252,204 @@ def test_stream_task_creates_an_env_for_an_empty_workspace_with_a_python_task(
     assert captured["project_env"].host_dir == str(tmp_path / ".venv")
     assert (tmp_path / ".venv").is_dir()
     assert any("Created the project environment" in m.content[0].text for m in emitted)
+
+
+# --- .certo/ run state and resume (project_state.py) -------------------------
+
+
+def _verified_outcome() -> runner.TaskOutcome:
+    return runner.TaskOutcome(
+        verification_state="retry_exhausted",
+        completion_contract=runner.CompletionContract(
+            goal="", acceptance_criteria=[], verification_checks=[], limitations=["no mypy"]
+        ),
+        checks=(_check(status="failed", exit_code=1, output="E   assert 2 == 3"),),
+        retries_used=2,
+    )
+
+
+def _stub_for_state_tests(monkeypatch, outcome=None, raise_in_phases=None):
+    _RecordingConversation.instances = []
+    monkeypatch.setattr(runner, "Conversation", _RecordingConversation)
+    monkeypatch.setattr(runner, "build_agent", lambda cfg, **_kw: "fake-agent")
+    monkeypatch.setattr(runner, "build_workspace", lambda cfg: nullcontext(cfg.workspace))
+    sent: list = []
+
+    def fake_phases(conversation, cfg, emit, task, *args):
+        first_message = args[6]
+        sent.append(first_message or task)
+        if raise_in_phases is not None:
+            raise raise_in_phases
+        return outcome or _verified_outcome()
+
+    monkeypatch.setattr(runner, "_run_stream_task_phases", fake_phases)
+    return sent
+
+
+def test_stream_task_without_save_state_leaves_no_certo_folder(monkeypatch, tmp_path):
+    _stub_for_state_tests(monkeypatch)
+
+    runner.stream_task("do it", cfg=_cfg(workspace=str(tmp_path)))
+
+    assert not (tmp_path / ".certo").exists()
+    assert "persistence_dir" not in _RecordingConversation.instances[0].kwargs
+
+
+def test_stream_task_saves_the_conversation_and_the_final_verdict(monkeypatch, tmp_path):
+    _stub_for_state_tests(monkeypatch)
+
+    runner.stream_task("do it", cfg=_cfg(workspace=str(tmp_path)), save_state=True)
+
+    kwargs = _RecordingConversation.instances[0].kwargs
+    assert kwargs["persistence_dir"] == str(tmp_path / ".certo" / "conversations")
+    from certo.project_state import load_record
+
+    record = load_record(str(tmp_path))
+    assert record.task == "do it"
+    assert record.conversation_id == kwargs["conversation_id"].hex
+    assert record.status == "finished"
+    assert record.verdict == "retry_exhausted"
+    assert record.retries_used == 2
+    assert record.checks[0].output_tail == "E   assert 2 == 3"
+    assert record.limitations == ["no mypy"]
+    assert "verdict `retry_exhausted`" in (tmp_path / ".certo" / "STATUS.md").read_text()
+
+
+@pytest.mark.parametrize(
+    ("error", "status"), [(KeyboardInterrupt(), "interrupted"), (RuntimeError("boom"), "error")]
+)
+def test_stream_task_records_an_interrupted_or_failed_run(monkeypatch, tmp_path, error, status):
+    from certo.project_state import load_record
+
+    _stub_for_state_tests(monkeypatch, raise_in_phases=error)
+
+    with pytest.raises(type(error)):
+        runner.stream_task("do it", cfg=_cfg(workspace=str(tmp_path)), save_state=True)
+
+    record = load_record(str(tmp_path))
+    assert record.status == status
+    assert record.verdict is None
+
+
+def test_docker_runs_save_the_record_but_not_the_conversation(monkeypatch, tmp_path):
+    from certo.project_state import load_record
+
+    _stub_for_state_tests(monkeypatch)
+
+    runner.stream_task(
+        "do it", cfg=_cfg(workspace=str(tmp_path), execution="docker"), save_state=True
+    )
+
+    assert "persistence_dir" not in _RecordingConversation.instances[0].kwargs
+    assert load_record(str(tmp_path)).verdict == "retry_exhausted"
+
+
+def test_resume_reloads_the_saved_conversation(monkeypatch, tmp_path):
+    from certo.project_state import load_record
+
+    sent = _stub_for_state_tests(monkeypatch)
+    runner.stream_task("do it", cfg=_cfg(workspace=str(tmp_path)), save_state=True)
+    first = load_record(str(tmp_path))
+    # Stand in for the SDK's own saved conversation.
+    saved = tmp_path / ".certo" / "conversations" / first.conversation_id
+    saved.mkdir(parents=True)
+    (saved / "base_state.json").write_text("{}")
+
+    runner.stream_task(
+        first.task,
+        cfg=_cfg(workspace=str(tmp_path)),
+        resume_from=first,
+        resume_instruction="the tests use port 8080",
+    )
+
+    kwargs = _RecordingConversation.instances[-1].kwargs
+    assert kwargs["conversation_id"].hex == first.conversation_id
+    assert "being resumed" in sent[-1]
+    assert "the tests use port 8080" in sent[-1]
+    assert "E   assert 2 == 3" in sent[-1]  # the last failing output, from STATUS.md
+    record = load_record(str(tmp_path))
+    assert record.resumes == 1
+    assert record.status == "finished"
+
+
+def test_resume_without_a_saved_conversation_starts_fresh_with_the_task(monkeypatch, tmp_path):
+    from certo.project_state import load_record
+
+    sent = _stub_for_state_tests(monkeypatch)
+    runner.stream_task("do it", cfg=_cfg(workspace=str(tmp_path)), save_state=True)
+    first = load_record(str(tmp_path))
+    emitted: list = []
+
+    runner.stream_task(
+        first.task,
+        cfg=_cfg(workspace=str(tmp_path)),
+        on_message=emitted.append,
+        resume_from=first,
+    )
+
+    kwargs = _RecordingConversation.instances[-1].kwargs
+    assert kwargs["conversation_id"].hex != first.conversation_id
+    assert "conversation isn't available" in sent[-1]
+    assert "do it" in sent[-1]
+    assert any("resuming without the earlier conversation" in m.content[0].text for m in emitted)
+
+
+def test_resume_falls_back_when_the_sdk_refuses_the_saved_conversation(monkeypatch, tmp_path):
+    from certo.project_state import load_record
+
+    sent = _stub_for_state_tests(monkeypatch)
+    runner.stream_task("do it", cfg=_cfg(workspace=str(tmp_path)), save_state=True)
+    first = load_record(str(tmp_path))
+    saved = tmp_path / ".certo" / "conversations" / first.conversation_id
+    saved.mkdir(parents=True)
+    (saved / "base_state.json").write_text("{}")
+
+    class _Refusing(_RecordingConversation):
+        def __init__(self, **kwargs):
+            if kwargs.get("conversation_id") is not None and (
+                kwargs["conversation_id"].hex == first.conversation_id
+            ):
+                raise ValueError("tools don't match")
+            super().__init__(**kwargs)
+
+    monkeypatch.setattr(runner, "Conversation", _Refusing)
+
+    runner.stream_task(first.task, cfg=_cfg(workspace=str(tmp_path)), resume_from=first)
+
+    assert "conversation isn't available" in sent[-1]
+
+
+def test_a_real_sdk_conversation_resumes_from_certo_and_never_saves_the_key(tmp_path):
+    """No model call: building a Conversation writes its state, and building
+    it again with the same id loads it."""
+    cfg = _cfg(workspace=str(tmp_path), api_key="sk-THIS-MUST-NOT-BE-SAVED")
+    first_messages: list = []
+
+    def new_conversation(**persistence):
+        return runner.Conversation(
+            agent=runner.build_agent(cfg),
+            workspace=str(tmp_path),
+            max_iteration_per_run=cfg.max_iterations,
+            **persistence,
+        )
+
+    conversation, writer, first_message = runner._open_saved_conversation(
+        new_conversation, cfg, "do it", cfg.model, None, None, first_messages.append
+    )
+    assert first_message is None
+    conversation.send_message("remember this: PROBE-42")
+    record = writer.record
+
+    resumed, _writer, message = runner._open_saved_conversation(
+        new_conversation, cfg, "do it", "anthropic/other-model", record, None, first_messages.append
+    )
+
+    assert "being resumed" in message
+    texts = [str(event) for event in resumed.state.events]
+    assert any("PROBE-42" in text for text in texts)
+    assert first_messages == []  # no fallback notice
+    saved = "".join(
+        p.read_text(errors="ignore") for p in (tmp_path / ".certo").rglob("*") if p.is_file()
+    )
+    assert "PROBE-42" in saved
+    assert "sk-THIS-MUST-NOT-BE-SAVED" not in saved

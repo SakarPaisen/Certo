@@ -201,6 +201,10 @@ class Config:
     # a folder that already has files (see worktree.py).
     no_worktree_warning: bool = False
 
+    # CERTO_SAVE_STATE: the CLI keeps the last run's state in the project's
+    # .certo/ folder, for `certo --resume` (see project_state.py).
+    save_state: bool = True
+
 
 # Certo's LLM settings. Up to 0.1.1 Certo read the bare LLM_* names, which other
 # tools use too; those are never read now (another app's LLM_MODEL must not
@@ -577,6 +581,7 @@ def load_config(
     models_file = _get(env, "MODELS_FILE") or DEFAULT_MODELS_FILE
     artifacts_dir = _get(env, "ARTIFACTS_DIR") or ""
     no_worktree_warning = _parse_bool(env, "NO_WORKTREE_WARNING", default=False)
+    save_state = _parse_bool(env, "SAVE_STATE", default=True)
 
     return Config(
         model=model,
@@ -619,6 +624,7 @@ def load_config(
         models_file=models_file,
         artifacts_dir=artifacts_dir,
         no_worktree_warning=no_worktree_warning,
+        save_state=save_state,
     )
 
 

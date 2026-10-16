@@ -87,6 +87,26 @@ def test_folder_outside_git_gets_a_note(tmp_path):
     )
 
 
+def test_a_folder_with_only_certo_state_counts_as_empty(tmp_path):
+    from certo.project_state import ensure_state_dir
+
+    folder = tmp_path / "plain"
+    folder.mkdir()
+    ensure_state_dir(str(folder))
+
+    assert worktree_warning(str(folder)) is None
+
+
+def test_certo_state_is_not_an_uncommitted_change(tmp_path):
+    from certo.project_state import ensure_state_dir
+
+    _repo(tmp_path)
+    ensure_state_dir(str(tmp_path))
+    (tmp_path / ".certo" / "STATUS.md").write_text("x")
+
+    assert worktree_warning(str(tmp_path)) is None
+
+
 def test_empty_or_missing_folder_gets_nothing(tmp_path):
     (tmp_path / "empty").mkdir()
     assert worktree_warning(str(tmp_path / "empty")) is None

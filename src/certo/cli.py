@@ -20,6 +20,7 @@ from .config import ConfigError, load_config, override_llm, resolve_project_dir
 from .custom_tools.run_tests_tool import detect_project, run_full_verification
 from .init_cmd import check_main, init_main
 from .model_catalog import ModelCatalogEntry
+from .project_state import load_record, status_path
 from .runner import _build_completion_contract, run_task
 from .skills import write_project_context
 from .worktree import record_created_project, was_created_by_certo, worktree_warning
@@ -165,9 +166,22 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument(
         "task",
+        nargs="?",
+        default=None,
         help=(
             "The task to give the agent — literal text, a path to a local "
-            "file containing it, or an http(s) URL to fetch it from."
+            "file containing it, or an http(s) URL to fetch it from. With "
+            "--resume it is optional, and is sent as an extra instruction."
+        ),
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help=(
+            "Continue the last run in this folder (or --project) from where it "
+            "stopped, using the state Certo keeps in .certo/. The agent gets "
+            "its earlier conversation back when it is saved, and Certo's "
+            "record of the last verdict and failing checks."
         ),
     )
     parser.add_argument(
@@ -375,13 +389,18 @@ def main(argv: list[str] | None = None) -> int:
         from .bench import bench_main
 
         return bench_main(argv[1:])
-    args = _build_parser().parse_args(argv)
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    if args.task is None and not args.resume:
+        parser.error("the following arguments are required: task")
 
-    try:
-        task = resolve_task_source(args.task)
-    except ValueError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        return 1
+    task = None
+    if args.task is not None:
+        try:
+            task = resolve_task_source(args.task)
+        except ValueError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
 
     try:
         cfg = load_config()
@@ -421,12 +440,34 @@ def main(argv: list[str] | None = None) -> int:
         except ConfigError as exc:
             print(f"Configuration error: {exc}", file=sys.stderr)
             return 1
+        if args.resume and not os.path.isdir(project_dir):
+            print(f"Error: nothing to resume: {project_dir} doesn't exist.", file=sys.stderr)
+            return 1
         created = not os.path.exists(project_dir)
         os.makedirs(project_dir, exist_ok=True)
         if created:
             record_created_project(cfg.projects_dir, args.project)
         cfg = replace(cfg, workspace=project_dir)
         print(f"Project workspace: {cfg.workspace}")
+
+    resume_from = None
+    if args.resume:
+        resume_from = load_record(cfg.workspace)
+        if resume_from is None:
+            print(
+                f"Error: nothing to resume in {os.path.abspath(cfg.workspace)}: Certo keeps "
+                "the last run's state in .certo/, and there is none here (or it can't "
+                "be read). Run a task first.",
+                file=sys.stderr,
+            )
+            return 1
+        if resume_from.verdict == "verified" and task is None:
+            print(
+                "The last run here already ended with 'verified'. To continue anyway, "
+                'say what to do next: certo --resume "..."'
+            )
+            return 0
+        print(f"Resuming: {_first_line(resume_from.task)}")
 
     certo_made = args.project is not None and was_created_by_certo(cfg.projects_dir, args.project)
     if not cfg.no_worktree_warning and not certo_made:
@@ -450,18 +491,30 @@ def main(argv: list[str] | None = None) -> int:
     on_model_choice = (
         _prompt_for_model_choice if (cfg.model_selection == "auto" and cfg.interactive) else None
     )
+    save_state = cfg.save_state or resume_from is not None
+    resume_hint = "certo --resume" + (f" --project {args.project}" if args.project else "")
     try:
         messages = run_task(
-            task,
+            resume_from.task if resume_from is not None else task,
             cfg=cfg,
             on_confirm=on_confirm,
             acceptance_checks=acceptance_checks,
             on_awaiting_input=on_awaiting_input,
             on_model_choice=on_model_choice,
             project=args.project,
+            save_state=save_state,
+            resume_from=resume_from,
+            resume_instruction=task if resume_from is not None else None,
         )
+    except KeyboardInterrupt:
+        print("\nInterrupted.", file=sys.stderr)
+        if save_state:
+            print(f"Continue with: {resume_hint}", file=sys.stderr)
+        return 130
     except Exception as exc:  # noqa: BLE001 - surfaced as a clean CLI error, not a traceback
         print(f"Error: {exc}", file=sys.stderr)
+        if save_state:
+            print(f"Continue with: {resume_hint}", file=sys.stderr)
         return 1
 
     if messages:
@@ -495,11 +548,18 @@ def main(argv: list[str] | None = None) -> int:
         print("\nRun summary:")
         for line in outcome.run_summary.format_lines():
             print(f"  {line}")
-    if outcome.verification_state in _FAILING_STATES:
-        return 1
-    if args.require_verification and outcome.verification_state == "inconclusive":
-        return 1
-    return 0
+    failing = outcome.verification_state in _FAILING_STATES or (
+        args.require_verification and outcome.verification_state == "inconclusive"
+    )
+    if failing and save_state:
+        status = os.path.relpath(status_path(cfg.workspace))
+        print(f"\nWhere it stopped: {status}. Continue with: {resume_hint}")
+    return 1 if failing else 0
+
+
+def _first_line(text: str, limit: int = 100) -> str:
+    line = text.strip().splitlines()[0] if text.strip() else ""
+    return line if len(line) <= limit else line[: limit - 1] + "…"
 
 
 if __name__ == "__main__":
