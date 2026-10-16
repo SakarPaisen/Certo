@@ -986,3 +986,132 @@ def test_load_dotenv_from_litellm_is_disabled():
     # LiteLLM's import-time load_dotenv() searched upward from its install
     # folder and could load a ~/.env (see certo/__init__.py).
     assert os.environ.get("LITELLM_MODE") == "PRODUCTION"
+
+
+# --- certo check: the model catalog ---------------------------------------------------
+
+_CATALOG = """
+models:
+  - name: qwen-local
+    model: ollama/qwen3-coder:30b
+    base_url: http://localhost:11434
+    ratings: {reasoning: 2, code: 3, cost: 5}
+  - name: gpt-luna
+    model: openai/gpt-5.6-luna
+    api_key: sk-CATALOG-SECRET
+    ratings: {reasoning: 3, code: 4, cost: 4}
+  - name: claude-sonnet
+    model: anthropic/claude-sonnet-5-5
+    api_key: sk-CATALOG-SECRET
+    ratings: {reasoning: 5, code: 5, cost: 2}
+  - name: gemma-local
+    model: ollama/gemma4:31b
+    base_url: http://localhost:11434
+    ratings: {reasoning: 2, code: 2, cost: 5}
+    activated: false
+task_profiles:
+  default:
+    weights: {reasoning: 1, code: 1, cost: 1}
+escalation:
+  ladders:
+    default:
+      - model: qwen-local
+      - model: gpt-luna
+      - model: claude-sonnet
+    local-only:
+      - model: qwen-local
+      - model: gemma-local
+"""
+
+
+def _check_with_catalog(tmp_path, monkeypatch, catalog, argv=()):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CERTO_LLM_MODEL", "openai/main")
+    monkeypatch.setenv("CERTO_LLM_API_KEY", "k")
+    path = tmp_path / "models.yaml"
+    path.write_text(catalog)
+    monkeypatch.setenv("CERTO_MODELS_FILE", str(path))
+    out = io.StringIO()
+    code = init_cmd.check_main(list(argv), out=out)
+    return code, out.getvalue()
+
+
+def test_certo_check_reports_the_catalog(tmp_path, monkeypatch, checks):
+    code, text = _check_with_catalog(tmp_path, monkeypatch, _CATALOG)
+
+    assert code == 0
+    assert "Active models: qwen-local, gpt-luna, claude-sonnet" in text
+    assert "Inactive models: gemma-local" in text
+    assert "Ladder 'default': qwen-local -> gpt-luna -> claude-sonnet" in text
+    assert "Ladder 'local-only': qwen-local (1 rung(s) skipped)" in text
+    assert (
+        "Derived ladder (task profile 'default'): qwen-local (capability 5, cost rating 5) "
+        "-> gpt-luna (capability 7, cost rating 4) -> claude-sonnet (capability 10, cost rating 2)"
+    ) in text
+    assert "Warning: Ladder 'local-only', rung 2: gemma-local has 'activated: false'" in text
+    assert "sk-CATALOG-SECRET" not in text
+    assert [c.model for c in checks] == ["openai/main"]  # no --models: only the main model
+
+
+def test_certo_check_exits_1_on_a_catalog_error(tmp_path, monkeypatch, checks):
+    broken = _CATALOG.replace("      - model: gpt-luna\n", "      - model: gpt-lunaa\n")
+    code, text = _check_with_catalog(tmp_path, monkeypatch, broken)
+
+    assert code == 1
+    assert "Error: Ladder 'default', rung 2: there is no model named 'gpt-lunaa'." in text
+
+
+def test_certo_check_models_tests_every_active_model(tmp_path, monkeypatch):
+    seen = []
+
+    def fake(cfg, **_kw):
+        seen.append(cfg)
+        failed = cfg.model.startswith("anthropic/")
+        return LLMCheckResult(
+            ok=not failed,
+            model=cfg.model,
+            base_url=cfg.base_url,
+            latency_seconds=0.1,
+            error_kind="authentication" if failed else None,
+            error="bad key" if failed else None,
+        )
+
+    monkeypatch.setattr(init_cmd, "check_tool_calling", fake)
+    code, text = _check_with_catalog(tmp_path, monkeypatch, _CATALOG, ["--models"])
+
+    assert code == 1
+    assert [c.model for c in seen] == [
+        "openai/main",
+        "ollama/qwen3-coder:30b",
+        "openai/gpt-5.6-luna",
+        "anthropic/claude-sonnet-5-5",
+    ]
+    # Each entry's own settings, never .env's.
+    assert seen[1].api_key is None and seen[1].base_url == "http://localhost:11434"
+    assert "qwen-local (ollama/qwen3-coder:30b)... ok: reachable, tool calling works." in text
+    assert (
+        "claude-sonnet (anthropic/claude-sonnet-5-5)... Anthropic rejected the API key." in text
+    )
+    assert "Check its api_key in models.yaml" in text
+    assert "sk-CATALOG-SECRET" not in text
+
+
+def test_certo_check_models_without_a_catalog_is_an_error(tmp_path, monkeypatch, checks):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CERTO_LLM_MODEL", "openai/main")
+    monkeypatch.setenv("CERTO_LLM_API_KEY", "k")
+    monkeypatch.setenv("CERTO_MODELS_FILE", str(tmp_path / "missing.yaml"))
+    out = io.StringIO()
+
+    assert init_cmd.check_main(["--models"], out=out) == 1
+    assert "--models: there is no model catalog" in out.getvalue()
+
+
+def test_certo_check_without_a_catalog_prints_no_report(tmp_path, monkeypatch, checks):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CERTO_LLM_MODEL", "openai/main")
+    monkeypatch.setenv("CERTO_LLM_API_KEY", "k")
+    out = io.StringIO()
+
+    assert init_cmd.check_main([], out=out) == 0
+    assert "Model catalog" not in out.getvalue()

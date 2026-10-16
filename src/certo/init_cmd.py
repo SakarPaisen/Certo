@@ -29,6 +29,7 @@ from dataclasses import dataclass, field
 from importlib import resources
 from typing import TextIO
 
+from .catalog_report import print_catalog_report
 from .config import (
     ConfigError,
     SettingSource,
@@ -474,7 +475,17 @@ def build_check_parser() -> argparse.ArgumentParser:
             "must come back as a tool call, since that's what Certo's agent "
             "needs. Reads the settings exactly as a run does: exported "
             "CERTO_LLM_* variables, then .env in the current folder, then the "
-            "user settings file. Prints where each setting came from first."
+            "user settings file. Prints where each setting came from first. When "
+            "a models.yaml (CERTO_MODELS_FILE) exists, also checks it: models, "
+            "ladders, errors and warnings."
+        ),
+    )
+    parser.add_argument(
+        "--models",
+        action="store_true",
+        help=(
+            "Also make the real tool-call test against every active model in "
+            "models.yaml, one line per model."
         ),
     )
     parser.add_argument(
@@ -492,9 +503,17 @@ def check_main(argv: list[str], *, out: TextIO | None = None) -> int:
     out = out or sys.stdout
     print_setting_sources(load_settings_files(), out)
     ok = run_check(None, out, timeout=args.timeout)
-    if not ok:
+    print(file=out)
+    catalog_ok = print_catalog_report(
+        out,
+        test_models=args.models,
+        timeout=args.timeout,
+        check=lambda cfg, timeout: check_tool_calling(cfg, timeout=timeout),
+        explain=lambda result, _provider: explain(result, _provider_name(result.model)),
+    )
+    if not ok or not catalog_ok:
         print("Fix the settings as described, then run: certo check", file=out)
-    return 0 if ok else 1
+    return 0 if ok and catalog_ok else 1
 
 
 # The settings `certo check` reports. The key is shown only as set/not set.

@@ -16,6 +16,11 @@ import pytest
 # call load_config() at collection time), so no test reads or writes the
 # real ~/.config. Tests that need the file set their own folder.
 os.environ["XDG_CONFIG_HOME"] = tempfile.mkdtemp(prefix="certo-tests-xdg-")
+# Likewise, never read a real models.yaml (it holds keys, and `certo check`
+# reports it): tests that need a catalog write their own.
+os.environ["CERTO_MODELS_FILE"] = os.path.join(
+    tempfile.mkdtemp(prefix="certo-tests-models-"), "models.yaml"
+)
 
 
 def make_project_venv(project_dir) -> str:

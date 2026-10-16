@@ -144,19 +144,46 @@ saved in your shell history.
 Check that the configured model works.
 
 ```text
-certo check [--timeout SECONDS]
+certo check [--timeout SECONDS] [--models]
 ```
 
 | Flag | Default | Effect |
 |---|---|---|
-| `--timeout SECONDS` | `120` | How long to wait for the answer. A local model may need time to load. |
+| `--timeout SECONDS` | `120` | How long to wait for each answer. A local model may need time to load. |
+| `--models` | off | Also send the same test request to every active model in `models.yaml`, one line per model. |
 
 It reads the settings like a run does, prints each LLM setting and where
 it came from (`environment variable`, `./.env (<path>)` or
 `user settings (<path>)`; the key only as `set` or `not set`), then sends
 one request that offers the model a tool. It passes only if the model
-answers with a tool call. Exit code 0 on success, 1 otherwise. Every
-message and its fix: [Troubleshooting](../troubleshooting.md).
+answers with a tool call. Every message and its fix:
+[Troubleshooting](../troubleshooting.md).
+
+**The model catalog.** When a `models.yaml` exists (`./models.yaml`, or
+`CERTO_MODELS_FILE`), `certo check` also reports it: active and inactive
+models, each ladder with its usable rungs, the ladder Certo would build
+from the ratings for the `default` task profile, and every error and
+warning (see [models.yaml](models-yaml.md#checks)). Keys are never
+printed. For example:
+
+```text
+Model catalog: models.yaml
+  Active models: qwen-local, gpt-luna, claude-sonnet
+  Inactive models: gemma-local
+  Ladder 'default': qwen-local -> gpt-luna -> claude-sonnet
+  Ladder 'local-only': qwen-local (1 rung(s) skipped)
+  Derived ladder (task profile 'default'): qwen-local (capability 5, cost rating 5) -> gpt-luna (capability 7, cost rating 4) -> claude-sonnet (capability 10, cost rating 2)
+  Warning: Ladder 'local-only', rung 2: gemma-local has 'activated: false', so this rung is skipped.
+  Warning: Ladder 'local-only' has only one usable rung (qwen-local), so it can't escalate.
+```
+
+With `--models`, each active model gets a line such as
+`qwen-local (ollama/qwen3-coder:30b)... ok: reachable, tool calling works.`
+A broken key or a model without tool calling shows up here, before a run.
+
+**Exit code.** 0 when the model check passes, the catalog has no error,
+and (with `--models`) every model passes; 1 otherwise. `--models` without
+a `models.yaml` is an error.
 
 ## `certo bench`
 

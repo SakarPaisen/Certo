@@ -180,8 +180,10 @@ def test_no_key_and_no_base_url(tmp_path):
         ),
     )
     assert report.warnings == [
-        "Model 'mid' has no api_key and no base_url: it works only if the provider's own "
-        "key variable (such as OPENAI_API_KEY) is set."
+        (
+            "Model 'mid' has no api_key and no base_url: it works only if the provider's own "
+            "key variable (such as OPENAI_API_KEY) is set."
+        )
     ]
 
 
@@ -191,8 +193,10 @@ def test_a_ladder_whose_capability_goes_down(tmp_path):
     )
     assert report.ok
     assert report.warnings == [
-        "Ladder 'x': local (capability 4) comes after strong (capability 10) but is less "
-        "capable under the default task profile. Allowed, but check the order."
+        (
+            "Ladder 'x': local (capability 4) comes after strong (capability 10) but is less "
+            "capable under the default task profile. Allowed, but check the order."
+        )
     ]
 
 
