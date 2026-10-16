@@ -4,8 +4,8 @@ Every command, subcommand and flag Certo installs. It is for looking
 things up; for a walk-through, see [Getting started](../getting-started.md).
 
 Certo installs three commands: `certo`, `certo-server` and `certo-admin`.
-`certo` also has three subcommands: `certo verify`, `certo init` and
-`certo check`. Every command and subcommand accepts `-h` / `--help`.
+`certo` also has four subcommands: `certo verify`, `certo init`,
+`certo check` and `certo bench`. Every command and subcommand accepts `-h` / `--help`.
 
 All three commands hide the OpenHands SDK's start-up banner. Set
 `OPENHANDS_SUPPRESS_BANNER=0` to see it.
@@ -59,9 +59,9 @@ verdict, for a configuration error (`Configuration error: ...`) and for a
 run-time error (`Error: ...`). With `--require-verification`,
 `inconclusive` exits 1. See [Verdicts](verdicts.md).
 
-`verify`, `init` and `check` are subcommands only when they are the whole
-first argument. `certo "verify the login flow"` runs a task. To run the
-one-word task `verify`, write `certo -- verify`.
+`verify`, `init`, `check` and `bench` are subcommands only when they are
+the whole first argument. `certo "verify the login flow"` runs a task. To
+run the one-word task `verify`, write `certo -- verify`.
 
 ## `certo verify`
 
@@ -150,6 +150,36 @@ it came from (`environment variable`, `./.env (<path>)` or
 one request that offers the model a tool. It passes only if the model
 answers with a tool call. Exit code 0 on success, 1 otherwise. Every
 message and its fix: [Troubleshooting](../troubleshooting.md).
+
+## `certo bench`
+
+Compare models and strategies on tasks graded by hidden tests.
+
+```text
+certo bench [--config FILE] [--out DIR] [--resume] [--parallel N]
+            [--max-cost USD] [--yes] [--list-tasks] [--check-tasks]
+```
+
+| Flag | Default | Effect |
+|---|---|---|
+| `--config FILE` | `bench.yaml` | The benchmark file. See [bench.yaml](bench-yaml.md). |
+| `--out DIR` | `./bench-results/<date-time>` | The results folder. A folder that already has results is refused unless `--resume` is given. |
+| `--resume` | off | Continue an interrupted benchmark in `--out` (default: the latest folder in `./bench-results`), skipping runs already recorded. Refused if the tasks, arms, repeats, models or task set changed. |
+| `--parallel N` | `1` | Run N at a time. Refused when any arm uses a local model (Ollama, or a server on this machine or network). |
+| `--max-cost USD` | none | Stop starting new runs once the recorded cost (all runs in the folder) reaches USD. Runs already started finish; results are kept. Models with no known price count as 0. |
+| `--yes`, `-y` | off | Start without asking. Needed when there is no terminal. |
+| `--list-tasks` | | List the tasks and exit. Needs no models. |
+| `--check-tasks` | | Check every task with no model: its reference solution must pass its hidden tests, and its starter alone must fail them. Exit 1 if any task is broken. |
+
+It reads only the benchmark file and the models file it names, never
+`.env`. Before starting, it prints the plan (tasks × arms × repeats) and a
+rough cost estimate. While running, it prints one line per finished run.
+At the end it writes `results.md` and `results.csv` and prints a summary
+per arm. Guide: [Benchmark models and strategies](../guides/benchmark.md).
+
+**Exit code.** 0 when the benchmark ran, whatever the models scored (also
+when stopped by `--max-cost`); 1 for a configuration error, or when the
+plan wasn't confirmed; 130 when interrupted (finished runs are kept).
 
 ## `certo-server`
 

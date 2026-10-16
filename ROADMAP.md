@@ -154,6 +154,23 @@ decisions log below for *why* a given design was chosen.
   `<artifacts_dir>/<project-or-"_unscoped">/<run_id>/`, own path-containment
   check. No SDK dependency. A sibling top-level directory (mirrors
   `CERTO_PROJECTS_DIR`'s shape), not nested inside a project.
+- **`bench_tasks.py` / `bench_config.py` / `bench_strategies.py` /
+  `bench.py` / `bench_report.py`** — `certo bench`. The task set ships in
+  `src/certo/benchmark_tasks/` (`VERSION` file; 9 tasks, each `task.md`,
+  optional `starter/`, `hidden_tests/`, `reference/`). `grade()` copies the
+  hidden tests into `.certo_hidden_tests/` and runs them in the project's
+  own environment (pytest with its own ini and `PYTHONPATH=workspace`;
+  `node --test`). `bench_config.py` validates `bench.yaml` against
+  `models.yaml` names; `bench_strategies.STRATEGIES` is the registry
+  (`single` only), each strategy building an explicit `Config` from the
+  catalog entry (`run_config`, Certo defaults, isolated skill dirs, no
+  `.env`). `bench.py` runs repeat-major, one JSON per run (atomic write),
+  workspace snapshots, `--max-cost`, `--parallel` (cloud-only),
+  `--resume` (fingerprint + task-set hash must match). `bench_report.py`
+  renders `results.md`/`results.csv` from the folder alone. The task
+  prompt is passed to `stream_task`, not copied into the workspace, so an
+  empty-starter Python task keeps the normal "empty folder + task names
+  Python → environment up front" behaviour.
 - **`run_summary.py`** — pure: `summarize_run(duration, {usage_id:
   Metrics.get()})` → `RunSummary` (wall-clock time, models that actually
   made calls, tokens, cost; zero cost with nonzero tokens = "unknown",
@@ -291,6 +308,20 @@ decisions log below for *why* a given design was chosen.
   publish a prebuilt image. Undecided; documented in
   `docs/guides/run-in-docker.md` and in `docs/README.md`'s "Known
   limitations".
+- **Benchmark strategies beyond `single`** — `cascade` (several models in
+  order, escalate when verification fails) and `best_of` (N attempts, the
+  verifier picks) are the planned next entries in
+  `bench_strategies.STRATEGIES`. Each must be benchmarked on a local and a
+  cloud model before release (CLAUDE.md working agreements).
+- **No benchmark baseline yet** — `docs/benchmark/baseline-<version>.md`
+  needs a session with a local and a cloud model in `models.yaml`; the
+  0.1.6 session had neither (no `models.yaml`, no Ollama).
+- **Node "no tests" counts as verified** (found by `certo bench`'s first
+  integration run, 2026-10-16): `node --test` exits 0 when it finds no test
+  files, so `npm test` passes and the verdict is `verified` for a project
+  with no tests. The same holds for any runner that exits 0 on nothing to
+  run. Documented in `docs/reference/verification-by-language.md`; the
+  benchmark counts it as "fooled". Not fixed.
 - **Bugs found while writing `docs/` (2026-10-16), not fixed yet:**
   - `cargo clippy` is planned unconditionally whenever `cargo` exists, so a
     toolchain without the clippy component makes a Rust project `failed`
@@ -925,3 +956,19 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   Maintainer-only notes ("verified live", SDK line references) stay here,
   not in `docs/`. `MANUAL.md` became a redirect table so old links and
   code comments that name a manual section still lead somewhere.
+- **`certo bench` grades with hidden tests, takes models from
+  `models.yaml` by name, and puts strategies in a registry** (0.1.6).
+  Hidden tests, because the agent's own tests share its misunderstandings
+  (the Hanoi and Wordle cases): only tests it never saw can show whether
+  Certo was fooled, which is the number Certo exists to keep at zero.
+  `models.yaml` names, not `.env`: `.env` holds one model by design,
+  while a benchmark compares several; the catalog already holds keys,
+  gitignored, so `bench.yaml` stays key-free and committable, and each arm
+  says exactly which model runs (no `--auto-model` ranking, `activated`
+  ignored). A registry, because the next strategies (`cascade`,
+  `best_of`) must be measurable the moment they exist: each is one class
+  that parses its own arm keys and runs one task, and the runner, grader
+  and report never change. "Caught" follows the spec literally (agent
+  finished, not `verified`); `unconfirmed_pass` is recorded beside it
+  because a correct project with no tests also lands there. Runs are
+  repeat-major so a stopped benchmark has some of every arm and task.

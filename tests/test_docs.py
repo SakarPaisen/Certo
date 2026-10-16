@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from certo import admin_cli, cli, config, init_cmd, server
+from certo import admin_cli, bench, cli, config, init_cmd, server
 from certo.custom_tools.run_tests_tool import CHECK_STATUSES
 from certo.runner import VERIFICATION_STATES
 
@@ -98,6 +98,7 @@ def _all_parsers() -> list[argparse.ArgumentParser]:
         cli._build_verify_parser(),
         init_cmd.build_init_parser(),
         init_cmd.build_check_parser(),
+        bench.build_bench_parser(),
         admin_cli.build_parser(),
         _server_parser(),
     ]

@@ -42,6 +42,9 @@ uv run ruff format --check .
   installed.
 - The `server` and `sandbox` tests skip when those extras aren't
   installed.
+- `tests/test_bench_tasks.py` checks every bundled benchmark task: its
+  reference solution passes its hidden tests and its starter alone fails
+  them. Adding a task: see `docs/guides/benchmark.md` ("Add a task").
 - `tests/test_docs.py` keeps `docs/` honest: it fails when a `CERTO_*`
   setting, a command, subcommand or flag, or a verification state is
   missing from its reference page, or when a link between Markdown files

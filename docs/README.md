@@ -38,6 +38,7 @@ The stories behind each of these checks are in
   every action" mode.
 - Run the agent in a Docker container, or as an HTTP server.
 - Keep a record of each run: the full transcript, tokens and cost.
+- Benchmark models on bundled tasks graded by hidden tests: `certo bench`.
 
 ## Where to go next
 
@@ -59,6 +60,7 @@ takes you from install to your first verified project.
 | Call Certo over HTTP | [Run as a server](guides/run-as-a-server.md) |
 | See what a run did and what it cost | [Run records and costs](guides/run-records-and-costs.md) |
 | Teach the agent my conventions, or give it new tools | [Add skills and tools](guides/add-skills-and-tools.md) |
+| Measure which models and strategies really deliver | [Benchmark models and strategies](guides/benchmark.md) |
 
 **Looking something up?** The reference pages are complete and exact:
 
@@ -70,7 +72,8 @@ takes you from install to your first verified project.
 - [Verification by language](reference/verification-by-language.md): what
   Certo runs for each kind of project.
 - [models.yaml](reference/models-yaml.md): the model list for automatic
-  model selection.
+  model selection and the benchmark.
+- [bench.yaml](reference/bench-yaml.md): the benchmark file.
 - [Server API](reference/server-api.md): every HTTP and WebSocket endpoint.
 
 **Curious how it works?**
@@ -103,6 +106,10 @@ takes you from install to your first verified project.
   if the task mentions Python (or a Python tool such as pytest). Otherwise
   packages the agent installs may land outside the project's environment,
   and imports can fail during verification until they are installed again.
+- **A Node project whose `test` script finds no test files counts as
+  verified.** `node --test` and some other runners exit successfully when
+  there is nothing to run. See
+  [Verification by language](reference/verification-by-language.md#node-in-detail).
 - **A task that is exactly the name of an existing file** in the current
   folder is read from that file.
 - **Interactive mode covers only the first part of a task**, and neither it

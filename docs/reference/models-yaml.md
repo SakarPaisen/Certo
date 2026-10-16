@@ -1,12 +1,18 @@
 # models.yaml
 
 The format of the model list used by automatic model selection
-(`--auto-model`). It is for looking things up; the guide is
-[Pick models automatically](../guides/pick-models-automatically.md).
+(`--auto-model`) and by the benchmark (`certo bench`). It is for looking
+things up; the guides are
+[Pick models automatically](../guides/pick-models-automatically.md) and
+[Benchmark models and strategies](../guides/benchmark.md). The benchmark
+uses only `models` entries, by name, and ignores `activated` and
+`task_profiles`.
 
-Certo reads the file only when `CERTO_MODEL_SELECTION=auto` or
-`--auto-model` is used. Its path is `./models.yaml`, or
-`CERTO_MODELS_FILE`. It holds API keys: keep it out of git. A full example
+Certo reads the file only for `--auto-model` (or
+`CERTO_MODEL_SELECTION=auto`) and for `certo bench`. For `--auto-model`
+its path is `./models.yaml`, or `CERTO_MODELS_FILE`; `certo bench` uses
+the `models_file` of its benchmark file (default `./models.yaml`) and
+doesn't read `CERTO_MODELS_FILE`. It holds API keys: keep it out of git. A full example
 with many providers is [models.yaml.example](../../models.yaml.example) in
 the repository.
 

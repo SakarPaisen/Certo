@@ -94,6 +94,12 @@ the scripts as they are; it doesn't read jest or vitest settings.
 If `package.json` has neither a `build` nor a real `test` script, the main
 check is `unavailable` and the verdict is `inconclusive`.
 
+**Known gap:** Certo goes by the script's exit code. Some test runners,
+including `node --test`, exit successfully when they find no test files,
+so a project with `"test": "node --test"` and no tests at all is
+`verified`. Ask the agent for tests, or check that `npm test` really runs
+some.
+
 ## Missing tools
 
 When the tool for a project type isn't installed (`npm`, `go`, `cargo`,
