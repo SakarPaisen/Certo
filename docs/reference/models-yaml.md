@@ -11,11 +11,11 @@ uses `models` entries by name, and ignores `task_profiles`.
 command: not in `--auto-model`, not in an escalation ladder, and not in
 `certo bench`.
 
-Certo reads the file only for `--auto-model` (or
-`CERTO_MODEL_SELECTION=auto`) and for `certo bench`. For `--auto-model`
-its path is `./models.yaml`, or `CERTO_MODELS_FILE`; `certo bench` uses
-the `models_file` of its benchmark file (default `./models.yaml`) and
-doesn't read `CERTO_MODELS_FILE`. It holds API keys: keep it out of git. A full example
+Certo reads the file for `--auto-model` and `--escalate` (or
+`CERTO_MODEL_SELECTION=auto` / `escalate`), for `certo check`, and for
+`certo bench`. Its path is `./models.yaml`, or `CERTO_MODELS_FILE`;
+`certo bench` uses the `models_file` of its benchmark file (default
+`./models.yaml`) and doesn't read `CERTO_MODELS_FILE`. It holds API keys: keep it out of git. A full example
 with many providers is [models.yaml.example](../../models.yaml.example) in
 the repository.
 
@@ -101,7 +101,9 @@ the file decides.
 
 Settings for escalation: running a task on a cheap model first, and moving
 to a stronger one only when Certo's verification shows the cheap one
-couldn't finish. The whole section is optional.
+couldn't finish. The whole section is optional. The guide, with how a
+derived ladder is computed, is
+[Escalate between models](../guides/escalate-between-models.md).
 
 | Field | Default | Meaning |
 |---|---|---|

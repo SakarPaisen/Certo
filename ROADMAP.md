@@ -171,6 +171,22 @@ decisions log below for *why* a given design was chosen.
   prompt is passed to `stream_task`, not copied into the workspace, so an
   empty-starter Python task keeps the normal "empty folder + task names
   Python → environment up front" behaviour.
+- **`catalog_check.py` / `escalation.py` / `catalog_report.py` /
+  `model_pricing.py`** — escalation (0.1.9). `model_catalog.py` parses
+  the optional `escalation:` section (`EscalationSettings`, `Ladder`,
+  `LadderRung`) and gained `capability()` (score without the cost axis).
+  `catalog_check.check_catalog` is the one consistency check (errors and
+  warnings as plain sentences); `load_checked_catalog` is how
+  `--auto-model`, `--escalate` and `certo bench` load the file.
+  `escalation.py` (pure) resolves a `ResolvedLadder` (explicit, or derived
+  per task), defines `ESCALATING_VERDICTS`, `RungResult`, the
+  before/after `workspace_listing`/`FileChanges` and `handoff_message`.
+  `runner._stream_escalation` is the loop: one fresh `Conversation` per
+  rung in the same workspace, reusing `_run_stream_task_phases` and
+  `_apply_acceptance_checks`; `TaskOutcome.rungs`/`final_rung`.
+  `catalog_report.py` is `certo check`'s catalog part and `--models`.
+  `model_pricing.py` holds `is_local`/`estimate_run_cost` (moved from
+  `bench.py`). `bench_strategies.EscalateStrategy` is `strategy: escalate`.
 - **`project_state.py`** + `certo --resume` — stdlib only. The CLI
   passes `save_state=True` (`CERTO_SAVE_STATE`, default on) to
   `stream_task`, which then builds the `Conversation` with
@@ -323,11 +339,18 @@ decisions log below for *why* a given design was chosen.
   publish a prebuilt image. Undecided; documented in
   `docs/guides/run-in-docker.md` and in `docs/README.md`'s "Known
   limitations".
-- **Benchmark strategies beyond `single`** — `cascade` (several models in
-  order, escalate when verification fails) and `best_of` (N attempts, the
-  verifier picks) are the planned next entries in
+- **Benchmark strategies beyond `single` and `escalate`** — `best_of` (N
+  attempts, the verifier picks) is the planned next entry in
   `bench_strategies.STRATEGIES`. Each must be benchmarked on a local and a
   cloud model before release (CLAUDE.md working agreements).
+- **Escalation: restart a rung from a clean workspace** — only "continue in
+  the same files" exists. `_stream_escalation` takes the workspace listing
+  before each rung, so a "restart" mode (copy the original files back
+  before the next rung) is one more branch there; not built.
+- **Escalation not yet benchmarked live** — the 0.1.9 session had no
+  `models.yaml` with a local and a cloud model and no Ollama, so
+  `docs/benchmark/escalation-<version>.md` doesn't exist. Escalation under
+  Docker is covered by fake-workspace tests only, not a real container.
 - **No benchmark baseline yet** — `docs/benchmark/baseline-<version>.md`
   needs a session with a local and a cloud model in `models.yaml`; the
   0.1.6 session had neither (no `models.yaml`, no Ollama).
@@ -1001,6 +1024,72 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   and TTLs need a real store, not Markdown files. Not done: a resume
   after a kill mid-tool-call relies on the SDK handling the unmatched
   action; not exercised against a live model.
+- **Escalation (0.1.9): start cheap, climb only when verification fails.**
+  Per task, not per step: the signal is Certo's own verdict, which only
+  exists at the end of a run. Opt-in (`--escalate`,
+  `CERTO_MODEL_SELECTION=escalate`, server `escalate`); single-model runs
+  and `--auto-model` ranking are untouched (working agreement 2).
+  `--escalate` with `--auto-model`, `--model` or `--resume` is an error:
+  the ladder decides the models, and resume continues one conversation.
+- **`activated: false` means never used, everywhere** (0.1.9, supersedes
+  the bench entry below that ignored it): not in `--auto-model` (already
+  so), escalation or `certo bench`. A bench arm naming an inactive model
+  is an error with how to reactivate; a ladder rung on one is skipped with
+  a warning; a ladder left empty is an error.
+- **Ladders are explicit or derived.** Explicit (`escalation.ladders`)
+  always wins; `--escalate` with no name uses `default`, else derives.
+  Derived: capability = matched profile's weighted sum without the cost
+  axis (`cost`, configurable), ascending, ties to the higher cost rating
+  then the name; capped at `max_rungs` (default 3, minimum 2) by
+  floor(j(n-1)/(k-1)+0.5), which keeps the least and most capable model
+  and spreads the rest. Deterministic, printed, written to
+  MODEL_DECISIONS.md.
+- **What climbs:** `retry_exhausted`, `no_progress`, `timed_out`,
+  `incomplete`, `stuck`; `acceptance_failed` only when the ladder opts in.
+  Never `inconclusive` (no signal: a stronger model faces the same blank),
+  `budget_exhausted` or `confirmation_required` (the user's limits). A
+  provider failure climbs too, recorded as such; on the last rung it is
+  raised like in a single-model run.
+- **A fresh conversation per rung, same workspace, handoff from facts.**
+  Replaying the previous conversation would cost money and add noise (a
+  real local run sent 344k input tokens for hello-world). The next rung
+  gets the files, the task, the bounded failing-check output Certo sends
+  on a retry, and a note Certo writes from recorded facts (model, verdict,
+  fix attempts, files from a before/after listing, failing checks). The
+  listing is used rather than `git status`, because it is exact to the
+  rung even when the folder already had uncommitted changes. Continue-only
+  for now (restart is in the backlog).
+- **Budgets:** `CERTO_MAX_TASK_SECONDS` spans every rung; each rung has its
+  own `retries` (default `CERTO_MAX_VERIFY_RETRIES`). New
+  `CERTO_MAX_TASK_COST` (USD, unset) is checked before each rung against
+  the recorded per-model cost; unknown prices count as 0 and are named. It
+  applies to escalation only.
+- **Escalation under Docker is supported.** Each rung is a new
+  `Conversation` on the same `DockerWorkspace` (public API: the SDK opens
+  a new conversation on the same agent-server, same container and bind
+  mount). The remote conversation wraps every failure in a server error,
+  so under Docker any `ConversationRunError` ends the rung ("provider or
+  run failure"); locally only the SDK's `LLMError` does, and any other
+  error is raised at once.
+- **One consistency check for `models.yaml`** (`catalog_check.py`), shared
+  by every command that reads it, so `certo check` reports exactly what a
+  run would refuse. Two readings of the brief: a "duplicate rung" is the
+  same model with the same settings (the same model at another
+  `reasoning_effort` is a legitimate rung); an unknown `cost_axis` is an
+  error only when written explicitly, since the default `cost` must not
+  break catalogs without cost ratings.
+- **`certo check --models` builds each model's config from its entry
+  alone** (nothing from `.env`), as runs do, and rewrites
+  `llm_check.explain()`'s `.env` field names into the `models.yaml` ones.
+- **Server rungs in the SQL store: a nullable `rungs` column added on
+  startup** with `ALTER TABLE ... ADD COLUMN` when missing (user's choice
+  over hiding it in `completion_contract` or leaving SQL stores without
+  it). Old rows read as `None`.
+- **Bench `strategy: escalate`:** `models: [...]` (at least two, active, no
+  repeats) or derived per task; `escalation.ladders` in `models.yaml` are
+  not used, so an arm states its ladder in `bench.yaml`. "Cost per solved
+  task" is added for every arm (also meaningful for `single`); rung
+  shares only for escalate arms; existing columns unchanged.
 - **`certo bench` grades with hidden tests, takes models from
   `models.yaml` by name, and puts strategies in a registry** (0.1.6).
   Hidden tests, because the agent's own tests share its misunderstandings
@@ -1009,8 +1098,8 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   `models.yaml` names, not `.env`: `.env` holds one model by design,
   while a benchmark compares several; the catalog already holds keys,
   gitignored, so `bench.yaml` stays key-free and committable, and each arm
-  says exactly which model runs (no `--auto-model` ranking, `activated`
-  ignored). A registry, because the next strategies (`cascade`,
+  says exactly which model runs (no `--auto-model` ranking; `activated`
+  was ignored until 0.1.9, superseded above). A registry, because the next strategies (`cascade`,
   `best_of`) must be measurable the moment they exist: each is one class
   that parses its own arm keys and runs one task, and the runner, grader
   and report never change. "Caught" follows the spec literally (agent

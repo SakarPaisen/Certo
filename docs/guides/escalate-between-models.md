@@ -1,0 +1,295 @@
+# Escalate between models
+
+This guide shows how to run each task on the cheapest model that can
+actually do it: start on a free local model, and move to a stronger
+(usually paid) model only when Certo's verification shows the cheap one
+couldn't finish.
+
+```bash
+certo "Build a terminal Wordle game in Python, with pytest tests" --escalate
+```
+
+## What escalation is
+
+You give Certo a **ladder**: a list of models from your `models.yaml`,
+cheapest first. Certo runs the task on rung 1, the normal way: the agent
+works, Certo runs the project's checks, sends failures back, and gives a
+verdict. Then:
+
+- if the verdict is `verified`, it stops: the cheap model did the job;
+- if the verdict shows the model couldn't finish (for example
+  `no_progress`), the task goes to rung 2, a stronger model, in the same
+  folder;
+- and so on, until a verdict doesn't call for a climb, the ladder ends, or
+  a limit is reached.
+
+Escalation works **per task**: one model at a time, climbing when that
+model's whole run fails verification. It doesn't switch models step by
+step inside a run.
+
+**When it pays off.** When many of your tasks are within reach of a local
+model and some aren't. The easy ones cost nothing; only the hard ones reach
+the paid model. If your local model almost never succeeds, escalation only
+adds its time to every task: run the cloud model directly. Use
+[`certo bench`](#prove-it-with-certo-bench) to find out which case you're
+in.
+
+Escalation is off unless you ask for it. Without `--escalate`, Certo runs
+exactly as before.
+
+## Set up a ladder
+
+Escalation uses the models in `models.yaml` (see
+[models.yaml](../reference/models-yaml.md)). Only models with
+`activated: true` (the default) are ever used.
+
+### An explicit ladder
+
+Write the order yourself, under `escalation.ladders`:
+
+```yaml
+escalation:
+  ladders:
+    default:
+      - model: qwen-local
+        retries: 1          # fix attempts on this rung
+      - model: gpt-luna
+      - model: claude-sonnet
+    local-only:
+      - model: qwen-local
+      - model: gemma-local
+        reasoning_effort: max
+```
+
+- `certo ... --escalate` uses the ladder named `default`.
+- `certo ... --escalate local-only` uses that ladder.
+- `retries` sets how many fix attempts that rung gets after a failed check
+  (default: `CERTO_MAX_VERIFY_RETRIES`). One attempt is often enough for a
+  local model before handing over.
+- `reasoning_effort` sets that rung's reasoning effort, instead of the
+  model entry's own. Some local models do much better with `max`.
+
+An explicit ladder always wins over a derived one.
+
+### A derived ladder
+
+With no `escalation` section, or no ladder named `default`, Certo builds
+the ladder from your ratings. It is the same every time for the same task,
+and printed before the run starts.
+
+1. **Capability.** Certo picks the task profile the same way
+   `--auto-model` does (see [Pick models automatically](pick-models-automatically.md)).
+   A model's capability is that profile's weighted sum of its ratings,
+   over every axis **except the cost axis** (`cost`, or
+   `escalation.cost_axis`).
+2. **Order.** Least capable first. When two models have the same
+   capability, the cheaper one goes first (in Certo's ratings, a higher
+   `cost` means cheaper), then the one whose name comes first.
+3. **Length.** At most `escalation.max_rungs` rungs (default 3). With *n*
+   models and *k* rungs, rung *j* (counting from 0) is model number
+   floor(*j* × (*n* − 1) / (*k* − 1) + 0.5) in that order. So the first
+   rung is always the least capable model, the last rung the most capable
+   one, and the rungs between are spread evenly.
+
+**A worked example.** Five active models, rated like this:
+
+| Model | reasoning | precision | code | cost |
+|---|---|---|---|---|
+| qwen-local | 2 | 2 | 3 | 5 |
+| gemma-local | 3 | 2 | 2 | 5 |
+| gpt-luna | 3 | 3 | 3 | 5 |
+| claude-sonnet | 4 | 4 | 5 | 3 |
+| claude-opus | 5 | 5 | 5 | 1 |
+
+For "Build a Wordle game", no profile matches, so the `default` profile
+(every weight 1) applies. Without the cost axis, capabilities are qwen 7,
+gemma 7, luna 9, sonnet 13, opus 15. qwen and gemma tie, and both have
+cost 5, so the name decides: gemma first. With 3 rungs out of 5 models,
+Certo keeps models 0, 2 and 4:
+
+```text
+Escalation: derived ladder (task profile 'default'), 3 rung(s):
+  1. gemma-local (capability 7, cost rating 5)
+  2. gpt-luna (capability 9, cost rating 5)
+  3. claude-opus (capability 15, cost rating 1)
+```
+
+For "Fix the bug in the parser", the `debugging` profile matches (weights
+reasoning 3, precision 2, code 2), and the order changes:
+
+```text
+Escalation: derived ladder (task profile 'debugging'), 3 rung(s):
+  1. qwen-local (capability 16, cost rating 5)
+  2. gpt-luna (capability 21, cost rating 5)
+  3. claude-opus (capability 35, cost rating 1)
+```
+
+Raise `max_rungs` to keep claude-sonnet too, or write an explicit ladder.
+
+## What makes Certo climb
+
+| Verdict of a rung | What happens |
+|---|---|
+| `verified` | Stop. The task is done. |
+| `retry_exhausted`, `no_progress`, `timed_out`, `incomplete`, `stuck` | Climb to the next rung. |
+| `acceptance_failed` | Stop, unless the ladder sets `escalate_on_acceptance_failed: true`. |
+| `inconclusive` | Stop. |
+| `budget_exhausted`, `confirmation_required` | Stop: these are your own limits. |
+| A provider failure (outage, rate limit, rejected key) | Climb, recorded as a provider failure rather than a quality failure. |
+
+**Why `inconclusive` never climbs.** It means there was nothing to check:
+no tests, no build. A stronger model would face the same blank, so Certo
+stops and says so. Escalation needs a project with something to check.
+Ask for tests in the task ("with pytest tests") to give it one.
+
+The final verdict is the verdict of the last rung that ran.
+
+## What the next model receives
+
+Each rung starts a **fresh conversation** in the **same folder**. The next
+model doesn't get the previous model's conversation: that can be huge (one
+local run sent 344,000 input tokens for a hello-world task), and replaying
+it to an expensive model costs money and adds noise. It gets:
+
+- the files, exactly as the previous rung left them;
+- the original task;
+- the real output of the checks that were failing (the same output Certo
+  sends on a retry);
+- a short note written by Certo from what it recorded, never by a model.
+
+A real handoff message looks like this:
+
+```text
+Another model already worked on this task in this folder and couldn't finish it. Its files are still here, exactly as it left them: look at them first, keep what works, and complete the task. This summary was written by Certo from what it recorded, not by a model.
+
+- Model: qwen-local (ollama/qwen3-coder:30b)
+- Result: no_progress
+- Fix attempts after failed checks: 1
+- Files it created: tests/test_wordle.py, wordle.py
+- Files it changed: README.md
+- Files it deleted: none
+- Checks failing when it stopped: pytest (`.venv/bin/python -m pytest -q`)
+
+The task:
+
+Build a terminal Wordle game in Python, with pytest tests.
+
+Output of the checks that were failing:
+
+### pytest (`.venv/bin/python -m pytest -q`) — pytest failed (exit 1)
+
+FAILED tests/test_wordle.py::test_repeated_letters - AssertionError: assert ['present', 'present'] == ['correct', 'absent']
+1 failed, 7 passed in 0.12s
+...
+```
+
+The file lists come from a listing of the folder before and after the
+rung, leaving out caches, environments (`.venv`, `node_modules`) and
+`.certo/`.
+
+## Limits
+
+- **Time.** `CERTO_MAX_TASK_SECONDS` covers every rung together, as it
+  covers every retry. Each rung has its own fix attempts.
+- **Cost.** Set `CERTO_MAX_TASK_COST` (US dollars) to cap a run. Before
+  each rung starts, Certo adds up the cost recorded so far; once it reaches
+  the cap, the climb stops with the verdict it has, and a note says so.
+  Models with no known price (usually local ones) count as 0, and the note
+  names them.
+
+## What you see
+
+Before the run, the ladder (above). When a rung ends and the next starts,
+one line:
+
+```text
+Certo: qwen-local ended no_progress after 1 fix attempt; escalating to gpt-luna (rung 2 of 3).
+```
+
+At the end, the run summary has one line per rung and the rung that gave
+the final result:
+
+```text
+  Rungs:
+    1. local (ollama/q): no_progress, 1 fix attempt, 1m 00s, 0 tokens, $0.0000
+    2. mid (openai/m): verified, 0 fix attempts, 30.0s, 0 tokens, $0.0000
+  Final result from rung 2 (mid).
+```
+
+`MODEL_DECISIONS.md` in the project records the ladder, how it was built,
+every climb with its reason and why the climb stopped. With
+`CERTO_ARTIFACTS_DIR`, each rung also gets its own folder of records (see
+[Run records and costs](run-records-and-costs.md#keep-a-record-of-every-run)).
+In server mode, results carry a `rungs` list (see
+[Server API](../reference/server-api.md)).
+
+## Confirm each climb
+
+With `--interactive`, Certo asks before moving to the next rung, with the
+cost so far and a rough price for the next model:
+
+```text
+qwen-local couldn't finish (no_progress). Try gpt-luna next? Cost so far: $0.0000 (no known price for qwen-local: counted as 0). gpt-luna: roughly $0.24 for a run, from LiteLLM's prices. [Y/n]
+```
+
+Enter climbs; `n` stops with the current verdict. Without `--interactive`
+escalation is automatic, and in server mode it is always automatic.
+
+## Docker
+
+Escalation works with `--execution docker`: every rung runs as a new
+conversation in the same container, so it sees the same files and the
+same Python environment. In Docker mode Certo can't tell a provider
+failure from another run error, so any run error ends the rung and the
+task moves to the next one, recorded as a "provider or run failure".
+
+## Settings and requests
+
+- **CLI:** `--escalate [LADDER]`. It can't be combined with
+  `--auto-model`, `--model` or `--resume`.
+- **Settings:** `CERTO_MODEL_SELECTION=escalate`, and optionally
+  `CERTO_ESCALATION_LADDER=NAME` (see [Configuration](../reference/configuration.md)).
+- **Server:** an `escalate` field on `POST /tasks` and the WebSocket:
+  `true`, or a ladder name.
+
+## Check the configuration first
+
+```bash
+certo check --models
+```
+
+`certo check` lists your active and inactive models, each ladder with its
+usable rungs, the derived ladder for the `default` profile, and every
+error and warning in `models.yaml` (for example a rung that names a model
+that doesn't exist). `--models` also sends a real test request to every
+active model, so a broken key or a model without tool calling shows up
+now, not halfway up a ladder. See [Commands](../reference/commands.md#certo-check).
+
+## Prove it with `certo bench`
+
+Measure escalation on your own models before relying on it. A benchmark
+with four arms compares it fairly:
+
+```yaml
+arms:
+  - {name: local, strategy: single, model: qwen-local}
+  - {name: cloud, strategy: single, model: gpt-luna}
+  - name: local-then-cloud
+    strategy: escalate
+    models: [qwen-local, gpt-luna]
+  - name: derived
+    strategy: escalate
+```
+
+What to look for in `results.md`: escalation should pass at least as many
+hidden tests as the local model alone, come close to the cloud model, and
+cost less than the cloud model. **Cost per solved task** and **which rung
+produced the final result** show where the money went. See
+[Benchmark models and strategies](benchmark.md).
+
+## Related
+
+- [models.yaml](../reference/models-yaml.md#escalation)
+- [Pick models automatically](pick-models-automatically.md)
+- [How verification works](../concepts/how-verification-works.md)
+- [Troubleshooting](../troubleshooting.md#escalation-and-modelsyaml)

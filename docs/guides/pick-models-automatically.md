@@ -40,7 +40,11 @@ task_profiles:
 
 - `models.yaml` holds real API keys. Keep it out of git, like `.env`.
 - Every model in the example file starts with `activated: false`. Turn on
-  only the ones whose keys you filled in.
+  only the ones whose keys you filled in. `activated: false` means Certo
+  never uses that model, in any command.
+- Run `certo check` to see what Certo makes of the file: the active models
+  and every error or warning. `certo check --models` also tests each
+  active model with a real request.
 - On every rating, **higher is better, including `cost`**: `cost: 5` means
   cheap.
 
@@ -56,7 +60,9 @@ Or set `CERTO_MODEL_SELECTION=auto` in your settings. Certo reads
 `./models.yaml`, or the file named by `CERTO_MODELS_FILE`.
 
 `CERTO_LLM_MODEL` must still be set: Certo checks the normal settings
-before it reads the model list.
+before it reads the model list. Problems in `models.yaml` are reported the
+same way for every command: errors stop the run, warnings are printed (see
+[models.yaml](../reference/models-yaml.md#checks)).
 
 ## How a model is chosen
 
@@ -115,7 +121,16 @@ Each fallback adds a section of its own, with the reason for the switch.
 - Under `--execution docker`, the first choice works, but Certo can't
   switch models in the middle of a task.
 
+## Automatic choice or escalation?
+
+`--auto-model` picks the best fit for each task up front and switches only
+on errors or failed fix attempts, inside one conversation. To start cheap
+and pay for a stronger model only when the cheap one's work fails
+verification, use [escalation](escalate-between-models.md) instead:
+`--escalate`. The two can't be combined.
+
 ## Related
 
 - [models.yaml reference](../reference/models-yaml.md)
+- [Escalate between models](escalate-between-models.md)
 - [Run records and costs](run-records-and-costs.md): tokens and cost per model

@@ -88,6 +88,7 @@ The exit code is nonzero for every failure state, so Certo works in scripts and 
 - **Sandboxed runs.** Add `--execution docker` to run the agent in a container.
 - **Server mode.** REST, WebSocket streaming, and an OpenAI-compatible `/v1/chat/completions` endpoint.
 - **Run records.** Full transcript, token counts and cost per run, plus a log of which model was picked and why.
+- **Escalates only when it must.** Give Certo a ladder of models from `models.yaml`, cheapest first. Each task starts on the first; it moves to the next, stronger model only when Certo's verification shows the cheaper one couldn't finish. Per task, not per step. Add `--escalate`. See [Escalate between models](https://github.com/alessioricco/certo/blob/main/docs/guides/escalate-between-models.md).
 - **A benchmark.** `certo bench` compares models on bundled tasks graded by hidden tests the agent never sees, and counts how often Certo itself was fooled. See [Benchmark models and strategies](https://github.com/alessioricco/certo/blob/main/docs/guides/benchmark.md).
 - **Skills and custom tools.** Add project conventions or new tools by dropping files in a folder.
 

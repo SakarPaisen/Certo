@@ -34,6 +34,9 @@ The stories behind each of these checks are in
 - Check a project with no agent and no model at all: `certo verify`.
 - Pick the best model for each task from a list you write, and fall back to
   the next one when a provider fails.
+- Escalate per task: start on a cheap or local model, and move to a
+  stronger one only when Certo's verification shows the cheaper model
+  couldn't finish.
 - Enforce limits: an iteration cap, a time budget, and an optional "approve
   every action" mode.
 - Run the agent in a Docker container, or as an HTTP server.
@@ -56,6 +59,7 @@ takes you from install to your first verified project.
 | Let the agent work on a project I already have | [Work on an existing project](guides/work-on-an-existing-project.md) |
 | Answer the agent's questions, or approve each action | [Interactive and confirm mode](guides/interactive-mode.md) |
 | Let Certo choose the model for each task | [Pick models automatically](guides/pick-models-automatically.md) |
+| Start cheap, and pay for a stronger model only when needed | [Escalate between models](guides/escalate-between-models.md) |
 | Check projects in CI | [Verify in CI](guides/verify-in-ci.md) |
 | Add my own pass/fail rules for a task | [Acceptance checks](guides/acceptance-checks.md) |
 | Run the agent inside a container | [Run in Docker](guides/run-in-docker.md) |
@@ -113,6 +117,10 @@ takes you from install to your first verified project.
   verified.** `node --test` and some other runners exit successfully when
   there is nothing to run. See
   [Verification by language](reference/verification-by-language.md#node-in-detail).
+- **Escalation climbs only on a verification signal.** A task whose
+  project has nothing to check ends `inconclusive` and never escalates.
+  In Docker mode a provider failure can't be told apart from another run
+  error. See [Escalate between models](guides/escalate-between-models.md).
 - **Resume in Docker mode starts a new conversation**: the agent gets the
   task, Certo's status record and the files, but not its earlier
   conversation. See [Resume an interrupted run](guides/resume-a-run.md#when-the-conversation-cant-be-resumed).

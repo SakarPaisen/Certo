@@ -35,6 +35,12 @@ setting comes from and makes one small call to the model.
   [`budget_exhausted`](#budget_exhausted),
   [nothing to resume](#nothing-to-resume),
   [Rust fails on `cargo clippy`](#a-rust-project-fails-on-cargo-clippy)
+- Escalation and `models.yaml`: [problems](#modelsyaml-has-problems),
+  [warnings](#warnings-about-modelsyaml),
+  [`--escalate` refuses to start](#--escalate-refuses-to-start),
+  [stops with inconclusive](#escalation-stops-on-the-first-rung-with-inconclusive),
+  [stops before the last rung](#escalation-stops-before-the-last-rung),
+  [`--models` failures](#certo-check---models-a-model-fails)
 - Benchmark: [no bench.yaml or models.yaml](#certo-bench-no-benchyaml-or-modelsyaml),
   [unknown model](#certo-bench-unknown-model),
   [`--parallel` refused](#certo-bench---parallel-is-refused),
@@ -447,6 +453,83 @@ limitation).
 
 **Fix:** install the component: `rustup component add clippy`.
 
+## Escalation and `models.yaml`
+
+### `models.yaml` has problems
+
+**You see:** `Configuration error: models.yaml has 2 problem(s):` followed
+by one line per problem, or `Error: ...` lines in `certo check`.
+
+**Cause:** every command that reads `models.yaml` checks it the same way,
+and stops on an error. The errors and their fixes:
+
+| Message starts with | Fix |
+|---|---|
+| `Two models are named '...'` | Give each model a unique `name`. |
+| `Every model has 'activated: false'` | Set `activated: true` on the models you filled in. |
+| `Ladder '...', rung N: there is no model named '...'. Models: ...` | Fix the spelling: the message lists the names that exist. |
+| `Ladder '...' lists ... twice with the same settings` | Remove the repeated rung (the same model with a different `reasoning_effort` is allowed). |
+| `Ladder '...', rung N (...): retries must be 0 or more` | Use 0 or a positive number. |
+| `escalation.cost_axis is '...', but no model has a rating with that name` | Set `cost_axis` to the rating you use for cost-effectiveness, usually `cost`. |
+| `Ladder '...' has no usable rung` | Activate at least one of its models, or fix the names. |
+
+**Fix:** run `certo check` after each change: it lists every problem at
+once.
+
+### Warnings about `models.yaml`
+
+**You see:** `Warning (models.yaml): ...` (or `Warning: ...` in
+`certo check`). The command still runs.
+
+| Warning | What it means |
+|---|---|
+| `... has 'activated: false', so this rung is skipped` | The ladder names an inactive model. Activate it, or remove the rung. |
+| `... has only one usable rung (...), so it can't escalate` | Only one model in the ladder can be used. Add or activate another. |
+| `Model '...' has no rating for ..., which task profile(s) ... weigh: it counts as 0` | Add the missing ratings, or the model ranks lower than it should. |
+| `Model '...' has no api_key and no base_url` | It works only if the provider's own key variable (such as `OPENAI_API_KEY`) is set. Add `api_key` otherwise. |
+| `... (capability ...) comes after ... but is less capable under the default task profile` | Your explicit ladder climbs to a weaker model. Allowed, if that's what you meant. |
+
+### `--escalate` refuses to start
+
+| You see | Fix |
+|---|---|
+| `Escalation needs a model catalog, and there is none at ./models.yaml` | Copy `models.yaml.example` to `models.yaml` and activate the models to climb through, or set `CERTO_MODELS_FILE`. |
+| `There is no escalation ladder named '...' in models.yaml. Ladders: ...` | Use one of the listed names, or leave the name out for the `default` (or derived) ladder. |
+| `--escalate can't be combined with --auto-model or --model` | The ladder decides which models run. Drop the other flag. |
+| `--model can't be used while CERTO_MODEL_SELECTION=escalate` | Drop `--model`, or set `CERTO_MODEL_SELECTION=manual` for this run. |
+| `--resume can't be combined with escalation` | Resume without `--escalate`: it continues the last model's conversation. |
+
+### Escalation stops on the first rung with `inconclusive`
+
+**You see:** `Certo: ... ended inconclusive: nothing in the project could
+be checked, so there is no signal to escalate on.`
+
+**Cause:** the project has no tests or build to run, so Certo can't tell
+whether the model succeeded. A stronger model would face the same blank.
+
+**Fix:** ask for tests in the task ("... with pytest tests"), or add them
+first. See [`inconclusive`: the project has no tests](#inconclusive-the-project-has-no-tests).
+
+### Escalation stops before the last rung
+
+**You see:** `Certo: ... escalation stops: the cost so far, $..., has
+reached CERTO_MAX_TASK_COST=...` or `... the task's time budget
+(CERTO_MAX_TASK_SECONDS=...) is spent`.
+
+**Cause:** a limit you set was reached. The verdict is the last rung's.
+
+**Fix:** raise `CERTO_MAX_TASK_COST` or `CERTO_MAX_TASK_SECONDS`, or give
+the cheaper rungs fewer fix attempts (`retries` in the ladder) so they hand
+over sooner. Models with no known price count as 0 toward the cost cap.
+
+### `certo check --models`: a model fails
+
+**You see:** a line such as `gpt-luna (openai/gpt-5.6-luna)... OpenAI
+rejected the API key. Check its api_key in models.yaml: ...`.
+
+**Fix:** follow the line: it names the `models.yaml` field to fix. `--models`
+without a `models.yaml` fails with `--models: there is no model catalog`.
+
 ## Benchmark (`certo bench`)
 
 ### `certo bench`: no bench.yaml or models.yaml
@@ -467,6 +550,24 @@ what to compare from `bench.yaml`. It never uses `.env`.
 to `models.yaml`, then fill in the models to compare. Use `--config` for
 another benchmark file, or `models_file` in it for another models file.
 See [Benchmark models and strategies](guides/benchmark.md).
+
+### `certo bench`: an inactive model
+
+**You see:** `arm 'a': model 'x' has 'activated: false' in models.yaml,
+and Certo never uses an inactive model.`
+
+**Cause:** since version 0.1.9, `activated: false` means never used, in
+the benchmark too. Before, the benchmark ignored the flag.
+
+**Fix:** set `activated: true` on that model in `models.yaml`.
+
+### `certo bench`: an escalate arm is refused
+
+**You see:** `'models' must list at least two models` or `'models' lists a
+model twice`.
+
+**Fix:** list two or more different models in the order to climb, or
+leave `models` out for the ladder derived from the ratings.
 
 ### `certo bench`: unknown model
 
