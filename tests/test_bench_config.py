@@ -95,7 +95,7 @@ def test_unknown_model_lists_the_catalog_names(tmp_path):
 def test_unknown_strategy_lists_the_known_ones(tmp_path):
     bench = "arms:\n  - {name: a, strategy: cascade, models: [cloud]}\n"
     with pytest.raises(
-        BenchConfigError, match="unknown strategy 'cascade'.*Known strategies: single"
+        BenchConfigError, match="unknown strategy 'cascade'.*Known strategies: escalate, single"
     ):
         load_bench_config(_write(tmp_path, bench))
 
@@ -148,7 +148,7 @@ def test_the_shipped_example_is_valid_against_the_shipped_models_example(tmp_pat
     path = tmp_path / "bench.yaml"
     path.write_text(f"models_file: {tmp_path / 'models.yaml'}\n" + text)
     cfg = load_bench_config(str(path))
-    assert len(cfg.arms) == 2
+    assert [a.strategy for a in cfg.arms] == ["single", "single", "escalate"]
 
 
 def test_run_config_takes_everything_from_the_catalog_entry(tmp_path, monkeypatch):
@@ -217,3 +217,96 @@ def test_a_new_strategy_is_one_registry_entry(tmp_path, monkeypatch):
     cfg = load_bench_config(_write(tmp_path, bench))
     assert cfg.arms[0].params == {"model": "cloud", "n": 3}
     assert cfg.arms[0].models == ["cloud"]
+
+
+# --- strategy: escalate ---------------------------------------------------------------
+
+ESCALATE = """
+arms:
+  - name: local-then-cloud
+    strategy: escalate
+    models: [local-coder, cloud]
+  - name: derived
+    strategy: escalate
+"""
+
+
+def test_escalate_arms_explicit_and_derived(tmp_path):
+    cfg = load_bench_config(_write(tmp_path, ESCALATE))
+    explicit, derived = cfg.arms
+    assert explicit.params == {"models": ["local-coder", "cloud"]}
+    assert explicit.models == ["local-coder", "cloud"]
+    # A derived arm may use every active model; 'parked' is inactive.
+    assert derived.models == ["local-coder", "cloud"]
+    assert cfg.model_catalog is not None
+
+
+@pytest.mark.parametrize(
+    ("arm", "message"),
+    [
+        ("{name: a, strategy: escalate, models: [cloud]}", "at least two models"),
+        ("{name: a, strategy: escalate, models: cloud}", "at least two models"),
+        ("{name: a, strategy: escalate, models: [cloud, cloud]}", "lists a model twice"),
+        ("{name: a, strategy: escalate, models: [cloud, nope]}", "unknown model 'nope'"),
+        ("{name: a, strategy: escalate, models: [cloud, parked]}", "'activated: false'"),
+        ("{name: a, strategy: escalate, model: cloud}", "unknown key"),
+    ],
+)
+def test_escalate_arm_errors(tmp_path, arm, message):
+    with pytest.raises(BenchConfigError, match=message):
+        load_bench_config(_write(tmp_path, f"arms:\n  - {arm}\n"))
+
+
+def _escalation_outcome(final_rung, names):
+    from certo.escalation import RungResult
+
+    rungs = tuple(
+        RungResult(n, name, f"x/{name}", "verified" if n == final_rung else "no_progress", 1, 1.0, None)
+        for n, name in enumerate(names, start=1)
+    )
+    return SimpleNamespace(
+        verification_state="verified",
+        retries_used=0,
+        run_summary=None,
+        rungs=rungs,
+        final_rung=final_rung,
+    )
+
+
+def test_escalate_strategy_runs_an_explicit_ladder(tmp_path):
+    cfg = load_bench_config(_write(tmp_path, ESCALATE))
+    seen = {}
+
+    def fake_stream(task, *, cfg, ladder):
+        seen.update(model=cfg.model, kind=ladder.kind, rungs=[r.name for r in ladder.rungs])
+        return _escalation_outcome(2, ["local-coder", "cloud"])
+
+    ctx = RunContext("do it", "/ws", cfg.catalog, "/iso", fake_stream, cfg.model_catalog)
+    result = STRATEGIES["escalate"].run(ctx, cfg.arms[0].params)
+
+    assert seen == {
+        "model": "ollama/qwen3-coder:30b",
+        "kind": "explicit",
+        "rungs": ["local-coder", "cloud"],
+    }
+    assert result.models_used == ("local-coder", "cloud")
+    assert result.final_rung == 2
+    assert [(r["name"], r["final"]) for r in result.rungs] == [
+        ("local-coder", False),
+        ("cloud", True),
+    ]
+
+
+def test_escalate_strategy_derives_a_ladder_per_task(tmp_path):
+    cfg = load_bench_config(_write(tmp_path, ESCALATE))
+    seen = {}
+
+    def fake_stream(task, *, cfg, ladder):
+        seen.update(kind=ladder.kind, rungs=[r.name for r in ladder.rungs])
+        return _escalation_outcome(1, [ladder.rungs[0].name])
+
+    ctx = RunContext("do it", "/ws", cfg.catalog, "/iso", fake_stream, cfg.model_catalog)
+    STRATEGIES["escalate"].run(ctx, cfg.arms[1].params)
+
+    assert seen["kind"] == "derived"
+    assert "parked" not in seen["rungs"]

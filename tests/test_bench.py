@@ -297,3 +297,50 @@ def test_check_tasks_reports_a_broken_task(tmp_path, monkeypatch):
         "gave failed (1 failed)"
     )
     assert problems == [expected]
+
+
+# --- strategy: escalate ---------------------------------------------------------------
+
+
+class FakeLadderModel(FakeModel):
+    """Stands in for stream_task with a ladder: the first rung fails, the
+    second solves the task."""
+
+    def __call__(self, task_text, *, cfg, ladder=None):
+        from certo.escalation import RungResult
+
+        outcome = super().__call__(task_text, cfg=cfg)
+        self.ladders = [*getattr(self, "ladders", []), ladder]
+        rungs = (
+            RungResult(1, ladder.rungs[0].name, "x", "no_progress", 1, 1.0, _summary(0.0)),
+            RungResult(2, ladder.rungs[1].name, "y", "verified", 0, 1.0, _summary(0.25)),
+        )
+        outcome.rungs, outcome.final_rung = rungs, 2
+        return outcome
+
+
+def test_an_escalate_arm_is_recorded_with_its_rungs(tmp_path, project_venv):
+    arm = "  - {name: climb, strategy: escalate, models: [local-coder, cloud-a]}\n"
+    model = FakeLadderModel(project_venv)
+    out = tmp_path / "out"
+
+    assert _run(_bench_file(tmp_path, arm), out, model) == 0
+
+    assert [r.name for r in model.ladders[0].rungs] == ["local-coder", "cloud-a"]
+    (record,) = _records(out)
+    assert record["strategy"] == "escalate"
+    assert record["final_rung"] == 2
+    assert [(r["name"], r["verdict"], r["final"]) for r in record["rungs"]] == [
+        ("local-coder", "no_progress", False),
+        ("cloud-a", "verified", True),
+    ]
+    assert [m["name"] for m in record["models"]] == ["local-coder", "cloud-a"]
+    results = (out / "results.md").read_text()
+    assert "- **climb:** rung 2 (cloud-a): 1/1" in results
+
+
+def test_single_arm_records_have_no_rungs(tmp_path, project_venv):
+    out = tmp_path / "out"
+    _run(_bench_file(tmp_path, ONE_ARM), out, FakeModel(project_venv))
+    (record,) = _records(out)
+    assert (record["rungs"], record["final_rung"]) == ([], None)

@@ -22,7 +22,7 @@ repeats: 3
 
 arms:
   # strategy: single = one model, the normal Certo run, exactly what
-  # `certo "<task>"` does. It is the only strategy so far.
+  # `certo "<task>"` does.
   - name: qwen-local
     strategy: single
     model: qwen3-coder-local      # a `name` from models.yaml
@@ -30,6 +30,13 @@ arms:
   - name: sonnet
     strategy: single
     model: claude-sonnet-5
+
+  # strategy: escalate = start on the first model, move to the next only
+  # when Certo's verdict shows it couldn't finish (like certo --escalate).
+  # Leave out `models` for the ladder Certo builds from the ratings.
+  - name: local-then-cloud
+    strategy: escalate
+    models: [qwen3-coder-local, claude-sonnet-5]
 
 # Optional: a folder of your own tasks instead of the bundled set, in the
 # same shape (task.md, starter/, hidden_tests/, reference/).

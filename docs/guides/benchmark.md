@@ -72,7 +72,9 @@ arms:
 ```
 
 `strategy: single` means one model and the normal Certo run, exactly what
-`certo "<task>"` does. It is the only strategy so far. Start from
+`certo "<task>"` does. `strategy: escalate` climbs a ladder of models,
+like `certo --escalate`: give it `models: [a, b]` for a fixed ladder, or no
+`models` for the ladder Certo derives per task. Start from
 [bench.yaml.example](../../bench.yaml.example); every field is in the
 [bench.yaml reference](../reference/bench-yaml.md).
 
@@ -154,8 +156,13 @@ In `results.md`, per arm:
   tests passed, for example because the agent wrote no tests. Some
   "caught" runs are in fact unconfirmed passes.
 - **Median time, tokens and cost.**
+- **Cost per solved task:** the arm's total cost divided by the runs whose
+  hidden tests passed. The fair way to compare a cheap model that solves
+  less with an expensive one that solves more.
 
-A per-task table shows where each arm passes and fails.
+A per-task table shows where each arm passes and fails. For `escalate`
+arms, a last section shows how often each rung produced the final result,
+for example `rung 1 (qwen-local): 4/9, rung 2 (gpt-luna): 5/9`.
 
 **Keep the numbers in proportion.** With 9 tasks and 3 repeats, an arm has
 27 runs; a difference of two or three runs can be chance. Compare results

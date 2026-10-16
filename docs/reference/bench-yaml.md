@@ -53,6 +53,30 @@ One model, the normal Certo run: exactly what `certo "<task>"` does.
 |---|---|
 | `model` | The `name` of an entry in the models file. An unknown name is an error that lists the names the file has. |
 
+### `strategy: escalate`
+
+Escalation, as `certo --escalate` does it: start on the first model, and
+move to the next, stronger one only when Certo's verdict shows the model
+couldn't finish.
+
+| Key | Meaning |
+|---|---|
+| `models` | Optional. A list of at least two model names, in the order to climb. Without it, each task gets the ladder Certo builds from the active models' ratings, for that task's profile. |
+
+```yaml
+arms:
+  - name: local-then-cloud
+    strategy: escalate
+    models: [qwen-local, gpt-luna]
+  - name: derived
+    strategy: escalate
+```
+
+Grading is the same as for every arm: the hidden tests decide. Each run
+records every rung that ran and which one gave the final verdict.
+`escalation.ladders` in `models.yaml` are not used here: an arm's ladder
+is its `models` list, or a derived one.
+
 ## How models are used
 
 - The arm's model is taken from its `models.yaml` entry: `model`,
@@ -65,11 +89,11 @@ One model, the normal Certo run: exactly what `certo "<task>"` does.
 - Problems in `models.yaml` are checked as for every command (see
   [models.yaml](models-yaml.md#checks)): errors stop the benchmark,
   warnings are printed with the plan.
-- `task_profiles` in `models.yaml` are not used.
+- `task_profiles` and `escalation` settings in `models.yaml` are used only
+  by a derived `escalate` arm, to build its ladder.
 
 ## Strategies to come
 
 Strategies are a small registry in Certo's code, so new ones can be added
-without changing how the benchmark runs, for example `cascade` (several
-models in order) or `best_of` (several attempts, the verifier picks).
-Only `single` exists today.
+without changing how the benchmark runs, for example `best_of` (several
+attempts, the verifier picks). `single` and `escalate` exist today.

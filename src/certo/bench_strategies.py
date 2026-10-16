@@ -3,9 +3,10 @@
 A strategy is one entry in `STRATEGIES`. It knows which keys it reads from a
 `bench.yaml` arm (`parse`), which `models.yaml` entries it uses (`models`),
 and how to run one task in a prepared workspace (`run`). The bench runner
-only uses this interface, so a later strategy, such as `cascade` (several
-models in order) or `best_of` (N attempts, the verifier picks), is one new
-class and one new entry here, with no change to the runner.
+only uses this interface, so a later strategy, such as `best_of` (N
+attempts, the verifier picks), is one new class and one new entry here,
+with no change to the runner. `single` is one model; `escalate` climbs a
+ladder of models (escalation.py), explicit or derived per task.
 
 Models always come from the `models.yaml` catalog, by name, and reach the
 normal Certo pipeline as an explicit configuration: never through `.env`.
@@ -21,7 +22,8 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from .config import DEFAULT_MAX_ITERATIONS, Config, override_llm
-from .model_catalog import ModelCatalogEntry
+from .escalation import derive_ladder, ladder_from_models
+from .model_catalog import ModelCatalog, ModelCatalogEntry
 
 
 class BenchConfigError(ValueError):
@@ -41,6 +43,9 @@ class RunContext:
     isolation_dir: str
     # runner.stream_task, or a fake in tests.
     stream: Callable[..., Any]
+    # The whole catalog, with task profiles and escalation settings, for
+    # strategies that build a ladder.
+    model_catalog: ModelCatalog | None = None
 
 
 @dataclass(frozen=True)
@@ -52,6 +57,10 @@ class AttemptResult:
     retries_used: int
     run_summary: Any  # run_summary.RunSummary | None
     models_used: tuple[str, ...]
+    # Escalation only: one dict per rung that ran, and the rung whose
+    # verdict this is.
+    rungs: tuple[dict[str, Any], ...] = ()
+    final_rung: int | None = None
 
 
 class Strategy(Protocol):
@@ -149,5 +158,55 @@ class SingleStrategy:
         )
 
 
+class EscalateStrategy:
+    """Start on the cheapest model, climb to a stronger one only when
+    Certo's verdict shows the model couldn't finish: what `certo --escalate`
+    does. `models: [a, b, ...]` is an explicit ladder; without it, each task
+    gets the ladder derived from the active models' ratings."""
+
+    name = "escalate"
+    description = "a ladder of models, climbing on verification failure"
+
+    def parse(self, arm, catalog, where):
+        reject_unknown_keys(arm, {"models"}, where)
+        if "models" not in arm:
+            active = [name for name, entry in catalog.items() if entry.activated]
+            return {"models": None, "derived_models": active}
+        names = arm["models"]
+        if not isinstance(names, list) or len(names) < 2:
+            raise BenchConfigError(
+                f"{where}: 'models' must list at least two models from models.yaml, in the "
+                "order to climb (or leave it out for the ladder derived from the ratings)."
+            )
+        if len(set(names)) != len(names):
+            raise BenchConfigError(f"{where}: 'models' lists a model twice.")
+        for i, _ in enumerate(names):
+            model_name({"models": names[i]}, "models", catalog, where)
+        return {"models": list(names)}
+
+    def models(self, params):
+        return params["models"] if params["models"] is not None else params["derived_models"]
+
+    def run(self, ctx, params):
+        catalog = ctx.model_catalog
+        if params["models"] is None:
+            ladder = derive_ladder(catalog, ctx.task_text)
+        else:
+            ladder = ladder_from_models(catalog, params["models"], ctx.task_text)
+        cfg = run_config(ladder.rungs[0].entry, ctx.workspace, ctx.isolation_dir)
+        outcome = ctx.stream(ctx.task_text, cfg=cfg, ladder=ladder)
+        rungs = tuple(
+            {**r.to_dict(), "final": r.number == outcome.final_rung} for r in outcome.rungs
+        )
+        return AttemptResult(
+            verification_state=outcome.verification_state,
+            retries_used=outcome.retries_used,
+            run_summary=outcome.run_summary,
+            models_used=tuple(r.name for r in outcome.rungs),
+            rungs=rungs,
+            final_rung=outcome.final_rung,
+        )
+
+
 # The registry. A new strategy is one more entry.
-STRATEGIES: dict[str, Strategy] = {s.name: s for s in (SingleStrategy(),)}
+STRATEGIES: dict[str, Strategy] = {s.name: s for s in (SingleStrategy(), EscalateStrategy())}

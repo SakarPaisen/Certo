@@ -21,7 +21,7 @@ from .bench_strategies import STRATEGIES, BenchConfigError
 from .bench_tasks import BUILTIN_TASKS_DIR, BenchTask, BenchTaskError, load_tasks
 from .catalog_check import load_checked_catalog
 from .config import DEFAULT_MODELS_FILE
-from .model_catalog import ModelCatalogEntry, ModelCatalogError
+from .model_catalog import ModelCatalog, ModelCatalogEntry, ModelCatalogError
 
 DEFAULT_BENCH_FILE = "bench.yaml"
 _TOP_LEVEL_KEYS = {"tasks", "repeats", "arms", "models_file", "tasks_dir"}
@@ -53,6 +53,8 @@ class BenchConfig:
     catalog: dict[str, ModelCatalogEntry]
     # models.yaml warnings (catalog_check.py), printed with the plan.
     catalog_warnings: list[str] = field(default_factory=list)
+    # The whole catalog (task profiles, escalation settings), for ladders.
+    model_catalog: ModelCatalog | None = None
 
     def fingerprint(self) -> dict[str, Any]:
         """What must match for `--resume` to continue an earlier run."""
@@ -180,4 +182,5 @@ def load_bench_config(path: str = DEFAULT_BENCH_FILE) -> BenchConfig:
         models_file=str(Path(models_file).resolve()),
         catalog=catalog,
         catalog_warnings=catalog_warnings,
+        model_catalog=loaded,
     )

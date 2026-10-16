@@ -140,7 +140,14 @@ def execute_run(
         attempt, error = None, None
         try:
             attempt = strategy.run(
-                RunContext(planned.task.prompt, workspace, cfg.catalog, isolation, stream),
+                RunContext(
+                    planned.task.prompt,
+                    workspace,
+                    cfg.catalog,
+                    isolation,
+                    stream,
+                    model_catalog=cfg.model_catalog,
+                ),
                 planned.arm.params,
             )
         except Exception as exc:  # noqa: BLE001 - recorded; the benchmark goes on
@@ -187,6 +194,9 @@ def execute_run(
         "cost": round(summary.total_cost, 6) if summary else 0.0,
         "cost_known": summary.cost_complete if summary else True,
         "retries_used": attempt.retries_used if attempt else 0,
+        # Escalation only: every rung that ran, and which one gave the verdict.
+        "rungs": list(attempt.rungs) if attempt else [],
+        "final_rung": attempt.final_rung if attempt else None,
         "error": error,
         "started_at": started_at,
         "finished_at": _now(),
@@ -242,7 +252,15 @@ def _print_plan(cfg: BenchConfig, todo: list[PlannedRun], total: int, out_dir: P
                 price = f"~${per_run:.2f} per run"
                 estimate += per_run * runs
             parts.append(f"{name} ({entry.model}, {price})")
-        print(f"  {arm.name}: {arm.strategy}, {'; '.join(parts)}, {runs} run(s)")
+        note = ""
+        if arm.strategy == "escalate":
+            derived = arm.params.get("models") is None
+            note = (
+                " (ladder derived per task from these; the estimate assumes every rung runs)"
+                if derived
+                else " (the estimate assumes every rung runs)"
+            )
+        print(f"  {arm.name}: {arm.strategy}, {'; '.join(parts)}, {runs} run(s){note}")
     line = f"  Estimated cost: ~${estimate:.2f}"
     line += (
         f" (rough: assumes ~{ESTIMATE_INPUT_TOKENS // 1000}k input and "
@@ -327,10 +345,10 @@ def _init_out_dir(cfg: BenchConfig, out_dir: Path) -> None:
         _write_json(out_dir / "meta.json", _meta(cfg))
 
 
-def _default_stream(task: str, *, cfg) -> Any:
+def _default_stream(task: str, *, cfg, ladder=None) -> Any:
     from .runner import stream_task
 
-    return stream_task(task, cfg=cfg)
+    return stream_task(task, cfg=cfg, ladder=ladder)
 
 
 def run_benchmark(

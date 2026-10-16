@@ -124,3 +124,68 @@ def test_write_report_writes_markdown_and_csv(tmp_path: Path):
     assert first["arm"] == "local" and first["task"] == "page-ranges"
     assert first["models"] == "qwen" and first["model_ids"] == "ollama/qwen3-coder:30b"
     assert first["hidden_passed"] == "True" and first["fooled"] == "False"
+
+
+# --- escalate arms --------------------------------------------------------------------
+
+
+def test_cost_per_solved_task():
+    markdown = render_markdown(META, RECORDS)
+    # cloud: $1.25 over 3 solved runs; local: no price known, 1 solved run.
+    assert _row(markdown, "cloud")[-1] == "$0.4167"
+    assert _row(markdown, "local")[-1] == "$0.0000 + unknown"
+
+
+def test_cost_per_solved_task_with_nothing_solved():
+    records = [_record("cloud", "slugify", 1, verdict="retry_exhausted", passed=False, cost=0.5)]
+    assert _row(render_markdown(META, records), "cloud")[-1] == "-"
+
+
+def _escalate_meta():
+    meta = json.loads(json.dumps(META))
+    meta["config"]["arms"].append({"name": "climb", "strategy": "escalate", "models": None})
+    meta["config"]["arm_models"]["climb"] = ["qwen", "sonnet"]
+    return meta
+
+
+def _climb_record(task, repeat, final_rung, *, passed=True, error=None):
+    record = _record("local", task, repeat, verdict="verified", passed=passed, error=error)
+    names = ["qwen", "sonnet"]
+    record.update(
+        arm="climb",
+        strategy="escalate",
+        run_id=f"climb__{task}__r{repeat}",
+        final_rung=final_rung,
+        rungs=[
+            {"rung": n, "name": names[n - 1], "final": n == final_rung}
+            for n in range(1, (final_rung or 1) + 1)
+        ],
+    )
+    return record
+
+
+def test_which_rung_produced_the_final_result():
+    records = RECORDS + [
+        _climb_record("page-ranges", 1, 1),
+        _climb_record("page-ranges", 2, 2),
+        _climb_record("slugify", 1, 2),
+        _climb_record("slugify", 2, None, passed=False, error="boom"),
+    ]
+    markdown = render_markdown(_escalate_meta(), records)
+
+    assert "## Which rung produced the final result" in markdown
+    assert (
+        "- **climb:** rung 1 (qwen): 1/4, rung 2 (sonnet): 2/4, no result (error): 1/4"
+        in markdown
+    )
+
+
+def test_single_arms_keep_their_columns_and_get_no_rung_section():
+    markdown = render_markdown(META, RECORDS)
+    header = next(ln for ln in markdown.splitlines() if ln.startswith("| Arm |"))
+    assert header == (
+        "| Arm | Strategy | Models | Hidden tests passed | Verified | Fooled | Caught | "
+        "Unconfirmed passes | Errors | Median time | Tokens in / out | Cost | "
+        "Cost per solved task |"
+    )
+    assert "Which rung produced the final result" not in markdown.split("## What the")[0]

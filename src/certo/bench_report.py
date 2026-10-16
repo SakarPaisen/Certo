@@ -35,6 +35,7 @@ CSV_FIELDS = (
     "cost",
     "cost_known",
     "retries_used",
+    "final_rung",
     "error",
 )
 
@@ -53,6 +54,34 @@ def _cost(records: list[dict[str, Any]]) -> str:
     if all(r["cost_known"] for r in records):
         return f"${total:.4f}"
     return f"${total:.4f} + unknown"
+
+
+def _cost_per_solved(records: list[dict[str, Any]]) -> str:
+    """Total cost divided by the runs whose hidden tests passed."""
+    solved = sum(r["hidden_tests"]["passed"] for r in records)
+    if not solved:
+        return "-"
+    per = sum(r["cost"] for r in records) / solved
+    return f"${per:.4f}" + ("" if all(r["cost_known"] for r in records) else " + unknown")
+
+
+def rung_shares(records: list[dict[str, Any]]) -> str:
+    """For an escalate arm: how often each rung gave the final result, for
+    example "rung 1 (qwen-local): 4/9, rung 2 (gpt-luna): 5/9"."""
+    counts: dict[tuple[int, str], int] = {}
+    no_result = 0
+    for r in records:
+        final = next((g for g in r.get("rungs", []) if g.get("final")), None)
+        if final is None:
+            no_result += 1
+            continue
+        key = (final["rung"], final["name"])
+        counts[key] = counts.get(key, 0) + 1
+    total = len(records)
+    parts = [f"rung {n} ({name}): {c}/{total}" for (n, name), c in sorted(counts.items())]
+    if no_result:
+        parts.append(f"no result (error): {no_result}/{total}")
+    return ", ".join(parts) or "-"
 
 
 def arm_rows(meta: dict[str, Any], records: list[dict[str, Any]]) -> list[dict[str, str]]:
@@ -80,6 +109,7 @@ def arm_rows(meta: dict[str, Any], records: list[dict[str, Any]]) -> list[dict[s
                 "Tokens in / out": f"{sum(r['tokens_in'] for r in mine):,} / "
                 f"{sum(r['tokens_out'] for r in mine):,}",
                 "Cost": _cost(mine) if mine else "-",
+                "Cost per solved task": _cost_per_solved(mine),
             }
         )
     return rows
@@ -141,6 +171,13 @@ def render_markdown(meta: dict[str, Any], records: list[dict[str, Any]]) -> str:
         task_rows.append(cells)
     lines += _table(["Task", *arms], task_rows)
 
+    escalate_arms = [a["name"] for a in config["arms"] if a["strategy"] == "escalate"]
+    if escalate_arms:
+        lines += ["", "## Which rung produced the final result", ""]
+        for arm in escalate_arms:
+            mine = [r for r in records if r["arm"] == arm]
+            lines.append(f"- **{arm}:** {rung_shares(mine)}")
+
     lines += [
         "",
         "## What the columns mean",
@@ -162,6 +199,14 @@ def render_markdown(meta: dict[str, Any], records: list[dict[str, Any]]) -> str:
         "- **Errors:** the run stopped with an error (for example, the provider failed).",
         "- **Median time:** wall time of one run, including Certo's checks and retries.",
         "- **Cost:** from LiteLLM's prices; `+ unknown` when a model has no price.",
+        (
+            "- **Cost per solved task:** the arm's total cost divided by the runs whose hidden "
+            "tests passed."
+        ),
+        (
+            "- **Which rung produced the final result** (escalate arms): the rung whose "
+            "verdict ended the run, counted over the arm's runs."
+        ),
         "",
     ]
     return "\n".join(lines)
