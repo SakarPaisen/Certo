@@ -1,0 +1,464 @@
+# Troubleshooting
+
+Problems people actually hit, with their fix. Each entry starts with what
+you see, then the cause in one sentence, then what to do. Search this page
+for a few words of your error message.
+
+For model problems, `certo check` is the fastest test: it shows where each
+setting comes from and makes one small call to the model.
+
+**Contents**
+
+- Setup: [`certo init` runs an agent](#certo-init-runs-an-agent-instead-of-asking-questions),
+  [externally managed environment](#externally-managed-environment-from-pip),
+  [no model configured](#no-model-configured),
+  [old `LLM_*` names](#certo_llm_model-is-required-although-llm_model-is-set),
+  [settings from an unexpected place](#a-setting-comes-from-a-place-you-didnt-expect),
+  [`# comment` read as a value](#certo_llm_base_url-is-read-as-a--comment)
+- Model: [missing key](#missing-api-key), [wrong key](#wrong-api-key),
+  [out of credit](#out-of-credit-or-rate-limited),
+  [unknown model](#the-provider-doesnt-know-the-model),
+  [no tool calling](#the-model-doesnt-support-tool-calling),
+  [can't reach the provider](#cant-reach-the-provider),
+  [cost unknown](#the-cost-shows-as-unknown)
+- Ollama: [not running](#ollama-isnt-running), [another machine](#ollama-on-another-machine),
+  [does not support thinking](#does-not-support-thinking),
+  [context window below the minimum](#context-window-below-the-minimum),
+  [agent behaves erratically](#the-agent-behaves-erratically-with-ollama),
+  [very slow steps](#every-step-is-very-slow)
+- Verdicts: [inconclusive, no tests](#inconclusive-the-project-has-no-tests),
+  [inconclusive, unknown type or HTML page](#inconclusive-unknown-project-type-or-a-standalone-html-page),
+  [inconclusive, several projects](#inconclusive-several-projects-in-one-folder),
+  [missing toolchain](#a-toolchain-is-missing-node-go-rust-maven-or-gradle),
+  [pytest unavailable](#pytest-is-unavailable),
+  [`no_progress`](#no_progress), [`retry_exhausted`](#retry_exhausted),
+  [`budget_exhausted`](#budget_exhausted),
+  [Rust fails on `cargo clippy`](#a-rust-project-fails-on-cargo-clippy)
+- Other: [uncommitted changes warning](#warning-uncommitted-changes),
+  [wrong path or read-only file system](#the-agent-writes-to-the-wrong-path),
+  [`init` refuses to write](#certo-init-says-a-file-already-exists),
+  [Docker](#docker)
+
+## Setup
+
+### `certo init` runs an agent instead of asking questions
+
+**You see:** `certo init` starts working on a task called "init".
+
+**Cause:** your Certo is older than 0.1.4, which added `certo init`.
+
+**Fix:** run `certo --version`, then upgrade: `uv tool upgrade certo` or
+`pip install -U certo`.
+
+### "externally-managed-environment" from pip
+
+**You see:** `pip install certo` fails with `error:
+externally-managed-environment`.
+
+**Cause:** your system Python doesn't allow installing packages into it.
+
+**Fix:** install with `uv tool install certo`, or into a virtual
+environment, as in [Getting started](getting-started.md#1-install).
+
+### No model configured
+
+**You see:**
+
+```text
+Configuration error: CERTO_LLM_MODEL is required (e.g. 'anthropic/claude-sonnet-5-5' or 'ollama/qwen3-coder:30b'), and it isn't set in any of the three places Certo looks, in this order: 1. the environment (export CERTO_LLM_MODEL=...); 2. .env in the current folder (/home/me/project/.env); 3. the user settings file (/home/me/.config/certo/.env). Run certo init to write it, or set it in one of these. Switching provider = changing only this value.
+```
+
+**Cause:** `CERTO_LLM_MODEL` isn't set in your shell, in `.env` in this
+folder, or in the user settings file.
+
+**Fix:** run `certo init`. Or set it yourself in one of those places, as
+in [OpenAI, Claude and Gemini](guides/openai-claude-gemini.md#set-up-by-hand).
+If `init` saved the settings for "this folder only", run `certo` from that
+folder, or run `certo init --global`.
+
+### "CERTO_LLM_MODEL is required" although `LLM_MODEL` is set
+
+**You see:** the error above, ending with `Found LLM_MODEL, which Certo no
+longer reads`.
+
+**Cause:** since 0.1.3, Certo only reads the `CERTO_LLM_` names, so that
+other tools' `LLM_*` variables can't leak in.
+
+**Fix:** rename `LLM_MODEL`, `LLM_API_KEY`, `LLM_BASE_URL` and
+`LLM_REASONING_EFFORT` to `CERTO_LLM_MODEL` and so on.
+
+### A setting comes from a place you didn't expect
+
+**You see:** Certo uses a model or key you didn't set in this folder.
+
+**Cause:** an exported variable, the folder's `.env` and the user settings
+file are all read, and the first one that sets a value wins, for each
+setting separately.
+
+**Fix:** run `certo check`. It prints where each setting came from:
+`environment variable`, `./.env (<path>)` or `user settings (<path>)`.
+Change it there. (Before 0.1.4, LiteLLM could also load a `.env` of its
+own; upgrade if you are on an older version.)
+
+### `CERTO_LLM_BASE_URL` is read as a `# comment`
+
+**You see:** Certo tries to reach an address like `# only for local
+models`.
+
+**Cause:** in a `.env` file, `python-dotenv` keeps a trailing comment as
+the value when nothing else is on the line: `CERTO_LLM_BASE_URL=   # comment`.
+
+**Fix:** leave the line as `CERTO_LLM_BASE_URL=` with nothing after it, or
+delete it. Put comments on their own line.
+
+## Model and provider
+
+### Missing API key
+
+**You see:**
+
+```text
+Configuration error: CERTO_LLM_API_KEY is required unless CERTO_LLM_BASE_URL is set (e.g. a local Ollama/vLLM/LM Studio endpoint that needs no key).
+```
+
+**Cause:** a cloud model needs a key, and none is set.
+
+**Fix:** paste your key after `CERTO_LLM_API_KEY=` in the settings file
+that `certo check` names, or export it. Then run `certo check`.
+
+### Wrong API key
+
+**You see**, from `certo check`:
+
+```text
+Checking the model openai/gpt-6.1-sol... OpenAI rejected the API key. Check CERTO_LLM_API_KEY in .env: it must be a valid key for OpenAI, pasted with no spaces.
+```
+
+**Cause:** the key is wrong, expired, or belongs to another provider than
+the one in `CERTO_LLM_MODEL`.
+
+**Fix:** copy the key again from the provider's site, with no spaces or
+quotes around it. Make sure it matches the provider before the `/` in
+`CERTO_LLM_MODEL`. The message says `.env`, but the key may be in your user
+settings file or your shell: `certo check` shows which.
+
+### Out of credit, or rate limited
+
+**You see**, from `certo check`:
+
+```text
+Anthropic refused the request: the account is out of credit, or it is being rate limited. Check your billing page, or wait a minute, then run certo check again.
+```
+
+During a task, the run stops with `Error:` and the provider's message
+(for example about quota, billing or rate limits).
+
+**Cause:** the provider refuses calls because the account has no credit,
+or because too many calls were made too quickly.
+
+**Fix:** add credit on the provider's billing page, or wait a minute and
+try again. With [automatic model selection](guides/pick-models-automatically.md),
+Certo falls back to the next model on its own.
+
+### The provider doesn't know the model
+
+**You see:** `... doesn't know the model ... Check the spelling of
+CERTO_LLM_MODEL`, or for Ollama, `Ollama has no model named ...`.
+
+**Cause:** the model id is misspelled, retired, or your key has no access
+to it; for Ollama, the model isn't pulled.
+
+**Fix:** check the id against the provider's model list. For Ollama, run
+`ollama list`, and `ollama pull <model>` if needed.
+
+### The model doesn't support tool calling
+
+**You see**, from `certo check`:
+
+```text
+The model ... doesn't support tool calling, which Certo's agent needs. Choose another model in CERTO_LLM_MODEL in .env.
+```
+
+or `... answered, but without calling a tool.`
+
+**Cause:** Certo's agent works only through tool calls (running commands,
+editing files), and this model can't make them, or didn't.
+
+**Fix:** choose a model with tool (function) calling support. For Ollama,
+coder models such as `qwen3-coder` support it.
+
+### Can't reach the provider
+
+**You see:** `Couldn't reach OpenAI. Check your internet connection; if it
+works, the provider may be having an outage, so try again in a few
+minutes.`
+
+**Cause:** no network, a proxy or firewall, or a provider outage.
+
+**Fix:** check your connection, then try again later.
+
+### The cost shows as unknown
+
+**You see:** `Total cost: $0.0000 + unknown (no pricing data for ...)`.
+
+**Cause:** LiteLLM, installed with Certo, has no price for this model:
+it is a local model, or newer than your LiteLLM.
+
+**Fix:** for a cloud model, upgrade (`uv tool upgrade certo`, or
+`pip install -U litellm`). For local models this is normal. The tokens are
+still counted.
+
+## Ollama
+
+### Ollama isn't running
+
+**You see:**
+
+```text
+Checking the model ollama/qwen3-coder:30b (a local model may take a minute to load)... Couldn't reach the server at http://localhost:11434. Check CERTO_LLM_BASE_URL in .env and that the server is running. If Ollama runs on another machine, start it there with OLLAMA_HOST=0.0.0.0.
+```
+
+**Cause:** Ollama isn't started, or listens on another address.
+
+**Fix:** start Ollama (`ollama serve`, or open the app), then run
+`certo check` again.
+
+### Ollama on another machine
+
+**You see:** the same `Couldn't reach the server at http://<address>:11434`
+message.
+
+**Cause:** by default Ollama only accepts connections from its own
+machine.
+
+**Fix:** on the Ollama machine, start it with `OLLAMA_HOST=0.0.0.0 ollama
+serve`. On the Certo machine, set
+`CERTO_LLM_BASE_URL=http://<that machine's address>:11434`. Check that no
+firewall blocks port 11434. See
+[Ollama and local models](guides/ollama-and-local-models.md#use-ollama-on-another-machine).
+
+### "does not support thinking"
+
+**You see:** `OllamaException: "qwen3-coder:30b" does not support thinking`
+on the first call.
+
+**Cause:** Certo asked the model to think (reason), and this model has no
+thinking mode.
+
+**Fix:** clear `CERTO_LLM_REASONING_EFFORT` (and `--reasoning-effort`, or
+`reasoning_effort` in `models.yaml`), or set it to `none`. When it is
+empty, Certo sends no reasoning setting to Ollama models. Versions up to
+0.1.0 always asked for thinking; upgrade if you are on one.
+
+### Context window below the minimum
+
+**You see:** `context window of 8,192 tokens, which is below the minimum
+of 16,384`, before any work starts. `certo-admin check-llm` reports it as
+a `setup` failure.
+
+**Cause:** the agent framework refuses models whose context window, as
+LiteLLM reports it, is under 16,384 tokens.
+
+**Fix:** choose a model with a larger window, such as a coder model.
+Common with older models such as `ollama/llama3`.
+
+### The agent behaves erratically with Ollama
+
+**You see:** the agent repeats steps, forgets the task, wanders off, or
+stops with half the work done, although `certo check` passes.
+
+**Cause:** Ollama's default context window is small (4096 tokens on
+machines with less than 24 GB of GPU memory), so the model can't see the
+start of the task any more.
+
+**Fix:** start Ollama with a larger window, for example
+`OLLAMA_CONTEXT_LENGTH=32768 ollama serve`, or raise it in the Ollama
+app's settings. `ollama ps` shows the context a loaded model got.
+
+### Every step is very slow
+
+**You see:** each step of the agent takes minutes, and tasks end with
+`budget_exhausted`.
+
+**Cause:** the model is larger than your GPU or unified memory, so Ollama
+runs part of it on the CPU.
+
+**Fix:** check `ollama ps` while the model is loaded. If the `PROCESSOR`
+column shows a CPU share, use a smaller model (for example
+`qwen2.5-coder:7b` instead of `qwen3-coder:30b`) or a smaller quantization.
+
+## Verdicts
+
+### `inconclusive`: the project has no tests
+
+**You see:** `Verification: inconclusive`, with no explanation, or the
+note `pytest: no tests collected`.
+
+**Cause:** there was nothing to run: no test files, or pytest found zero
+tests. Certo never counts that as a pass.
+
+**Fix:** ask for tests in the task ("..., with pytest tests"), or add them.
+To make this case fail in scripts, use `--require-verification`.
+
+### `inconclusive`: unknown project type, or a standalone HTML page
+
+**You see:**
+
+```text
+Verification: inconclusive
+  - verification: Found index.html — but no project manifest the harness recognizes (pyproject.toml, package.json, go.mod, Cargo.toml, pom.xml, build.gradle), so there was nothing it could run or test. The files exist; the result is unverified, not failed. Standalone HTML/JavaScript pages aren't executed by the harness: open the page in a browser to check it, or add a package.json with a `test` script to make it verifiable.
+```
+
+**Cause:** Certo didn't recognise the project type, so it had no command
+to run. The files exist; they just weren't checked.
+
+**Fix:** for a web page, open it in a browser, or ask for a
+`package.json` with a `test` (or `build`) script. For other languages, see
+[Verification by language](reference/verification-by-language.md#not-covered).
+
+### `inconclusive`: several projects in one folder
+
+**You see:** a note starting `Multiple candidate projects were found with
+no single obvious root`, listing the candidates.
+
+**Cause:** the folder holds several projects side by side, and none at
+the top, so Certo can't tell which one to check.
+
+**Fix:** run Certo from (or `certo verify`) the sub-project folder you
+mean.
+
+### A toolchain is missing (Node, Go, Rust, Maven or Gradle)
+
+**You see:** `Verification: inconclusive`, with a note such as
+`npm run build: npm not found on PATH`,
+`go test: go is configured (go.mod present) but not installed`,
+`cargo test: cargo is configured (Cargo.toml present) but not installed`,
+or `mvn test: pom.xml is present but neither ./mvnw nor mvn is available`.
+
+**Cause:** Certo runs the project's own tools and doesn't install them.
+
+**Fix:** install the toolchain (Node 18+ with npm, Go, Rust with cargo, or
+Maven or Gradle), check it works in the same terminal (`npm --version`,
+`go version`, ...), and run again. A Maven or Gradle wrapper (`./mvnw`,
+`./gradlew`) in the project also works. In Docker mode, the tool must be in
+the image.
+
+### pytest is unavailable
+
+**You see:** `pytest: pytest is not installed in the project environment
+(...) and installing it failed: ...`, or `... could not be run`.
+
+**Cause:** Certo couldn't install pytest into the project's environment
+(often no network), or the project's own `.venv` is broken.
+
+**Fix:** check your network, or install pytest into the project's
+environment yourself. Certo never repairs a `.venv` it didn't create:
+delete or fix a broken one, and Certo will create a new one.
+
+### `no_progress`
+
+**You see:**
+
+```text
+Certo verification: the fix attempt just made produced no observable change — the same check (pytest failed (exit 1)) is still failing with identical output (ignoring timing). Stopping early rather than spending the rest of the retry budget on attempts that already provably didn't help — this project needs manual attention.
+
+Verification: no_progress
+```
+
+**Cause:** the agent's fix attempt changed nothing in the failing check's
+output, so more attempts were unlikely to help.
+
+**Fix:** look at the failure yourself; it is in the project. Useful
+questions:
+
+- Is the **test** wrong rather than the code? Agents sometimes chase a
+  test that expects the wrong thing.
+- Is the failure about the environment (a missing package, a network
+  call) rather than the code?
+- Is the task too hard for this model? Try a stronger model with
+  `--model`.
+
+Then fix it by hand, or run a new task with a precise instruction, for
+example `certo "test_board.py::test_invalid_move expects a move that is
+legal. Fix the test, not the code."`. `certo verify` checks the result for
+free.
+
+### `retry_exhausted`
+
+**You see:** `Certo verification: the project's checks are still failing
+after 2 automated fix attempt(s) (...). Giving up — this project needs
+manual attention.`
+
+**Cause:** the agent kept trying different fixes, and the checks still
+failed after the allowed attempts.
+
+**Fix:** read the failure (`certo verify` prints it in full), then fix by
+hand or run a more precise task. `CERTO_MAX_VERIFY_RETRIES` allows more
+attempts, at more cost.
+
+### `budget_exhausted`
+
+**You see:** `Verification: budget_exhausted`.
+
+**Cause:** the whole task took longer than `CERTO_MAX_TASK_SECONDS` (30
+minutes by default).
+
+**Fix:** if the model is slow, see [very slow steps](#every-step-is-very-slow).
+Otherwise split the task into smaller ones, or raise
+`CERTO_MAX_TASK_SECONDS`. The work done so far stays in the folder.
+
+### A Rust project fails on `cargo clippy`
+
+**You see:** `failed      cargo clippy` with `error: no such command:
+clippy`, and `Verification: failed` or `retry_exhausted`.
+
+**Cause:** Certo always runs `cargo clippy` for a Rust project, and treats
+the missing clippy component as a failure (a known bug: it should be a
+limitation).
+
+**Fix:** install the component: `rustup component add clippy`.
+
+## Other problems
+
+### Warning: uncommitted changes
+
+**You see**, before the task starts:
+
+```text
+Warning: /home/me/code/my-api has uncommitted changes (1 file). The agent will edit files here; commit or stash first if you want to be able to roll back.
+```
+
+or `Note: ... isn't a git repository, so the agent's changes there can't
+be rolled back with git.`
+
+**Cause:** the agent edits files in place, and with uncommitted changes
+(or no git) you can't undo its edits with git. It is only a warning; the
+task continues.
+
+**Fix:** stop the task (Ctrl-C) and run `git commit` or `git stash`, then
+start again. To turn the warning off, set `CERTO_NO_WORKTREE_WARNING=1`.
+
+### The agent writes to the wrong path
+
+**You see:** errors like "Read-only file system", or files created in an
+odd place such as `/HELLO.txt`.
+
+**Cause:** the agent's file editor needs absolute paths, and the model
+guessed one that doesn't exist on your machine.
+
+**Fix:** use `--project NAME`, so the workspace is a clear absolute path,
+and mention paths relative to the project in the task.
+
+### `certo init` says a file already exists
+
+**You see:** `Error: .../certo/.env already exists (...). Use --force to
+replace it.`, or `... is not empty`.
+
+**Cause:** `init` never replaces settings or files without asking. With
+`--yes`, or without a terminal, it can't ask.
+
+**Fix:** run `certo init` in a terminal to be asked, or add `--force`.
+
+### Docker
+
+See the table in [Run in Docker](guides/run-in-docker.md#if-it-doesnt-work).
