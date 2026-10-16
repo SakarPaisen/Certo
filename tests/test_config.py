@@ -871,3 +871,21 @@ def test_override_llm_timeout_only():
     assert cfg.llm_timeout_seconds == 1200
     with pytest.raises(ConfigError):
         override_llm(cfg, timeout_seconds=-5)
+
+
+def test_env_example_puts_comments_above_settings_not_beside_them():
+    """python-dotenv keeps a `# comment` after an empty value as the value
+    itself, so every comment in .env.example goes on its own line."""
+    import re
+    from pathlib import Path
+
+    from dotenv import dotenv_values
+
+    path = Path(__file__).resolve().parent.parent / ".env.example"
+    beside = [
+        line
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if re.match(r"^[A-Z][A-Z0-9_]*=.*#", line)
+    ]
+    assert beside == []
+    assert not [k for k, v in dotenv_values(path).items() if v and "#" in v]

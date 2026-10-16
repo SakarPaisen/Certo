@@ -234,6 +234,9 @@ being duplicated (and inevitably going stale) here.
   time — verify current IDs against provider + LiteLLM docs, don't assume.
 - Individual built-in tool class names have varied across SDK versions — that's
   why the default path is `get_default_tools()`.
+- In `.env.example` (and any `.env` Certo writes), a comment goes on its own
+  line above the setting, never to its right: `python-dotenv` can read a
+  trailing `# comment` as the value. `tests/test_config.py` enforces it.
 
 ## SDK references (consult before using unconfirmed APIs)
 
