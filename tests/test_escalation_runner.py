@@ -508,3 +508,36 @@ def test_the_per_rung_summary_lines(tmp_path, fake_run):
     assert lines[1].endswith(", 1,100 tokens, $0.0000 + unknown")
     assert lines[2].endswith(", 1,100 tokens, $0.2500")
     assert lines[3] == "Final result from rung 2 (mid)."
+
+
+# --- regressions: nothing changes without --escalate ------------------------------
+
+
+def test_auto_model_ranking_ignores_the_escalation_section(tmp_path):
+    from certo.model_catalog import classify_task, rank_candidates
+
+    with_section = tmp_path / "with.yaml"
+    with_section.write_text(_CATALOG)
+    without = tmp_path / "without.yaml"
+    without.write_text(_CATALOG[: _CATALOG.index("escalation:")])
+    ranked = []
+    for path in (with_section, without):
+        catalog = load_model_catalog(str(path))
+        weights = classify_task("Build the thing", catalog).weights
+        ranked.append([e.name for e in rank_candidates(catalog, weights)])
+    assert ranked[0] == ranked[1]
+
+
+def test_auto_model_runs_one_conversation_and_never_escalates(tmp_path, fake_run, monkeypatch):
+    monkeypatch.setattr(
+        runner, "_stream_escalation", lambda *a, **k: pytest.fail("escalation in auto mode")
+    )
+    (tmp_path / "models.yaml").write_text(_CATALOG)
+    fake_run.script[:] = [("no_progress", 0, {})]
+    cfg = _cfg(tmp_path, model_selection="auto", models_file=str(tmp_path / "models.yaml"))
+
+    outcome = runner.stream_task("Build the thing", cfg=cfg)
+
+    assert outcome.rungs == ()
+    assert len(_Conversation.instances) == 1
+    assert outcome.model_decisions[0].kind == "initial"
