@@ -84,6 +84,7 @@ models:
     api_key: ""
     base_url: ""
     reasoning_effort: ""
+    timeout_seconds: 300
     description: >
       Best all-round default. Near-Opus quality on coding and agentic work
       at a much friendlier price and latency. Good first choice for most
@@ -96,6 +97,7 @@ models:
     api_key: ""
     base_url: ""
     reasoning_effort: ""
+    timeout_seconds: 300
     description: >
       Fast and cheap. Great for scaffolding, boilerplate, simple edits, and
       high-volume throwaway calls. Weaker on deep reasoning and large
@@ -109,6 +111,7 @@ models:
     api_key: ""
     base_url: ""
     reasoning_effort: ""
+    timeout_seconds: 300
     description: >
       Previous-generation flagship, still fully available. Keep it in the
       catalog for fallback diversity — if Opus 5 is unavailable or rate
@@ -126,6 +129,7 @@ models:
     api_key: ""
     base_url: ""
     reasoning_effort: "high"
+    timeout_seconds: 300
     description: >
       OpenAI's current flagship model for the hardest end-to-end work. Best
       choice when correctness, deep reasoning, complex coding, agentic
@@ -139,6 +143,7 @@ models:
     api_key: ""
     base_url: ""
     reasoning_effort: "high"
+    timeout_seconds: 300
     description: >
       Frontier GPT-5.6 model for complex professional work, advanced coding,
       long-horizon reasoning, research, and agentic workflows. Stronger
@@ -155,6 +160,7 @@ models:
     api_key: ""
     base_url: ""
     reasoning_effort: "medium"
+    timeout_seconds: 300
     description: >
       Balanced GPT-5.6 model for everyday professional work. Designed to
       trade some frontier capability for substantially lower cost while
@@ -172,6 +178,7 @@ models:
     api_key: ""
     base_url: ""
     reasoning_effort: "medium"
+    timeout_seconds: 300
     description: >
       Fast, highly cost-efficient GPT-5.6 model for high-volume workloads,
       simple reasoning, classification, extraction, transformations,
@@ -189,6 +196,7 @@ models:
     api_key: ""
     base_url: ""
     reasoning_effort: "high"
+    timeout_seconds: 300
     description: >
       Previous-generation frontier GPT model. Still highly capable for
       reasoning and coding, but generally superseded by GPT-5.6 Sol/Terra.
@@ -201,6 +209,7 @@ models:
     api_key: ""
     base_url: ""
     reasoning_effort: "medium"
+    timeout_seconds: 300
     description: >
       Previous-generation general-purpose reasoning model. Useful when a
       stable GPT-5.x fallback is desirable or when workloads do not require
@@ -213,6 +222,7 @@ models:
     api_key: ""
     base_url: ""
     reasoning_effort: "medium"
+    timeout_seconds: 300
     description: >
       Smaller and cheaper GPT-5.4 model for well-defined tasks, routine
       coding, structured transformations, classification, and high-volume
@@ -229,6 +239,7 @@ models:
     api_key: ""
     base_url: ""
     reasoning_effort: ""
+    timeout_seconds: 300
     description: >
       Strong non-reasoning GPT model. Useful for fast instruction following,
       structured generation, coding, and workloads where explicit reasoning
@@ -241,6 +252,7 @@ models:
     api_key: ""
     base_url: ""
     reasoning_effort: ""
+    timeout_seconds: 300
     description: >
       Smaller, faster GPT-4.1 model for inexpensive routine tasks,
       extraction, classification, transformation, and straightforward code
@@ -257,6 +269,7 @@ models:
     api_key: ""
     base_url: "https://api.deepseek.com"
     reasoning_effort: ""             # 混合架构，思考模式由 API 参数控制，非 effort
+    timeout_seconds: 300
     description: >
       DeepSeek 旗舰。1.6T 总参 / 49B 激活，在 Agentic Coding、数学与代码基准上
       对标顶级闭源模型。适合硬核调试、架构推理、复杂多步任务。长上下文效率极高
@@ -269,6 +282,7 @@ models:
     api_key: ""
     base_url: "https://api.deepseek.com"
     reasoning_effort: ""
+    timeout_seconds: 300
     description: >
       DeepSeek 主力廉价模型（V4.1 Flash 为其后续统一命名）。284B 总参 / 13B 激活，
       推理能力接近 Pro，支持原生图像输入。在简单 Agent 任务上与 Pro 相当，速度快、
@@ -285,6 +299,7 @@ models:
     api_key: ""
     base_url: "https://api.deepseek.com"
     reasoning_effort: ""
+    timeout_seconds: 300
     description: >
       上一代通用模型。V4 发布后已非主力，但保留用于兼容性或作为 DeepSeek 阵营内的
       额外 fallback。不具备 V4 的长上下文效率与 Agentic 能力。
@@ -306,6 +321,7 @@ models:
     api_key: ""
     base_url: ""
     reasoning_effort: ""
+    timeout_seconds: 300
     description: >
       Google's flagship Gemini 3 Pro. Natively multimodal (text, audio,
       images, video, entire code repositories) with an optional "Deep
@@ -319,6 +335,7 @@ models:
     api_key: ""
     base_url: ""
     reasoning_effort: ""
+    timeout_seconds: 300
     description: >
       Faster, cheaper Gemini 3 workhorse, positioned by Google specifically
       for coding and agentic work. Good default for most non-trivial tasks
@@ -342,6 +359,7 @@ models:
     api_key: ""
     base_url: ""
     reasoning_effort: ""
+    timeout_seconds: 300
     description: >
       Moonshot's current flagship — 2.8T parameters (MoE), the largest
       open-weight model released to date. Moonshot's own recommended
@@ -354,6 +372,7 @@ models:
     api_key: ""
     base_url: ""
     reasoning_effort: ""
+    timeout_seconds: 300
     description: >
       Moonshot's coding-specialized model — more reliable instruction
       following in long contexts, higher success rate on coding tasks,
@@ -380,6 +399,7 @@ models:
     api_key: ""                              # local models are typically keyless
     base_url: "http://localhost:11434"
     reasoning_effort: ""
+    timeout_seconds: 300
     description: >
       Local, self-hosted, effectively free to run — but noticeably weaker at
       complex reasoning and less reliable on larger codebases. Good for
@@ -393,6 +413,7 @@ models:
     api_key: ""
     base_url: "http://localhost:11434"
     reasoning_effort: ""
+    timeout_seconds: 300
     description: >
       Google's open-weight Gemma 3 (untagged pull = the 4B variant, ~3.3GB,
       128K context — runs comfortably on a single consumer GPU or an
@@ -407,6 +428,7 @@ models:
     api_key: ""
     base_url: "http://localhost:11434"
     reasoning_effort: ""
+    timeout_seconds: 300
     description: >
       Alibaba's open-weight Qwen3 (untagged pull = the 8B variant, ~5GB,
       40K context, hybrid think/non-think reasoning mode — runs on a
@@ -438,6 +460,7 @@ models:
     api_key: ""
     base_url: "http://localhost:11434"
     reasoning_effort: ""
+    timeout_seconds: 300
     description: >
       Zhipu AI's open-weight GLM-4.7-Flash (30B total / 3B active MoE,
       ~19GB at Q4_K_M, 198K context — "30B quality at 3B speed"). Similar
