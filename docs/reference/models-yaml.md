@@ -30,6 +30,13 @@ task_profiles:   # optional
     weights: {...}
   default:
     weights: {...}
+
+escalation:      # optional, for escalation between models
+  cost_axis: cost
+  max_rungs: 3
+  ladders:
+    default:
+      - model: ...
 ```
 
 ## `models` entries
@@ -86,6 +93,55 @@ An axis the model doesn't rate counts as 0. Models are ranked by score,
 highest first; equal scores keep the order of the file. If no profile
 matches and there is no `default`, every model scores 0 and the order of
 the file decides.
+
+## `escalation`
+
+Settings for escalation: running a task on a cheap model first, and moving
+to a stronger one only when Certo's verification shows the cheap one
+couldn't finish. The whole section is optional.
+
+| Field | Default | Meaning |
+|---|---|---|
+| `cost_axis` | `cost` | The rating axis that means cost-effectiveness. It is left out when Certo works out how capable a model is. |
+| `max_rungs` | `3` | The longest ladder Certo builds from the ratings. A whole number, at least 2. |
+| `ladders` | none | Ladders you write yourself, by name. |
+
+**A ladder** is a list of rungs, tried in order:
+
+```yaml
+escalation:
+  ladders:
+    default:
+      - model: qwen-local      # a name from models:
+        retries: 1             # optional
+        reasoning_effort: ""   # optional
+      - model: gpt-luna
+      - model: claude-sonnet
+```
+
+| Rung field | Required | Meaning |
+|---|---|---|
+| `model` | yes | The `name` of a model in `models`. |
+| `retries` | no | Fix attempts on this rung after a failed check. Default: `CERTO_MAX_VERIFY_RETRIES`. |
+| `reasoning_effort` | no | Reasoning effort for this rung only, instead of the model entry's own. |
+
+To set an option for a ladder, write it as a mapping with its rungs under
+`rungs`:
+
+```yaml
+    local-only:
+      escalate_on_acceptance_failed: true
+      rungs:
+        - model: qwen-local
+        - model: gemma-local
+          reasoning_effort: max
+```
+
+`escalate_on_acceptance_failed` (default `false`) also moves to the next
+rung when a required acceptance check fails.
+
+A ladder named `default` is the one used when no ladder name is given.
+With no ladder at all, Certo builds one from the active models' ratings.
 
 ## Errors
 

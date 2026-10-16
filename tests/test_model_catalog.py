@@ -361,3 +361,103 @@ def test_timeout_seconds_must_be_a_whole_number_of_seconds(tmp_path, value):
     text = f"models:\n  - name: m\n    model: openai/gpt-4o\n    timeout_seconds: {value}\n"
     with pytest.raises(ModelCatalogError, match="timeout_seconds"):
         load_model_catalog(_write(tmp_path, text))
+
+
+# --- escalation section ----------------------------------------------------------
+
+_TWO_MODELS = """
+models:
+  - name: local
+    model: ollama/qwen3-coder:30b
+    base_url: http://localhost:11434
+    ratings: {code: 2, cost: 5}
+  - name: cloud
+    model: openai/gpt-4o
+    api_key: sk-fake
+    ratings: {code: 5, cost: 2}
+"""
+
+
+def test_no_escalation_section_gives_the_defaults(tmp_path):
+    settings = load_model_catalog(_write(tmp_path, _TWO_MODELS)).escalation
+
+    assert settings.cost_axis == "cost"
+    assert settings.cost_axis_set is False
+    assert settings.max_rungs == 3
+    assert settings.ladders == {}
+
+
+def test_escalation_section_with_both_ladder_forms(tmp_path):
+    text = (
+        _TWO_MODELS
+        + """
+escalation:
+  cost_axis: price
+  max_rungs: 4
+  ladders:
+    default:
+      - model: local
+        retries: 1
+        reasoning_effort: ""
+      - model: cloud
+    careful:
+      escalate_on_acceptance_failed: true
+      rungs:
+        - model: local
+          reasoning_effort: max
+"""
+    )
+    settings = load_model_catalog(_write(tmp_path, text)).escalation
+
+    assert (settings.cost_axis, settings.cost_axis_set, settings.max_rungs) == ("price", True, 4)
+    default = settings.ladders["default"]
+    assert [r.model for r in default.rungs] == ["local", "cloud"]
+    assert default.rungs[0].retries == 1
+    assert default.rungs[0].reasoning_effort is None  # blank means the entry's own
+    assert default.rungs[1].retries is None
+    assert default.escalate_on_acceptance_failed is False
+    careful = settings.ladders["careful"]
+    assert careful.escalate_on_acceptance_failed is True
+    assert careful.rungs[0].reasoning_effort == "max"
+
+
+@pytest.mark.parametrize(
+    ("section", "message"),
+    [
+        ("escalation: [a]", "'escalation' must be a mapping"),
+        ("escalation: {colour: red}", "unknown key"),
+        ("escalation: {max_rungs: 1}", "at least 2"),
+        ("escalation: {max_rungs: two}", "at least 2"),
+        ("escalation: {cost_axis: ''}", "cost_axis"),
+        ("escalation: {ladders: [a]}", "mapping of name"),
+        ("escalation: {ladders: {x: local}}", "list of rungs"),
+        ("escalation: {ladders: {x: [local]}}", "each rung must be a mapping"),
+        ("escalation: {ladders: {x: [{retries: 1}]}}", "'model'"),
+        ("escalation: {ladders: {x: [{model: local, retries: 1.5}]}}", "'retries'"),
+        ("escalation: {ladders: {x: [{model: local, colour: red}]}}", "unknown key"),
+        ("escalation: {ladders: {x: {rungs: [], extra: 1}}}", "unknown key"),
+        (
+            "escalation: {ladders: {x: {rungs: [], escalate_on_acceptance_failed: 1}}}",
+            "true or false",
+        ),
+    ],
+)
+def test_escalation_section_shape_errors(tmp_path, section, message):
+    with pytest.raises(ModelCatalogError, match=message):
+        load_model_catalog(_write(tmp_path, _TWO_MODELS + section + "\n"))
+
+
+def test_the_commented_example_in_models_yaml_example_parses(tmp_path):
+    from pathlib import Path
+
+    text = (Path(__file__).resolve().parent.parent / "models.yaml.example").read_text()
+    block = text[text.index("# escalation:") :]
+    uncommented = "\n".join(line[2:] for line in block.splitlines() if line.startswith("# "))
+    models = text[
+        : text.index(
+            "# =============================================================================\n# DETERMINISTIC"
+        )
+    ]
+    catalog = load_model_catalog(_write(tmp_path, models + "\n" + uncommented + "\n"))
+
+    assert list(catalog.escalation.ladders) == ["default", "local-only"]

@@ -72,9 +72,43 @@ class TaskProfile:
 
 
 @dataclass(frozen=True)
+class LadderRung:
+    """One step of an explicit escalation ladder: a catalog model by name,
+    optionally with its own fix-attempt budget and reasoning effort."""
+
+    model: str
+    retries: int | None = None  # None: CERTO_MAX_VERIFY_RETRIES
+    reasoning_effort: str | None = None  # None: the model entry's own
+
+
+@dataclass(frozen=True)
+class Ladder:
+    name: str
+    rungs: tuple[LadderRung, ...]
+    escalate_on_acceptance_failed: bool = False
+
+
+DEFAULT_COST_AXIS = "cost"
+DEFAULT_MAX_RUNGS = 3
+
+
+@dataclass(frozen=True)
+class EscalationSettings:
+    """The optional top-level `escalation:` section (see escalation.py)."""
+
+    cost_axis: str = DEFAULT_COST_AXIS
+    # Whether `cost_axis` was written in the file: only then is an axis no
+    # model is rated on an error (catalog_check.py).
+    cost_axis_set: bool = False
+    max_rungs: int = DEFAULT_MAX_RUNGS
+    ladders: dict[str, Ladder] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class ModelCatalog:
     models: list[ModelCatalogEntry]
     task_profiles: list[TaskProfile]
+    escalation: EscalationSettings = field(default_factory=EscalationSettings)
 
 
 _DEFAULT_PROFILE = TaskProfile(name="default", triggers=(), weights={})
@@ -180,6 +214,88 @@ def _parse_task_profile(name: str, data: Any) -> TaskProfile:
     )
 
 
+_ESCALATION_KEYS = {"cost_axis", "max_rungs", "ladders"}
+_LADDER_KEYS = {"rungs", "escalate_on_acceptance_failed"}
+_RUNG_KEYS = {"model", "retries", "reasoning_effort"}
+
+
+def _parse_rung(data: Any, *, context: str) -> LadderRung:
+    if not isinstance(data, dict):
+        raise ModelCatalogError(f"{context}: each rung must be a mapping with a 'model' name.")
+    unknown = sorted(set(data) - _RUNG_KEYS)
+    if unknown:
+        raise ModelCatalogError(
+            f"{context}: unknown key(s) {', '.join(unknown)}. "
+            f"A rung takes: {', '.join(sorted(_RUNG_KEYS))}."
+        )
+    model = _require_str(data, "model", context=context)
+    retries = data.get("retries")
+    if retries is not None and (isinstance(retries, bool) or not isinstance(retries, int)):
+        raise ModelCatalogError(f"{context}: 'retries' must be a whole number, got {retries!r}.")
+    return LadderRung(
+        model=model.strip(),
+        retries=retries,
+        reasoning_effort=_optional_str(data, "reasoning_effort"),
+    )
+
+
+def _parse_ladder(name: str, data: Any) -> Ladder:
+    """A ladder is a list of rungs, or a mapping with `rungs` and options."""
+    context = f"Escalation ladder {name!r}"
+    options: dict[str, Any] = {}
+    if isinstance(data, dict):
+        unknown = sorted(set(data) - _LADDER_KEYS)
+        if unknown:
+            raise ModelCatalogError(
+                f"{context}: unknown key(s) {', '.join(unknown)}. "
+                f"A ladder written as a mapping takes: {', '.join(sorted(_LADDER_KEYS))}."
+            )
+        options = data
+        data = data.get("rungs")
+    if not isinstance(data, list):
+        raise ModelCatalogError(f"{context} must be a list of rungs.")
+    on_acceptance = options.get("escalate_on_acceptance_failed", False)
+    if not isinstance(on_acceptance, bool):
+        raise ModelCatalogError(
+            f"{context}: 'escalate_on_acceptance_failed' must be true or false."
+        )
+    rungs = tuple(
+        _parse_rung(rung, context=f"{context}, rung {i}") for i, rung in enumerate(data, start=1)
+    )
+    return Ladder(name=name, rungs=rungs, escalate_on_acceptance_failed=on_acceptance)
+
+
+def _parse_escalation(raw: Any, path: str) -> EscalationSettings:
+    if raw is None:
+        return EscalationSettings()
+    if not isinstance(raw, dict):
+        raise ModelCatalogError(f"{path}: 'escalation' must be a mapping.")
+    unknown = sorted(set(raw) - _ESCALATION_KEYS)
+    if unknown:
+        raise ModelCatalogError(
+            f"{path}: unknown key(s) under 'escalation': {', '.join(unknown)}. "
+            f"Allowed: {', '.join(sorted(_ESCALATION_KEYS))}."
+        )
+    cost_axis = raw.get("cost_axis")
+    if cost_axis is not None and (not isinstance(cost_axis, str) or not cost_axis.strip()):
+        raise ModelCatalogError(f"{path}: 'escalation.cost_axis' must be a rating axis name.")
+    max_rungs = raw.get("max_rungs", DEFAULT_MAX_RUNGS)
+    if isinstance(max_rungs, bool) or not isinstance(max_rungs, int) or max_rungs < 2:
+        raise ModelCatalogError(
+            f"{path}: 'escalation.max_rungs' must be a whole number of at least 2, "
+            f"got {max_rungs!r}."
+        )
+    ladders_raw = raw.get("ladders") or {}
+    if not isinstance(ladders_raw, dict):
+        raise ModelCatalogError(f"{path}: 'escalation.ladders' must be a mapping of name -> rungs.")
+    return EscalationSettings(
+        cost_axis=cost_axis.strip() if cost_axis else DEFAULT_COST_AXIS,
+        cost_axis_set=cost_axis is not None,
+        max_rungs=max_rungs,
+        ladders={str(name): _parse_ladder(str(name), data) for name, data in ladders_raw.items()},
+    )
+
+
 def load_model_catalog(path: str) -> ModelCatalog:
     """Parse `models.yaml`. Raises `ModelCatalogError` for a missing file, a
     file that isn't valid YAML, or one that fails schema validation (a
@@ -218,7 +334,11 @@ def load_model_catalog(path: str) -> ModelCatalog:
         raise ModelCatalogError(f"{path}: 'task_profiles' must be a mapping of name -> profile.")
     task_profiles = [_parse_task_profile(name, data) for name, data in profiles_raw.items()]
 
-    return ModelCatalog(models=models, task_profiles=task_profiles)
+    return ModelCatalog(
+        models=models,
+        task_profiles=task_profiles,
+        escalation=_parse_escalation(raw.get("escalation"), path),
+    )
 
 
 def classify_task(task_text: str, catalog: ModelCatalog) -> TaskProfile:
