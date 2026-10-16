@@ -135,6 +135,32 @@ identify a focused check that could disconfirm the current hypothesis, make
 the smallest coherent change, and run that check immediately afterward. Use
 the applicable skills rather than duplicating their detailed guidance here.
 
+## Working agreements
+
+Standing rules for every change, agreed with Alessio. Every Claude Code
+prompt written for this project must follow them.
+
+1. **Docs in the same change.** Every change that touches a command, flag,
+   setting, verdict, behaviour or known limitation updates the matching
+   page under `docs/` in the same change (see "Keep docs/ up to date"
+   below). Prompts list the docs update as an explicit numbered item, not
+   an afterthought. `MANUAL.md` is superseded by `docs/`.
+2. **Local first, cloud never worse.** The quality goal is better results
+   from local models (e.g. `qwen3-coder:30b` via Ollama) without degrading
+   results from mainstream cloud models (Claude, GPT, Gemini). Strategies
+   aimed at weaker models are opt-in or gated by model tier, and every such
+   change is checked with the benchmark on both a local and a cloud model
+   before release.
+3. **Measure before claiming.** Quality improvements are judged by the
+   benchmark (`certo bench`, hidden tests), not by single runs or
+   impressions. `certo bench` is planned, not built yet.
+4. **Prompts don't publish.** Claude Code sessions never tag, push or
+   publish; Alessio does that after review. One commit per numbered item.
+   Stop and ask on decisions not covered by the prompt. The full test suite
+   passes with no API key.
+5. **Real runs only.** Reports never claim a live result that wasn't run in
+   that session.
+
 ## Keep docs/ up to date
 
 `docs/` is the user-facing documentation: short pages in four kinds, kept
