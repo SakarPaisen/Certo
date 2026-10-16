@@ -137,7 +137,7 @@ the applicable skills rather than duplicating their detailed guidance here.
 
 ## Working agreements
 
-Standing rules for every change, agreed with Alessio. Every Claude Code
+Standing rules for every change, agreed with the Author. Every Claude Code
 prompt written for this project must follow them.
 
 1. **Docs in the same change.** Every change that touches a command, flag,
