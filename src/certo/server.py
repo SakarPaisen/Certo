@@ -20,6 +20,7 @@ from typing import Any
 
 from .acceptance import parse_acceptance_checks
 from .config import Config, ConfigError, load_config, override_llm, resolve_project_dir
+from .escalation import load_ladder
 from .runner import run_task, stream_task
 from .skills import write_project_context
 from .task_store import TaskRecord, TaskStore, build_task_store
@@ -85,9 +86,15 @@ def _resolve_cfg(
     api_key: str | None = None,
     base_url: str | None = None,
     reasoning_effort: str | None = None,
+    escalate: bool | str | None = None,
 ) -> Config:
     if agents_md is not None and project is None:
         raise ValueError("agents_md requires project")
+    if escalate is not None and escalate is not False and model is not None:
+        raise ValueError(
+            "escalate can't be combined with model: the ladder in models.yaml decides "
+            "which models run"
+        )
 
     cfg = load_config()
     if (
@@ -98,6 +105,14 @@ def _resolve_cfg(
     ):
         cfg = override_llm(
             cfg, model=model, api_key=api_key, base_url=base_url, reasoning_effort=reasoning_effort
+        )
+    if escalate is not None and escalate is not False:
+        name = escalate if isinstance(escalate, str) else ""
+        cfg = replace(cfg, model_selection="escalate", escalation_ladder=name)
+    elif cfg.model_selection == "escalate" and model is not None:
+        raise ValueError(
+            "model can't be used while CERTO_MODEL_SELECTION=escalate: the ladder in "
+            "models.yaml decides which models run"
         )
     if execution is not None:
         cfg = replace(cfg, execution=execution)
@@ -151,6 +166,11 @@ def create_app():
         # acceptance.py). A failing required check downgrades an
         # otherwise-"verified" result to "acceptance_failed".
         acceptance_checks: list[dict] | None = None
+        # Escalation between models (see escalation.py): true climbs the
+        # `default` ladder (or a derived one), a string names a ladder from
+        # models.yaml. Same as the CLI's --escalate [LADDER]; can't be
+        # combined with `model`.
+        escalate: bool | str | None = None
 
     class ChatMessage(BaseModel):
         role: str
@@ -204,7 +224,7 @@ def create_app():
         threading.Thread(target=_purge_loop, daemon=True).start()
 
     def run_in_background(
-        record: TaskRecord, cfg: Config, require_verification: bool, acceptance_checks
+        record: TaskRecord, cfg: Config, require_verification: bool, acceptance_checks, ladder
     ) -> None:
         record.status = "running"
         record.updated_at = time.time()
@@ -223,6 +243,7 @@ def create_app():
                 acceptance_checks=acceptance_checks,
                 run_id=record.id,
                 project=record.project,
+                ladder=ladder,
             )
             record.verification_state = outcome.verification_state
             record.completion_contract = asdict(outcome.completion_contract)
@@ -265,10 +286,16 @@ def create_app():
                 api_key=request.api_key,
                 base_url=request.base_url,
                 reasoning_effort=request.reasoning_effort,
+                escalate=request.escalate,
             )
             acceptance_checks = (
                 parse_acceptance_checks(request.acceptance_checks)
                 if request.acceptance_checks
+                else None
+            )
+            ladder = (
+                load_ladder(cfg.models_file, request.task, cfg.escalation_ladder or None)
+                if cfg.model_selection == "escalate"
                 else None
             )
         except (ConfigError, ValueError) as exc:  # AcceptanceCheckError is a ValueError
@@ -278,7 +305,7 @@ def create_app():
         store.save(record)
         threading.Thread(
             target=run_in_background,
-            args=(record, cfg, request.require_verification, acceptance_checks),
+            args=(record, cfg, request.require_verification, acceptance_checks, ladder),
             daemon=True,
         ).start()
 
@@ -331,10 +358,16 @@ def create_app():
                 api_key=request.api_key,
                 base_url=request.base_url,
                 reasoning_effort=request.reasoning_effort,
+                escalate=request.escalate,
             )
             acceptance_checks = (
                 parse_acceptance_checks(request.acceptance_checks)
                 if request.acceptance_checks
+                else None
+            )
+            ladder = (
+                load_ladder(cfg.models_file, request.task, cfg.escalation_ladder or None)
+                if cfg.model_selection == "escalate"
                 else None
             )
         except (ConfigError, ValueError) as exc:  # AcceptanceCheckError is a ValueError
@@ -354,6 +387,7 @@ def create_app():
                     cfg=cfg,
                     on_message=on_message,
                     acceptance_checks=acceptance_checks,
+                    ladder=ladder,
                 )
                 if request.require_verification and outcome.verification_state == "inconclusive":
                     detail = (

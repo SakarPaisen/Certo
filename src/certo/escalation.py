@@ -22,10 +22,11 @@ Pure: no SDK, no network. The run loop lives in runner.py.
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+import os
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from .catalog_check import usable_rungs
+from .catalog_check import load_checked_catalog, usable_rungs
 from .model_catalog import (
     Ladder,
     LadderRung,
@@ -173,6 +174,26 @@ def resolve_ladder(catalog: ModelCatalog, task: str, name: str | None) -> Resolv
     if "default" in ladders:
         return explicit_ladder(catalog, ladders["default"], task)
     return derive_ladder(catalog, task)
+
+
+def load_ladder(
+    models_file: str,
+    task: str,
+    name: str | None,
+    *,
+    on_warning: Callable[[str], None] | None = None,
+) -> ResolvedLadder:
+    """Load and check `models.yaml`, then resolve the ladder for `task`.
+    Raises `EscalationError` or `ModelCatalogError` (both `ValueError`s)
+    with a message for the user."""
+    if not os.path.isfile(models_file):
+        raise EscalationError(
+            f"Escalation needs a model catalog, and there is none at {models_file}. Copy "
+            "models.yaml.example to models.yaml and activate the models to climb through, "
+            "or set CERTO_MODELS_FILE."
+        )
+    catalog = load_checked_catalog(models_file, on_warning=on_warning)
+    return resolve_ladder(catalog, task, name)
 
 
 def describe_rung(rung: Rung, *, scores: bool) -> str:

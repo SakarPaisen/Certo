@@ -1534,9 +1534,7 @@ def test_a_normal_run_asks_the_runner_to_save_state(monkeypatch, tmp_path):
 
 def test_certo_save_state_off_is_passed_on(monkeypatch, tmp_path):
     calls: list = []
-    monkeypatch.setattr(
-        cli, "load_config", lambda: _cfg(workspace=str(tmp_path), save_state=False)
-    )
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg(workspace=str(tmp_path), save_state=False))
     monkeypatch.setattr(cli, "run_task", _recording_run_task(calls))
 
     cli.main(["do it"])
@@ -1567,9 +1565,7 @@ def test_resume_continues_the_saved_task_with_the_optional_instruction(monkeypat
 def test_resume_saves_state_even_when_saving_is_off(monkeypatch, tmp_path):
     _saved_run(tmp_path)
     calls: list = []
-    monkeypatch.setattr(
-        cli, "load_config", lambda: _cfg(workspace=str(tmp_path), save_state=False)
-    )
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg(workspace=str(tmp_path), save_state=False))
     monkeypatch.setattr(cli, "run_task", _recording_run_task(calls))
 
     cli.main(["--resume"])
@@ -1614,3 +1610,93 @@ def test_ctrl_c_prints_how_to_resume_and_exits_130(monkeypatch, tmp_path, capsys
 
     assert cli.main(["do it"]) == 130
     assert "Continue with: certo --resume" in capsys.readouterr().err
+
+
+# --- --escalate -------------------------------------------------------------------------
+
+_ESCALATION_CATALOG = """
+models:
+  - name: local
+    model: ollama/qwen
+    base_url: http://localhost:11434
+    ratings: {code: 2, cost: 5}
+  - name: cloud
+    model: openai/luna
+    api_key: k
+    ratings: {code: 5, cost: 2}
+escalation:
+  ladders:
+    default: [{model: local}, {model: cloud}]
+    cloud-only: [{model: cloud}]
+"""
+
+
+def _escalation_cfg(tmp_path, **overrides):
+    path = tmp_path / "models.yaml"
+    path.write_text(_ESCALATION_CATALOG)
+    return _cfg(workspace=str(tmp_path), models_file=str(path), **overrides)
+
+
+@pytest.mark.parametrize(
+    ("argv", "ladder_name"),
+    [(["do it", "--escalate"], "default"), (["do it", "--escalate", "cloud-only"], "cloud-only")],
+)
+def test_escalate_resolves_the_ladder_and_passes_it(monkeypatch, tmp_path, argv, ladder_name):
+    calls: list = []
+    monkeypatch.setattr(cli, "load_config", lambda: _escalation_cfg(tmp_path))
+    monkeypatch.setattr(cli, "run_task", _recording_run_task(calls))
+
+    assert cli.main(argv) == 0
+    assert calls[0]["cfg"].model_selection == "escalate"
+    assert calls[0]["ladder"].name == ladder_name
+
+
+def test_the_escalate_setting_works_without_the_flag(monkeypatch, tmp_path):
+    calls: list = []
+    monkeypatch.setattr(
+        cli, "load_config", lambda: _escalation_cfg(tmp_path, model_selection="escalate")
+    )
+    monkeypatch.setattr(cli, "run_task", _recording_run_task(calls))
+
+    assert cli.main(["do it"]) == 0
+    assert calls[0]["ladder"].name == "default"
+
+
+@pytest.mark.parametrize(
+    ("argv", "message"),
+    [
+        (["do it", "--escalate", "--auto-model"], "can't be combined with --auto-model or --model"),
+        (["do it", "--escalate", "--model", "openai/x"], "can't be combined"),
+        (
+            ["do it", "--escalate", "fast"],
+            "no escalation ladder named 'fast' in models.yaml. Ladders: cloud-only, default.",
+        ),
+        (["--resume", "--escalate"], "--resume can't be combined with escalation"),
+    ],
+)
+def test_escalate_errors(monkeypatch, tmp_path, capsys, argv, message):
+    monkeypatch.setattr(cli, "load_config", lambda: _escalation_cfg(tmp_path))
+    monkeypatch.setattr(cli, "run_task", _fail_if_called)
+
+    assert cli.main(argv) == 1
+    assert message in capsys.readouterr().err
+
+
+def test_model_flag_with_the_escalate_setting_is_an_error(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(
+        cli, "load_config", lambda: _escalation_cfg(tmp_path, model_selection="escalate")
+    )
+    monkeypatch.setattr(cli, "run_task", _fail_if_called)
+
+    assert cli.main(["do it", "--model", "openai/x"]) == 1
+    assert "--model can't be used while CERTO_MODEL_SELECTION=escalate" in capsys.readouterr().err
+
+
+def test_escalate_without_a_catalog_says_what_to_do(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(
+        cli, "load_config", lambda: _cfg(workspace=str(tmp_path), models_file=str(tmp_path / "no"))
+    )
+    monkeypatch.setattr(cli, "run_task", _fail_if_called)
+
+    assert cli.main(["do it", "--escalate"]) == 1
+    assert "Escalation needs a model catalog" in capsys.readouterr().err

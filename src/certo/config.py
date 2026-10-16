@@ -24,7 +24,7 @@ EXECUTION_MODES = ("local", "docker")
 DOCKER_PLATFORMS = ("linux/amd64", "linux/arm64")
 VERIFY_TESTS_MODES = ("always", "never")
 TASK_STORE_BACKENDS = ("memory", "redis", "sqlite", "mysql", "postgres")
-MODEL_SELECTION_MODES = ("manual", "auto")
+MODEL_SELECTION_MODES = ("manual", "auto", "escalate")
 
 logger = logging.getLogger(__name__)
 
@@ -196,6 +196,10 @@ class Config:
     # been; models_file is only ever read when model_selection == "auto".
     model_selection: str = DEFAULT_MODEL_SELECTION  # one of MODEL_SELECTION_MODES
     models_file: str = DEFAULT_MODELS_FILE
+    # CERTO_ESCALATION_LADDER: with model_selection "escalate", the ladder
+    # from models.yaml to climb; blank: `default`, else a derived one
+    # (see escalation.py).
+    escalation_ladder: str = ""
 
     # Opt-in per-run artifacts directory (see artifacts.py): metadata, the
     # full message transcript, and token/cost metrics for each task run,
@@ -589,6 +593,7 @@ def load_config(
         choices=MODEL_SELECTION_MODES,
     )
     models_file = _get(env, "MODELS_FILE") or DEFAULT_MODELS_FILE
+    escalation_ladder = _get(env, "ESCALATION_LADDER") or ""
     artifacts_dir = _get(env, "ARTIFACTS_DIR") or ""
     no_worktree_warning = _parse_bool(env, "NO_WORKTREE_WARNING", default=False)
     save_state = _parse_bool(env, "SAVE_STATE", default=True)
@@ -633,6 +638,7 @@ def load_config(
         interactive=interactive,
         model_selection=model_selection,
         models_file=models_file,
+        escalation_ladder=escalation_ladder,
         artifacts_dir=artifacts_dir,
         no_worktree_warning=no_worktree_warning,
         save_state=save_state,

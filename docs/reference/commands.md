@@ -19,6 +19,7 @@ certo TASK [--project NAME] [--execution {local,docker}] [--model MODEL]
            [--api-key KEY] [--base-url URL] [--reasoning-effort LEVEL]
            [--agents-md TEXT] [--interactive] [--auto-model]
            [--require-verification] [--acceptance-checks JSON_OR_FILE]
+           [--escalate [LADDER]]
 certo --resume [TASK] [same options]
 ```
 
@@ -47,6 +48,7 @@ current folder, the file is read instead.
 | `--auto-model` | off (`CERTO_MODEL_SELECTION`) | Pick the model from `models.yaml`. See [Pick models automatically](../guides/pick-models-automatically.md). |
 | `--require-verification` | off | Exit 1 for `inconclusive` too. |
 | `--acceptance-checks JSON_OR_FILE` | none | Extra file checks for this task, as inline JSON or a JSON file. See [Acceptance checks](../guides/acceptance-checks.md). |
+| `--escalate [LADDER]` | off (`CERTO_MODEL_SELECTION`) | Start on the first rung of a ladder of models from `models.yaml`, and move to the next, stronger model only when Certo's verdict shows the model couldn't finish. `LADDER` names a ladder; without it, the ladder named `default` is used, else one built from the ratings. Can't be combined with `--auto-model`, `--model` or `--resume`. A missing `models.yaml` or an unknown ladder is a configuration error that lists the ladders found. |
 | `--resume` | off | Continue the last run in this folder (or in `--project NAME`) from the state in its `.certo/` folder. `TASK` is optional and is sent as an extra instruction. Errors when there is no saved state; does nothing (exit 0) when the last run ended `verified` and no `TASK` is given. See [Resume an interrupted run](../guides/resume-a-run.md). |
 
 **Output.** With `--project`, the first line is

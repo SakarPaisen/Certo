@@ -84,8 +84,9 @@ Per-run overrides: `--model`, `--api-key`, `--base-url`,
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `CERTO_MODEL_SELECTION` | `manual` | `manual` or `auto`. `auto` is the same as `--auto-model`. |
-| `CERTO_MODELS_FILE` | `./models.yaml` | The model list. Read only when selection is `auto`. See [models.yaml](models-yaml.md). |
+| `CERTO_MODEL_SELECTION` | `manual` | `manual`, `auto` or `escalate`. `auto` is the same as `--auto-model`, `escalate` the same as `--escalate`. |
+| `CERTO_MODELS_FILE` | `./models.yaml` | The model list. Read when selection is `auto` or `escalate`, and by `certo check`. See [models.yaml](models-yaml.md). |
+| `CERTO_ESCALATION_LADDER` | empty | With `escalate`: the ladder in `models.yaml` to climb. Empty uses the ladder named `default`, or one built from the ratings. |
 
 ## Skills
 

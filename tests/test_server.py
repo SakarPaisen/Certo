@@ -1046,3 +1046,105 @@ def test_chat_completions_streaming_sends_sse_chunks(monkeypatch):
     assert {"content": "step two"} in deltas
     assert not any(d.get("content") == "echoed task, should not stream" for d in deltas)
     assert chunks[-1]["choices"][0]["finish_reason"] == "stop"
+
+
+# --- escalate -------------------------------------------------------------------------
+
+_LADDER_CATALOG = """
+models:
+  - name: local
+    model: ollama/qwen
+    base_url: http://localhost:11434
+    ratings: {code: 2, cost: 5}
+  - name: cloud
+    model: openai/luna
+    api_key: k
+    ratings: {code: 5, cost: 2}
+escalation:
+  ladders:
+    default: [{model: local}, {model: cloud}]
+    cloud-only: [{model: cloud}]
+"""
+
+
+def _escalation_app(monkeypatch, tmp_path, calls):
+    path = tmp_path / "models.yaml"
+    path.write_text(_LADDER_CATALOG)
+
+    def _fake_stream_task(task, cfg=None, on_message=None, acceptance_checks=None, **kwargs):
+        calls.append({"cfg": cfg, **kwargs})
+        return _fake_outcome()
+
+    monkeypatch.setattr(server, "load_config", lambda: _cfg(models_file=str(path)))
+    monkeypatch.setattr(server, "stream_task", _fake_stream_task)
+    return TestClient(server.create_app())
+
+
+@pytest.mark.parametrize(
+    ("value", "ladder_name", "rungs"),
+    [
+        (True, "default", ["local", "cloud"]),
+        ("cloud-only", "cloud-only", ["cloud"]),
+    ],
+)
+def test_create_task_with_escalate(monkeypatch, tmp_path, value, ladder_name, rungs):
+    calls: list = []
+    client = _escalation_app(monkeypatch, tmp_path, calls)
+
+    response = client.post("/tasks", json={"task": "do it", "escalate": value})
+    _wait_for_status(client, response.json()["task_id"])
+
+    assert calls[0]["cfg"].model_selection == "escalate"
+    assert calls[0]["ladder"].name == ladder_name
+    assert [r.name for r in calls[0]["ladder"].rungs] == rungs
+
+
+def test_create_task_without_escalate_passes_no_ladder(monkeypatch, tmp_path):
+    calls: list = []
+    client = _escalation_app(monkeypatch, tmp_path, calls)
+
+    response = client.post("/tasks", json={"task": "do it", "escalate": False})
+    _wait_for_status(client, response.json()["task_id"])
+
+    assert calls[0]["ladder"] is None
+    assert calls[0]["cfg"].model_selection == "manual"
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        ({"escalate": True, "model": "openai/x"}, "can't be combined with model"),
+        ({"escalate": "fast"}, "no escalation ladder named 'fast'"),
+    ],
+)
+def test_create_task_escalate_errors_are_400(monkeypatch, tmp_path, payload, message):
+    calls: list = []
+    client = _escalation_app(monkeypatch, tmp_path, calls)
+
+    response = client.post("/tasks", json={"task": "do it", **payload})
+
+    assert response.status_code == 400
+    assert message in response.json()["detail"]
+    assert calls == []
+
+
+def test_create_task_escalate_without_a_catalog_is_400(monkeypatch, tmp_path):
+    monkeypatch.setattr(server, "load_config", lambda: _cfg(models_file=str(tmp_path / "no.yaml")))
+    client = TestClient(server.create_app())
+
+    response = client.post("/tasks", json={"task": "do it", "escalate": True})
+
+    assert response.status_code == 400
+    assert "needs a model catalog" in response.json()["detail"]
+
+
+def test_websocket_with_escalate(monkeypatch, tmp_path):
+    calls: list = []
+    client = _escalation_app(monkeypatch, tmp_path, calls)
+
+    with client.websocket_connect("/tasks/stream") as ws:
+        ws.send_json({"task": "do it", "escalate": "cloud-only"})
+        while ws.receive_json()["type"] != "result":
+            pass
+
+    assert [r.name for r in calls[0]["ladder"].rungs] == ["cloud"]

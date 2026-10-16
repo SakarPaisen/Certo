@@ -18,6 +18,7 @@ from . import __version__
 from .acceptance import AcceptanceCheck, AcceptanceCheckError, parse_acceptance_checks
 from .config import ConfigError, load_config, override_llm, resolve_project_dir
 from .custom_tools.run_tests_tool import detect_project, run_full_verification
+from .escalation import load_ladder
 from .init_cmd import check_main, init_main
 from .model_catalog import ModelCatalogEntry
 from .project_state import load_record, status_path
@@ -269,6 +270,20 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--escalate",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="LADDER",
+        help=(
+            "Start on the first, cheapest model of a ladder from models.yaml and move "
+            "to the next, stronger one only when Certo's verification shows the model "
+            "couldn't finish. LADDER names a ladder under escalation.ladders; without "
+            "it, the ladder named 'default' is used, else one built from the ratings. "
+            "Can't be combined with --auto-model or --model."
+        ),
+    )
+    parser.add_argument(
         "--require-verification",
         action="store_true",
         help=(
@@ -427,8 +442,31 @@ def main(argv: list[str] | None = None) -> int:
     if args.interactive:
         cfg = replace(cfg, interactive=True)
 
-    if args.auto_model:
+    if args.escalate is not None:
+        if args.auto_model or args.model is not None:
+            print(
+                "Error: --escalate can't be combined with --auto-model or --model: the "
+                "ladder in models.yaml decides which models run.",
+                file=sys.stderr,
+            )
+            return 1
+        cfg = replace(cfg, model_selection="escalate", escalation_ladder=args.escalate)
+    elif args.auto_model:
         cfg = replace(cfg, model_selection="auto")
+    elif cfg.model_selection == "escalate" and args.model is not None:
+        print(
+            "Error: --model can't be used while CERTO_MODEL_SELECTION=escalate: the "
+            "ladder in models.yaml decides which models run.",
+            file=sys.stderr,
+        )
+        return 1
+    if cfg.model_selection == "escalate" and args.resume:
+        print(
+            "Error: --resume can't be combined with escalation. Resume continues one "
+            "model's conversation; run it without --escalate.",
+            file=sys.stderr,
+        )
+        return 1
 
     if args.agents_md is not None and args.project is None:
         print("Error: --agents-md requires --project", file=sys.stderr)
@@ -469,6 +507,19 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         print(f"Resuming: {_first_line(resume_from.task)}")
 
+    ladder = None
+    if cfg.model_selection == "escalate":
+        try:
+            ladder = load_ladder(
+                cfg.models_file,
+                task,
+                cfg.escalation_ladder or None,
+                on_warning=lambda w: print(f"Warning (models.yaml): {w}", file=sys.stderr),
+            )
+        except ValueError as exc:  # EscalationError, ModelCatalogError
+            print(f"Configuration error: {exc}", file=sys.stderr)
+            return 1
+
     certo_made = args.project is not None and was_created_by_certo(cfg.projects_dir, args.project)
     if not cfg.no_worktree_warning and not certo_made:
         warning = worktree_warning(cfg.workspace)
@@ -505,6 +556,7 @@ def main(argv: list[str] | None = None) -> int:
             save_state=save_state,
             resume_from=resume_from,
             resume_instruction=task if resume_from is not None else None,
+            ladder=ladder,
         )
     except KeyboardInterrupt:
         print("\nInterrupted.", file=sys.stderr)

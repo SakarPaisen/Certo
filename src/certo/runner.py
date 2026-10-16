@@ -41,6 +41,7 @@ from .custom_tools.run_tests_tool import (
     detect_project,
     run_full_verification,
 )
+from .escalation import EscalationError, ResolvedLadder
 from .model_catalog import classify_task, rank_candidates
 from .model_selection import (
     ModelChain,
@@ -1106,6 +1107,7 @@ def stream_task(
     save_state: bool = False,
     resume_from: RunRecord | None = None,
     resume_instruction: str | None = None,
+    ladder: ResolvedLadder | None = None,
 ) -> TaskOutcome:
     """Run a task, invoking `on_message` with each message as it's produced,
     and return the terminal `TaskOutcome` once verification has settled.
@@ -1146,6 +1148,8 @@ def stream_task(
     started_at = datetime.now(UTC).isoformat()
     if cfg is None:
         cfg = load_config()
+    if ladder is not None or cfg.model_selection == "escalate":
+        raise EscalationError("Escalation isn't available in this build yet.")
     emit = on_message or (lambda _msg: None)
     checkpoint_buffer: list[Message] = []
     all_messages: list[Message] = []
@@ -1524,6 +1528,7 @@ def run_task(
     save_state: bool = False,
     resume_from: RunRecord | None = None,
     resume_instruction: str | None = None,
+    ladder: ResolvedLadder | None = None,
 ) -> TaskResult:
     messages: list = []
     outcome = stream_task(
@@ -1539,5 +1544,6 @@ def run_task(
         save_state=save_state,
         resume_from=resume_from,
         resume_instruction=resume_instruction,
+        ladder=ladder,
     )
     return TaskResult(messages, outcome)  # last message is the final assistant output

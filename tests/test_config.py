@@ -889,3 +889,11 @@ def test_env_example_puts_comments_above_settings_not_beside_them():
     ]
     assert beside == []
     assert not [k for k, v in dotenv_values(path).items() if v and "#" in v]
+
+
+def test_escalate_is_a_model_selection_mode_with_an_optional_ladder():
+    cfg = load_config(
+        _base_env(CERTO_MODEL_SELECTION="escalate", CERTO_ESCALATION_LADDER="local-only")
+    )
+    assert (cfg.model_selection, cfg.escalation_ladder) == ("escalate", "local-only")
+    assert load_config(_base_env()).escalation_ladder == ""
