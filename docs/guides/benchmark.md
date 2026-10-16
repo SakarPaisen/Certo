@@ -54,8 +54,9 @@ often go wrong.
   commit it.
 
 The benchmark never reads `.env` and never uses `--auto-model` ranking.
-It also ignores `activated: false`: naming a model in a benchmark is an
-explicit choice.
+`activated: false` means Certo never uses a model, so an arm that names an
+inactive model is an error: set `activated: true` on it first. (Before
+version 0.1.9 the benchmark ignored the flag.)
 
 ```yaml
 # bench.yaml

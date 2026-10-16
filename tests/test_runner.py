@@ -1842,9 +1842,9 @@ def test_auto_mode_off_never_loads_a_catalog(monkeypatch, tmp_path):
     _stub_stream_task_dependencies(monkeypatch, conversation, tmp_path)
 
     def _fail_if_called(_path):
-        raise AssertionError("load_model_catalog should not be called when model_selection=manual")
+        raise AssertionError("the catalog should not be loaded when model_selection=manual")
 
-    monkeypatch.setattr(runner, "load_model_catalog", _fail_if_called)
+    monkeypatch.setattr(runner, "load_checked_catalog", _fail_if_called)
 
     outcome = runner.stream_task(
         "do the thing", cfg=_cfg(workspace=str(tmp_path), model_selection="manual")

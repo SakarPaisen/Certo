@@ -6,8 +6,8 @@
 #
 # Models come from models.yaml (copy models.yaml.example), by their `name`.
 # Credentials stay there; this file has none and can be committed. The
-# benchmark never reads .env, never uses --auto-model ranking, and ignores
-# `activated: false`: naming a model here is an explicit choice.
+# benchmark never reads .env and never uses --auto-model ranking. A model
+# with `activated: false` can't be used: set it to true first.
 
 # Optional. Default: ./models.yaml, relative to where you run certo bench.
 # models_file: ./models.yaml

@@ -59,8 +59,12 @@ One model, the normal Certo run: exactly what `certo "<task>"` does.
   `api_key`, `base_url` and `reasoning_effort`. An empty field stays empty;
   it is never filled from `.env` or the environment's `CERTO_LLM_*`
   settings.
-- `activated: false` in `models.yaml` is ignored: naming a model here is
-  an explicit choice.
+- An arm that names a model with `activated: false` is an error: Certo
+  never uses an inactive model. Set `activated: true` on it to benchmark
+  it. (Before version 0.1.9 the flag was ignored here.)
+- Problems in `models.yaml` are checked as for every command (see
+  [models.yaml](models-yaml.md#checks)): errors stop the benchmark,
+  warnings are printed with the plan.
 - `task_profiles` in `models.yaml` are not used.
 
 ## Strategies to come

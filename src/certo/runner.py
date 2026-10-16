@@ -33,6 +33,7 @@ from openhands.tools.task_tracker import TaskTrackerTool
 from .acceptance import AcceptanceCheck, AcceptanceCheckResult, evaluate_acceptance_checks
 from .agent import build_agent
 from .artifacts import write_run_artifacts
+from .catalog_check import load_checked_catalog
 from .config import Config, load_config
 from .custom_tools.run_tests_tool import (
     CheckOutcome,
@@ -40,7 +41,7 @@ from .custom_tools.run_tests_tool import (
     detect_project,
     run_full_verification,
 )
-from .model_catalog import classify_task, load_model_catalog, rank_candidates
+from .model_catalog import classify_task, rank_candidates
 from .model_selection import (
     ModelChain,
     ModelDecisionRecord,
@@ -1165,7 +1166,9 @@ def stream_task(
     agent_cfg = cfg
     agent_usage_id = "certo"
     if cfg.model_selection == "auto":
-        catalog = load_model_catalog(cfg.models_file)
+        catalog = load_checked_catalog(
+            cfg.models_file, on_warning=lambda w: _emit_notice(emit, f"Certo: models.yaml: {w}")
+        )
         profile = classify_task(task, catalog)
         ranked = rank_candidates(catalog, profile.weights)
         chosen_index = 0

@@ -5,8 +5,11 @@ The format of the model list used by automatic model selection
 things up; the guides are
 [Pick models automatically](../guides/pick-models-automatically.md) and
 [Benchmark models and strategies](../guides/benchmark.md). The benchmark
-uses only `models` entries, by name, and ignores `activated` and
-`task_profiles`.
+uses `models` entries by name, and ignores `task_profiles`.
+
+**`activated: false` means Certo never uses that model**, in every
+command: not in `--auto-model`, not in an escalation ladder, and not in
+`certo bench`.
 
 Certo reads the file only for `--auto-model` (or
 `CERTO_MODEL_SELECTION=auto`) and for `certo bench`. For `--auto-model`
@@ -143,9 +146,34 @@ rung when a required acceptance check fails.
 A ladder named `default` is the one used when no ladder name is given.
 With no ladder at all, Certo builds one from the active models' ratings.
 
-## Errors
+## Checks
 
-Certo stops with a clear message if the file is missing or not valid
-YAML, if `models` is missing or empty, if an entry has no `name` or
-`model`, if a rating or weight is not a number, if two entries share a
-name, or if every entry has `activated: false`.
+Every command that reads the file checks it the same way. Errors stop the
+command; warnings are printed, and the command runs.
+
+Errors:
+
+- the file is missing or not valid YAML, `models` is missing or empty, an
+  entry has no `name` or `model`, a rating or weight is not a number, or a
+  field has the wrong type;
+- two models share a name;
+- every model has `activated: false`;
+- a ladder rung names a model that doesn't exist (the message lists the
+  names that do);
+- a ladder lists the same model twice with the same settings (the same
+  model with a different `reasoning_effort` is allowed);
+- a rung has a negative `retries`;
+- `escalation.cost_axis` is set, and no model has a rating with that name;
+- a ladder has no usable rung once inactive models are removed.
+
+Warnings:
+
+- a rung names a model with `activated: false`: the rung is skipped;
+- a ladder has a single usable rung, so it can't escalate;
+- an active model has no rating on an axis that a task profile weighs: it
+  counts as 0;
+- an active model has no `api_key` and no `base_url`: it works only if the
+  provider's own key variable (such as `OPENAI_API_KEY`) is set;
+- a ladder goes from a more capable model to a less capable one, under the
+  `default` task profile. Allowed, since you may know better, but check
+  the order.

@@ -289,6 +289,8 @@ def _print_plan(cfg: BenchConfig, todo: list[PlannedRun], total: int, out_dir: P
     if unknown:
         line += f"; no price known for {', '.join(sorted(set(unknown)))}"
     print(line)
+    for warning in cfg.catalog_warnings:
+        print(f"  Warning (models.yaml): {warning}")
     print(f"  Results: {out_dir}")
 
 

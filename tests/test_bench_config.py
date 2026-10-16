@@ -19,12 +19,15 @@ models:
   - name: local-coder
     model: ollama/qwen3-coder:30b
     base_url: http://localhost:11434
-    activated: false
     timeout_seconds: 1200
   - name: cloud
     model: anthropic/claude-sonnet-5-5
     api_key: sk-test
     reasoning_effort: low
+  - name: parked
+    model: openai/gpt-4o
+    api_key: sk-test
+    activated: false
 """
 
 
@@ -58,10 +61,22 @@ def test_a_valid_file(tmp_path):
     ]
 
 
-def test_activated_false_is_ignored_because_naming_a_model_is_explicit(tmp_path):
-    cfg = load_bench_config(_write(tmp_path, VALID))
-    assert cfg.catalog["local-coder"].activated is False
-    assert cfg.arms[0].models == ["local-coder"]
+def test_an_arm_naming_an_inactive_model_is_an_error(tmp_path):
+    bench = "arms:\n  - {name: a, strategy: single, model: parked}\n"
+    with pytest.raises(BenchConfigError, match="'activated: false'.*Set 'activated: true'"):
+        load_bench_config(_write(tmp_path, bench))
+
+
+def test_models_yaml_warnings_are_kept_for_the_plan(tmp_path):
+    models = MODELS.replace("    api_key: sk-test\n    reasoning_effort: low\n", "")
+    cfg = load_bench_config(_write(tmp_path, VALID, models))
+    assert any("'cloud' has no api_key and no base_url" in w for w in cfg.catalog_warnings)
+
+
+def test_a_models_yaml_error_stops_the_benchmark(tmp_path):
+    models = MODELS + "  - name: cloud\n    model: openai/gpt-4o\n"
+    with pytest.raises(BenchConfigError, match="Two models are named 'cloud'"):
+        load_bench_config(_write(tmp_path, VALID, models))
 
 
 def test_a_task_list_and_default_repeats(tmp_path):
@@ -124,9 +139,14 @@ def test_missing_models_file_says_what_to_do(tmp_path):
 
 
 def test_the_shipped_example_is_valid_against_the_shipped_models_example(tmp_path):
+    # Every model in the template ships inactive; activate them in a copy.
     text = (_REPO / "bench.yaml.example").read_text()
+    models = (_REPO / "models.yaml.example").read_text().replace(
+        "activated: false", "activated: true"
+    )
+    (tmp_path / "models.yaml").write_text(models)
     path = tmp_path / "bench.yaml"
-    path.write_text(f"models_file: {_REPO / 'models.yaml.example'}\n" + text)
+    path.write_text(f"models_file: {tmp_path / 'models.yaml'}\n" + text)
     cfg = load_bench_config(str(path))
     assert len(cfg.arms) == 2
 

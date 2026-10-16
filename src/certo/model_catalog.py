@@ -296,13 +296,17 @@ def _parse_escalation(raw: Any, path: str) -> EscalationSettings:
     )
 
 
-def load_model_catalog(path: str) -> ModelCatalog:
+def load_model_catalog(path: str, *, strict: bool = True) -> ModelCatalog:
     """Parse `models.yaml`. Raises `ModelCatalogError` for a missing file, a
     file that isn't valid YAML, or one that fails schema validation (a
     non-empty 'models' list, each with 'name'/'model'; 'activated' defaults
     to `true` if omitted; profiles are optional). No minimum catalog size is
     enforced — see `rank_candidates()`'s docstring for why (and for what
-    happens when every model is deactivated)."""
+    happens when every model is deactivated).
+
+    `strict=False` skips the duplicate-name check, so `catalog_check.py`
+    can report it together with every other problem. Commands load the file
+    through `catalog_check.load_checked_catalog`, which checks everything."""
     file_path = Path(path)
     if not file_path.is_file():
         raise ModelCatalogError(
@@ -325,7 +329,7 @@ def load_model_catalog(path: str) -> ModelCatalog:
 
     seen_names = set()
     for entry in models:
-        if entry.name in seen_names:
+        if strict and entry.name in seen_names:
             raise ModelCatalogError(f"{path}: duplicate model name {entry.name!r}.")
         seen_names.add(entry.name)
 
@@ -365,6 +369,12 @@ def score_entry(entry: ModelCatalogEntry, weights: dict[str, float]) -> float:
     """Weighted sum over whatever axes `weights` declares — an axis a model
     doesn't rate itself on contributes 0, not an error."""
     return sum(entry.ratings.get(axis, 0.0) * weight for axis, weight in weights.items())
+
+
+def capability(entry: ModelCatalogEntry, weights: dict[str, float], cost_axis: str) -> float:
+    """How capable a model is for a task: the profile's weighted sum over
+    every axis except the cost axis (escalation orders models by this)."""
+    return score_entry(entry, {a: w for a, w in weights.items() if a != cost_axis})
 
 
 def rank_candidates(catalog: ModelCatalog, weights: dict[str, float]) -> list[ModelCatalogEntry]:

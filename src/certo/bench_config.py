@@ -3,9 +3,9 @@
 The file says which tasks to run, how many times, and which arms to
 compare. Each arm names a strategy (see bench_strategies.py) and the
 `models.yaml` entries it uses, by catalog name: credentials stay in
-`models.yaml`, and `.env` is never read. Naming a model in a benchmark is
-an explicit choice, so `activated: false` and `--auto-model` ranking don't
-apply here. No SDK import.
+`models.yaml`, and `.env` is never read. `activated: false` means Certo
+never uses a model, here as everywhere: an arm naming one is an error.
+`--auto-model` ranking doesn't apply. No SDK import.
 """
 
 from __future__ import annotations
@@ -19,8 +19,9 @@ import yaml
 
 from .bench_strategies import STRATEGIES, BenchConfigError
 from .bench_tasks import BUILTIN_TASKS_DIR, BenchTask, BenchTaskError, load_tasks
+from .catalog_check import load_checked_catalog
 from .config import DEFAULT_MODELS_FILE
-from .model_catalog import ModelCatalogEntry, ModelCatalogError, load_model_catalog
+from .model_catalog import ModelCatalogEntry, ModelCatalogError
 
 DEFAULT_BENCH_FILE = "bench.yaml"
 _TOP_LEVEL_KEYS = {"tasks", "repeats", "arms", "models_file", "tasks_dir"}
@@ -50,6 +51,8 @@ class BenchConfig:
     arms: list[Arm]
     models_file: str
     catalog: dict[str, ModelCatalogEntry]
+    # models.yaml warnings (catalog_check.py), printed with the plan.
+    catalog_warnings: list[str] = field(default_factory=list)
 
     def fingerprint(self) -> dict[str, Any]:
         """What must match for `--resume` to continue an earlier run."""
@@ -151,8 +154,10 @@ def load_bench_config(path: str = DEFAULT_BENCH_FILE) -> BenchConfig:
             "its models, by name, from models.yaml: copy models.yaml.example to "
             "models.yaml and fill in the models to compare, or set 'models_file'."
         )
+    catalog_warnings: list[str] = []
     try:
-        catalog = {e.name: e for e in load_model_catalog(models_file).models}
+        loaded = load_checked_catalog(models_file, on_warning=catalog_warnings.append)
+        catalog = {e.name: e for e in loaded.models}
     except ModelCatalogError as exc:
         raise BenchConfigError(f"models file for {where}: {exc}") from exc
 
@@ -174,4 +179,5 @@ def load_bench_config(path: str = DEFAULT_BENCH_FILE) -> BenchConfig:
         arms=_arms(raw.get("arms"), catalog, where),
         models_file=str(Path(models_file).resolve()),
         catalog=catalog,
+        catalog_warnings=catalog_warnings,
     )
