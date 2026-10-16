@@ -1,0 +1,36 @@
+# Copy to bench.yaml and edit. Run with: certo bench
+#
+# A benchmark compares "arms" on Certo's bundled tasks, each graded by
+# hidden tests the agent never sees. See docs/guides/benchmark.md and
+# docs/reference/bench-yaml.md.
+#
+# Models come from models.yaml (copy models.yaml.example), by their `name`.
+# Credentials stay there; this file has none and can be committed. The
+# benchmark never reads .env, never uses --auto-model ranking, and ignores
+# `activated: false`: naming a model here is an explicit choice.
+
+# Optional. Default: ./models.yaml, relative to where you run certo bench.
+# models_file: ./models.yaml
+
+# `all`, or a list of task names (certo bench --list-tasks shows them).
+tasks: all
+# tasks: [wordle-score, page-ranges, token-bucket]
+
+# Runs per task per arm. Results vary between runs of the same model, so
+# more repeats give a fairer comparison (and cost more).
+repeats: 3
+
+arms:
+  # strategy: single = one model, the normal Certo run, exactly what
+  # `certo "<task>"` does. It is the only strategy so far.
+  - name: qwen-local
+    strategy: single
+    model: qwen3-coder-local      # a `name` from models.yaml
+
+  - name: sonnet
+    strategy: single
+    model: claude-sonnet-5
+
+# Optional: a folder of your own tasks instead of the bundled set, in the
+# same shape (task.md, starter/, hidden_tests/, reference/).
+# tasks_dir: ./my-bench-tasks

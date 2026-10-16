@@ -108,6 +108,7 @@ def test_sdist_ships_only_the_allowlisted_paths(built):
         "LICENSE",
         ".env.example",
         "models.yaml.example",
+        "bench.yaml.example",
         "docker/agent-server.Dockerfile",
     }
     names = _sdist_names(built["sdist"])

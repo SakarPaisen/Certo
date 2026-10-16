@@ -110,6 +110,7 @@ include = [
     "/pyproject.toml",
     "/.env.example",
     "/models.yaml.example",
+    "/bench.yaml.example",
 ]
 exclude = [
     "**/__pycache__",

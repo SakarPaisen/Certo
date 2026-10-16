@@ -227,6 +227,8 @@ private/
 .env.local
 secrets/
 models.yaml
+# certo bench results (default output folder)
+bench-results/
 
 # Third-party skill content (Apache-2.0, from github.com/anthropics/skills) —
 # not this project's own IP, kept locally but not redistributed from this
