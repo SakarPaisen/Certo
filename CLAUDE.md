@@ -155,7 +155,7 @@ prompt written for this project must follow them.
    benchmark (`certo bench`, hidden tests), not by single runs or
    impressions. `certo bench` is planned, not built yet.
 4. **Prompts don't publish.** Claude Code sessions never tag, push or
-   publish; Alessio does that after review. One commit per numbered item.
+   publish; the Author does that after review. One commit per numbered item.
    Stop and ask on decisions not covered by the prompt. The full test suite
    passes with no API key.
 5. **Real runs only.** Reports never claim a live result that wasn't run in
