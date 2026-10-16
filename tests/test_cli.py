@@ -7,6 +7,7 @@ from __future__ import annotations
 import importlib.metadata
 import tomllib
 import urllib.error
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -1719,3 +1720,30 @@ def test_escalate_prints_progress_and_asks_only_when_interactive(monkeypatch, tm
 def test_the_escalation_prompt(monkeypatch, answer, climbs):
     monkeypatch.setattr("builtins.input", lambda prompt: answer)
     assert cli._confirm_escalation("Try mid next?") is climbs
+
+
+def test_an_escalation_run_prints_one_line_per_rung(monkeypatch, tmp_path, capsys):
+    from certo.escalation import RungResult
+    from certo.run_summary import RunSummary
+
+    def fake(task, **kwargs):
+        result = _fake_result([_FakeMessage("done")])
+        result.outcome = replace(
+            result.outcome,
+            run_summary=RunSummary(duration_seconds=1.0),
+            rungs=(
+                RungResult(1, "local", "ollama/q", "no_progress", 1, 60.0, RunSummary(60.0)),
+                RungResult(2, "mid", "openai/m", "verified", 0, 30.0, RunSummary(30.0)),
+            ),
+            final_rung=2,
+        )
+        return result
+
+    monkeypatch.setattr(cli, "load_config", lambda: _escalation_cfg(tmp_path))
+    monkeypatch.setattr(cli, "run_task", fake)
+
+    assert cli.main(["do it", "--escalate"]) == 0
+    out = capsys.readouterr().out
+    assert "  Rungs:" in out
+    assert "    1. local (ollama/q): no_progress, 1 fix attempt, 1m 00s, 0 tokens, $0.0000" in out
+    assert "  Final result from rung 2 (mid)." in out

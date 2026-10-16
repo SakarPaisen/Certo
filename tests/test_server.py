@@ -1148,3 +1148,57 @@ def test_websocket_with_escalate(monkeypatch, tmp_path):
             pass
 
     assert [r.name for r in calls[0]["ladder"].rungs] == ["cloud"]
+
+
+def _escalated_outcome():
+    from dataclasses import replace
+
+    from certo.escalation import RungResult
+
+    return replace(
+        _fake_outcome(),
+        rungs=(
+            RungResult(1, "local", "ollama/qwen", "no_progress", 1, 5.0, None),
+            RungResult(2, "cloud", "openai/luna", "verified", 0, 3.0, None),
+        ),
+        final_rung=2,
+    )
+
+
+def test_get_task_returns_the_rungs(monkeypatch, tmp_path):
+    calls: list = []
+    client = _escalation_app(monkeypatch, tmp_path, calls)
+    monkeypatch.setattr(server, "stream_task", lambda *a, **k: _escalated_outcome())
+    client = TestClient(server.create_app())
+
+    response = client.post("/tasks", json={"task": "do it", "escalate": True})
+    body = _wait_for_status(client, response.json()["task_id"])
+
+    assert [(r["name"], r["verdict"], r["final"]) for r in body["rungs"]] == [
+        ("local", "no_progress", False),
+        ("cloud", "verified", True),
+    ]
+    assert body["rungs"][0]["fix_attempts"] == 1
+
+
+def test_a_single_model_task_has_no_rungs(monkeypatch):
+    monkeypatch.setattr(server, "load_config", lambda: _cfg())
+    monkeypatch.setattr(server, "stream_task", lambda *a, **k: _fake_outcome())
+    client = TestClient(server.create_app())
+
+    body = _wait_for_status(client, client.post("/tasks", json={"task": "x"}).json()["task_id"])
+    assert body["rungs"] is None
+
+
+def test_websocket_result_includes_the_rungs(monkeypatch, tmp_path):
+    calls: list = []
+    _escalation_app(monkeypatch, tmp_path, calls)
+    monkeypatch.setattr(server, "stream_task", lambda *a, **k: _escalated_outcome())
+    client = TestClient(server.create_app())
+
+    with client.websocket_connect("/tasks/stream") as ws:
+        ws.send_json({"task": "do it", "escalate": True})
+        while (item := ws.receive_json())["type"] != "result":
+            pass
+
+    assert [r["name"] for r in item["rungs"]] == ["local", "cloud"]

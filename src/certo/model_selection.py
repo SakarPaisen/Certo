@@ -30,13 +30,20 @@ class ModelDecisionRecord:
     names/scores/reasons), so it's always safe to write to
     `MODEL_DECISIONS.md` or attach to `TaskOutcome`."""
 
-    kind: str  # "initial" | "escalation_api_failure" | "escalation_quality_failure"
+    # "initial" | "escalation_api_failure" | "escalation_quality_failure"
+    # (--auto-model), or "ladder" | "climb_quality_failure" |
+    # "climb_provider_failure" | "escalation_stop" (--escalate)
+    kind: str
     timestamp: str  # ISO-8601 UTC
     task_profile: str
     weights: dict[str, float]
     ranked: tuple[tuple[str, float], ...]  # (name, score), ranked order
     chosen: str
     reason: str
+    # How the list is labelled in MODEL_DECISIONS.md: --auto-model ranks
+    # candidates by score; an escalation ladder lists rungs by capability.
+    list_title: str = "Ranked candidates"
+    score_label: str = "score"
 
 
 # Given the ranked candidates, the recommended index (usually 0, or the
@@ -164,11 +171,11 @@ def write_model_decisions(workspace: str, decisions: Sequence[ModelDecisionRecor
             "",
             f"Task profile: `{d.task_profile}` (weights: {d.weights})",
             "",
-            "Ranked candidates:",
+            f"{d.list_title}:",
         ]
         for name, score in d.ranked:
             label = f"**{name}**" if name == d.chosen else name
-            lines.append(f"- {label} (score {score:.2f})")
+            lines.append(f"- {label} ({d.score_label} {score:.2f})")
         lines.append("")
         lines.append(f"Chosen: **{d.chosen}**")
         sections.append("\n".join(lines))

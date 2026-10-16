@@ -423,3 +423,88 @@ def test_a_single_model_run_never_escalates(tmp_path, fake_run, monkeypatch):
     assert outcome.rungs == ()
     assert outcome.final_rung is None
     assert len(_Conversation.instances) == 1
+
+
+# --- visibility --------------------------------------------------------------------
+
+
+def test_model_decisions_records_the_ladder_every_climb_and_the_stop(tmp_path, fake_run):
+    fake_run.script[:] = [(_provider_failure(), 0, {}), ("no_progress", 0, {}), ("verified", 0, {})]
+    outcome, _ = _run(tmp_path, _ladder(tmp_path))
+
+    assert [d.kind for d in outcome.model_decisions] == [
+        "ladder",
+        "climb_provider_failure",
+        "climb_quality_failure",
+        "escalation_stop",
+    ]
+    text = (tmp_path / "MODEL_DECISIONS.md").read_text()
+    assert "Explicit ladder 'default' from models.yaml." in text
+    assert "Ladder (explicit ladder 'default'):" in text
+    assert "- **local** (capability" in text
+    assert "local failed at the provider or run level (LLMRateLimitError: slow down)" in text
+    assert "mid ended no_progress after 1 fix attempt; escalating to strong (rung 3 of 3)." in text
+    assert "strong ended verified, which doesn't escalate." in text
+
+
+def test_model_decisions_explains_a_derived_ladder(tmp_path, fake_run):
+    fake_run.script[:] = [("verified", 0, {})]
+    _run(tmp_path, _derived(tmp_path))
+    text = (tmp_path / "MODEL_DECISIONS.md").read_text()
+    assert "Derived from the active models' ratings for task profile 'default'" in text
+    assert "without the 'cost' axis" in text
+
+
+def _derived(tmp_path):
+    from certo.escalation import derive_ladder
+
+    path = tmp_path / "models.yaml"
+    path.write_text(_CATALOG)
+    return derive_ladder(load_model_catalog(str(path)), "task")
+
+
+def test_model_decisions_is_written_even_when_a_rung_raises(tmp_path, fake_run):
+    fake_run.script[:] = [(ConversationRunError(uuid.uuid4(), RuntimeError("bug")), 0, {})]
+    with pytest.raises(ConversationRunError):
+        _run(tmp_path, _ladder(tmp_path))
+    assert "Explicit ladder 'default'" in (tmp_path / "MODEL_DECISIONS.md").read_text()
+
+
+def test_each_rung_gets_its_own_artifacts_folder(tmp_path, fake_run):
+    import json
+
+    artifacts = tmp_path / "artifacts"
+    fake_run.script[:] = [("no_progress", 0, {}), ("verified", 0.1, {})]
+    _run(tmp_path, _ladder(tmp_path), cfg=_cfg(tmp_path, artifacts_dir=str(artifacts)), run_id="r1")
+
+    top = json.loads((artifacts / "_unscoped" / "r1" / "metadata.json").read_text())
+    assert top["model_selection"] == "escalate"
+    assert top["verification_state"] == "verified"
+    assert [(r["name"], r["verdict"], r["final"]) for r in top["rungs"]] == [
+        ("local", "no_progress", False),
+        ("mid", "verified", True),
+    ]
+    rung_dirs = sorted(p.name for p in (artifacts / "_unscoped" / "r1" / "rungs").iterdir())
+    assert rung_dirs == ["1-local", "2-mid"]
+    first = json.loads(
+        (artifacts / "_unscoped" / "r1" / "rungs" / "1-local" / "metadata.json").read_text()
+    )
+    assert (first["model"], first["verification_state"]) == (
+        "ollama/qwen3-coder:30b",
+        "no_progress",
+    )
+    assert (artifacts / "_unscoped" / "r1" / "rungs" / "2-mid" / "transcript.json").is_file()
+
+
+def test_the_per_rung_summary_lines(tmp_path, fake_run):
+    from certo.escalation import format_rung_lines
+
+    fake_run.script[:] = [("no_progress", 0.0, {}), ("verified", 0.25, {})]
+    outcome, _ = _run(tmp_path, _ladder(tmp_path))
+    lines = format_rung_lines(outcome.rungs, outcome.final_rung)
+
+    assert lines[0] == "Rungs:"
+    assert lines[1].startswith("  1. local (ollama/qwen3-coder:30b): no_progress, 1 fix attempt, ")
+    assert lines[1].endswith(", 1,100 tokens, $0.0000 + unknown")
+    assert lines[2].endswith(", 1,100 tokens, $0.2500")
+    assert lines[3] == "Final result from rung 2 (mid)."

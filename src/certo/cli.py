@@ -18,7 +18,7 @@ from . import __version__
 from .acceptance import AcceptanceCheck, AcceptanceCheckError, parse_acceptance_checks
 from .config import ConfigError, load_config, override_llm, resolve_project_dir
 from .custom_tools.run_tests_tool import detect_project, run_full_verification
-from .escalation import load_ladder
+from .escalation import format_rung_lines, load_ladder
 from .init_cmd import check_main, init_main
 from .model_catalog import ModelCatalogEntry
 from .project_state import load_record, status_path
@@ -615,6 +615,9 @@ def main(argv: list[str] | None = None) -> int:
     if outcome.run_summary is not None:
         print("\nRun summary:")
         for line in outcome.run_summary.format_lines():
+            print(f"  {line}")
+    if outcome.rungs:
+        for line in format_rung_lines(outcome.rungs, outcome.final_rung):
             print(f"  {line}")
     failing = outcome.verification_state in _FAILING_STATES or (
         args.require_verification and outcome.verification_state == "inconclusive"

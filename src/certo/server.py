@@ -20,7 +20,7 @@ from typing import Any
 
 from .acceptance import parse_acceptance_checks
 from .config import Config, ConfigError, load_config, override_llm, resolve_project_dir
-from .escalation import load_ladder
+from .escalation import load_ladder, rung_dicts
 from .runner import run_task, stream_task
 from .skills import write_project_context
 from .task_store import TaskRecord, TaskStore, build_task_store
@@ -123,6 +123,11 @@ def _resolve_cfg(
     if agents_md is not None:
         write_project_context(cfg.workspace, agents_md)
     return cfg
+
+
+def _rung_list(outcome) -> list[dict] | None:
+    """An escalation's rungs for a server result, or None for a single-model run."""
+    return rung_dicts(outcome.rungs, outcome.final_rung) if outcome.rungs else None
 
 
 def _final_text_from_dumps(messages: list[dict]) -> str | None:
@@ -252,6 +257,7 @@ def create_app():
                 if outcome.acceptance_results
                 else None
             )
+            record.rungs = _rung_list(outcome)
             if require_verification and outcome.verification_state == "inconclusive":
                 record.status = "failed"
                 record.error = (
@@ -328,6 +334,7 @@ def create_app():
             "verification_state": record.verification_state,
             "completion_contract": record.completion_contract,
             "acceptance_results": record.acceptance_results,
+            "rungs": record.rungs,
             "messages": list(record.messages),
             "error": record.error,
         }
@@ -404,6 +411,7 @@ def create_app():
                             "completion_contract": asdict(outcome.completion_contract),
                             "acceptance_results": [asdict(r) for r in outcome.acceptance_results]
                             or None,
+                            "rungs": _rung_list(outcome),
                         }
                     )
             except Exception as exc:  # noqa: BLE001 - surfaced to the client, not raised

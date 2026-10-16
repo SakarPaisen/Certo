@@ -72,6 +72,9 @@ class TaskRecord:
     verification_state: str | None = None
     completion_contract: dict[str, Any] | None = None
     acceptance_results: list[dict[str, Any]] | None = None
+    # Escalation only: one entry per rung that ran (escalation.RungResult,
+    # plus "final" on the rung whose verdict this is).
+    rungs: list[dict[str, Any]] | None = None
 
     def to_json_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -227,8 +230,25 @@ class SQLTaskStore(TaskStore):
             sa.Column("verification_state", sa.String(64), nullable=True),
             sa.Column("completion_contract", sa.Text, nullable=True),
             sa.Column("acceptance_results", sa.Text, nullable=True),
+            sa.Column("rungs", sa.Text, nullable=True),
         )
         self._metadata.create_all(self._engine)
+        self._add_missing_columns(sa)
+
+    def _add_missing_columns(self, sa: Any) -> None:
+        """Add columns newer than the table: a table made by an earlier
+        version keeps its rows, and an old row reads the new field as None.
+        Only nullable columns are ever added this way."""
+        name = self._table.name
+        existing = {c["name"] for c in sa.inspect(self._engine).get_columns(name)}
+        quote = self._engine.dialect.identifier_preparer.quote
+        with self._engine.begin() as conn:
+            for column in ("rungs",):
+                if column not in existing:
+                    logger.info("Adding column %r to task-store table %r.", column, name)
+                    conn.execute(
+                        sa.text(f"ALTER TABLE {quote(name)} ADD COLUMN {quote(column)} TEXT")
+                    )
 
     def _resolve_table_name(self, sa: Any) -> str:
         """`certo_tasks`, unless only the pre-rename `harness_tasks` table
@@ -262,6 +282,7 @@ class SQLTaskStore(TaskStore):
             acceptance_results=(
                 json.loads(row.acceptance_results) if row.acceptance_results else None
             ),
+            rungs=json.loads(row.rungs) if row.rungs else None,
         )
 
     def _record_to_values(self, record: TaskRecord) -> dict[str, Any]:
@@ -285,6 +306,7 @@ class SQLTaskStore(TaskStore):
                 if record.acceptance_results is not None
                 else None
             ),
+            "rungs": json.dumps(record.rungs) if record.rungs is not None else None,
         }
 
     def save(self, record: TaskRecord) -> None:

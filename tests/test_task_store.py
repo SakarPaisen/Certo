@@ -548,3 +548,42 @@ def test_redis_store_deletes_cover_legacy_keys(redis_store):
     assert r.exists("harness:task:a") == 0
     assert redis_store.delete_by_project("p") == 2
     assert r.keys("*") == []
+
+
+# --- the rungs column (escalation) ----------------------------------------------------
+
+
+def test_sql_store_keeps_an_escalations_rungs(sqlite_store):
+    rungs = [{"rung": 1, "name": "local", "verdict": "no_progress", "final": False}]
+    sqlite_store.save(TaskRecord(id="t1", task="x", rungs=rungs))
+    assert sqlite_store.get("t1").rungs == rungs
+
+
+def test_sql_store_adds_the_rungs_column_to_an_older_table(tmp_path):
+    import sqlite3
+
+    path = tmp_path / "old.db"
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            "CREATE TABLE certo_tasks (id VARCHAR(64) PRIMARY KEY, task TEXT NOT NULL, "
+            "status VARCHAR(32) NOT NULL, project VARCHAR(255), messages TEXT NOT NULL, "
+            "error TEXT, created_at FLOAT NOT NULL, updated_at FLOAT NOT NULL, "
+            "verification_state VARCHAR(64), completion_contract TEXT, acceptance_results TEXT)"
+        )
+        conn.execute(
+            "INSERT INTO certo_tasks VALUES ('old', 'x', 'completed', NULL, '[]', NULL, 1, 1, "
+            "'verified', NULL, NULL)"
+        )
+
+    store = SQLTaskStore(f"sqlite:///{path}")
+
+    assert store.get("old").rungs is None
+    store.save(TaskRecord(id="new", task="y", rungs=[{"rung": 1}]))
+    assert store.get("new").rungs == [{"rung": 1}]
+    store.close()
+
+
+def test_a_record_saved_before_rungs_existed_still_loads():
+    data = TaskRecord(id="t", task="x").to_json_dict()
+    del data["rungs"]
+    assert TaskRecord.from_json_dict(data).rungs is None

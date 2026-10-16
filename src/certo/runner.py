@@ -50,6 +50,7 @@ from .escalation import (
     describe_ladder,
     handoff_message,
     load_ladder,
+    rung_dicts,
     workspace_listing,
 )
 from .model_catalog import classify_task, rank_candidates
@@ -1656,6 +1657,25 @@ def _escalation_question(previous: RungResult, nxt: Rung, rungs: Sequence[RungRe
     )
 
 
+def _ladder_reason(ladder: ResolvedLadder) -> str:
+    if ladder.kind == "derived":
+        reason = (
+            f"Derived from the active models' ratings for task profile "
+            f"'{ladder.task_profile}': capability is the profile's weighted sum without "
+            f"the '{ladder.cost_axis}' axis; least capable first, ties to the cheaper model "
+            "then the name; the longest ladder is escalation.max_rungs."
+        )
+    else:
+        reason = f"Explicit ladder '{ladder.name}' from models.yaml."
+    if ladder.skipped:
+        reason += f" Skipped: {', '.join(ladder.skipped)}."
+    return reason
+
+
+def _safe_name(name: str) -> str:
+    return re.sub(r"[^A-Za-z0-9._-]", "_", name)
+
+
 def _stream_escalation(
     task: str,
     cfg: Config,
@@ -1683,6 +1703,10 @@ def _stream_escalation(
     costs money and adds noise. A provider failure ends a rung as well, and
     is recorded as such; on the last rung, or when the climb stops after
     it, the error is raised as in a single-model run.
+
+    MODEL_DECISIONS.md (the ladder, every climb and the stop) and, with
+    CERTO_ARTIFACTS_DIR, one artifacts folder per rung plus the combined
+    record are written even when a rung raises.
     """
     io.notify("\n".join(describe_ladder(ladder)))
     rungs: list[RungResult] = []
@@ -1692,141 +1716,228 @@ def _stream_escalation(
     last_error: BaseException | None = None
     failing_output = ""
     total = len(ladder.rungs)
+    scores = tuple((r.name, r.capability) for r in ladder.rungs)
+    decisions: list[ModelDecisionRecord] = []
+    if cfg.artifacts_dir:
+        run_id = run_id or str(uuid.uuid4())
 
-    with build_workspace(cfg) as workspace:
-        runner = _command_runner(cfg, workspace)
-        project_env = _prepare_agent_env(task, cfg, runner, io.emit)
-        # One budget for every rung together, as for every retry.
-        deadline = time.monotonic() + cfg.max_task_seconds
-        for number, rung in enumerate(ladder.rungs, start=1):
-            rung_cfg = _rung_config(cfg, rung)
-            usage_id = f"certo:rung{number}:{rung.name}"
+    def decide(kind: str, chosen: str, reason: str) -> None:
+        decisions.append(
+            ModelDecisionRecord(
+                kind=kind,
+                timestamp=datetime.now(UTC).isoformat(),
+                task_profile=ladder.task_profile,
+                weights=dict(ladder.weights),
+                ranked=scores,
+                chosen=chosen,
+                reason=reason,
+                list_title=f"Ladder ({ladder.label})",
+                score_label="capability",
+            )
+        )
 
-            def new_conversation(
-                rung_cfg: Config = rung_cfg, usage_id: str = usage_id, **persistence: Any
-            ) -> Conversation:
-                return Conversation(
-                    agent=build_agent(
+    def write_rung_artifacts(result: RungResult, outcome, error, messages, metrics) -> None:
+        if not cfg.artifacts_dir:
+            return
+        write_run_artifacts(
+            artifacts_dir=cfg.artifacts_dir,
+            run_id=f"{run_id}/rungs/{result.number}-{_safe_name(result.name)}",
+            project=project,
+            task=task,
+            execution=cfg.execution,
+            model=result.model,
+            model_selection="escalate",
+            started_at=started_at,
+            ended_at=datetime.now(UTC).isoformat(),
+            messages=[m.model_dump(mode="json") for m in messages],
+            outcome=outcome,
+            error=error,
+            combined_metrics={},
+            per_model_metrics=metrics,
+            run_summary=result.summary.to_dict() if result.summary else None,
+            rungs=[result.to_dict()],
+        )
+
+    decide("ladder", ladder.rungs[0].name, _ladder_reason(ladder))
+    captured_error: BaseException | None = None
+    try:
+        with build_workspace(cfg) as workspace:
+            runner = _command_runner(cfg, workspace)
+            project_env = _prepare_agent_env(task, cfg, runner, io.emit)
+            # One budget for every rung together, as for every retry.
+            deadline = time.monotonic() + cfg.max_task_seconds
+            for number, rung in enumerate(ladder.rungs, start=1):
+                rung_cfg = _rung_config(cfg, rung)
+                usage_id = f"certo:rung{number}:{rung.name}"
+
+                def new_conversation(
+                    rung_cfg: Config = rung_cfg, usage_id: str = usage_id, **persistence: Any
+                ) -> Conversation:
+                    return Conversation(
+                        agent=build_agent(
+                            rung_cfg,
+                            usage_id=usage_id,
+                            project_env=project_env,
+                            terminal_env=terminal_env(project_env, runner),
+                        ),
+                        callbacks=[io.on_event],
+                        workspace=workspace,
+                        max_iteration_per_run=rung_cfg.max_iterations,
+                        **persistence,
+                    )
+
+                state_writer: _ProjectStateWriter | None = None
+                if save_state:
+                    conversation, state_writer, _ = _open_saved_conversation(
+                        new_conversation, rung_cfg, task, rung.entry.model, None, None, io.emit
+                    )
+                else:
+                    conversation = new_conversation()
+                if cfg.confirm_mode == "always":
+                    conversation.set_confirmation_policy(AlwaysConfirm())
+
+                first_message = (
+                    None if number == 1 else handoff_message(task, rungs, failing_output)
+                )
+                before = workspace_listing(cfg.workspace)
+                rung_started = time.monotonic()
+                first_message_index = len(io.all_messages)
+                io.checkpoint_buffer.clear()
+                outcome: TaskOutcome | None = None
+                failure: str | None = None
+                try:
+                    outcome = _run_stream_task_phases(
+                        conversation,
                         rung_cfg,
-                        usage_id=usage_id,
-                        project_env=project_env,
-                        terminal_env=terminal_env(project_env, runner),
-                    ),
-                    callbacks=[io.on_event],
-                    workspace=workspace,
-                    max_iteration_per_run=rung_cfg.max_iterations,
-                    **persistence,
-                )
-
-            state_writer: _ProjectStateWriter | None = None
-            if save_state:
-                conversation, state_writer, _ = _open_saved_conversation(
-                    new_conversation, rung_cfg, task, rung.entry.model, None, None, io.emit
-                )
-            else:
-                conversation = new_conversation()
-            if cfg.confirm_mode == "always":
-                conversation.set_confirmation_policy(AlwaysConfirm())
-
-            first_message = None if number == 1 else handoff_message(task, rungs, failing_output)
-            before = workspace_listing(cfg.workspace)
-            rung_started = time.monotonic()
-            io.checkpoint_buffer.clear()
-            outcome: TaskOutcome | None = None
-            failure: str | None = None
-            try:
-                outcome = _run_stream_task_phases(
-                    conversation,
-                    rung_cfg,
-                    io.emit,
-                    task,
-                    io.on_confirm,
-                    io.on_awaiting_input,
-                    deadline,
-                    None,
-                    io.checkpoint_buffer,
-                    runner,
-                    first_message,
-                    state_writer.on_verification if state_writer is not None else None,
-                )
-                outcome = _apply_acceptance_checks(outcome, cfg, io.emit, acceptance_checks)
-            except ConversationRunError as exc:
-                if not _is_rung_failure(exc, cfg):
+                        io.emit,
+                        task,
+                        io.on_confirm,
+                        io.on_awaiting_input,
+                        deadline,
+                        None,
+                        io.checkpoint_buffer,
+                        runner,
+                        first_message,
+                        state_writer.on_verification if state_writer is not None else None,
+                    )
+                    outcome = _apply_acceptance_checks(outcome, cfg, io.emit, acceptance_checks)
+                except ConversationRunError as exc:
+                    if not _is_rung_failure(exc, cfg):
+                        if state_writer is not None:
+                            state_writer.fail(exc)
+                        raise
+                    original = exc.original_exception or exc
+                    failure = f"{type(original).__name__}: {original}"
+                    last_error = exc
+                except BaseException as exc:
                     if state_writer is not None:
                         state_writer.fail(exc)
                     raise
-                original = exc.original_exception or exc
-                failure = f"{type(original).__name__}: {original}"
-                last_error = exc
-            except BaseException as exc:
+                rung_metrics = _per_model_metrics(conversation)
+                per_model_metrics.update(rung_metrics)
+                failing = _failing(outcome)
+                duration = time.monotonic() - rung_started
+                result = RungResult(
+                    number=number,
+                    name=rung.name,
+                    model=rung.entry.model,
+                    verdict=outcome.verification_state if outcome is not None else None,
+                    retries_used=outcome.retries_used if outcome is not None else 0,
+                    duration_seconds=duration,
+                    summary=summarize_run(duration, rung_metrics),
+                    failure=failure,
+                    changes=FileChanges.between(before, workspace_listing(cfg.workspace)),
+                    failing_checks=tuple(f"{c.name} (`{c.command}`)" for c in failing),
+                )
+                rungs.append(result)
+                write_rung_artifacts(
+                    result, outcome, failure, io.all_messages[first_message_index:], rung_metrics
+                )
                 if state_writer is not None:
-                    state_writer.fail(exc)
-                raise
-            rung_metrics = _per_model_metrics(conversation)
-            per_model_metrics.update(rung_metrics)
-            failing = _failing(outcome)
-            result = RungResult(
-                number=number,
-                name=rung.name,
-                model=rung.entry.model,
-                verdict=outcome.verification_state if outcome is not None else None,
-                retries_used=outcome.retries_used if outcome is not None else 0,
-                duration_seconds=time.monotonic() - rung_started,
-                summary=summarize_run(time.monotonic() - rung_started, rung_metrics),
-                failure=failure,
-                changes=FileChanges.between(before, workspace_listing(cfg.workspace)),
-                failing_checks=tuple(f"{c.name} (`{c.command}`)" for c in failing),
-            )
-            rungs.append(result)
-            if state_writer is not None:
+                    if outcome is not None:
+                        state_writer.finish(outcome)
+                    else:
+                        state_writer.fail(RuntimeError(failure))
                 if outcome is not None:
-                    state_writer.finish(outcome)
-                else:
-                    state_writer.fail(RuntimeError(failure))
-            if outcome is not None:
-                final_outcome, final_rung = outcome, number
+                    final_outcome, final_rung = outcome, number
 
-            if outcome is not None and not ladder.escalates_on(outcome.verification_state):
-                if outcome.verification_state == "inconclusive":
-                    io.notify(
-                        f"Certo: {rung.name} ended inconclusive: nothing in the project could "
-                        "be checked, so there is no signal to escalate on. Escalation needs a "
-                        "project with something to check, such as tests or a build."
+                if outcome is not None and not ladder.escalates_on(outcome.verification_state):
+                    if outcome.verification_state == "inconclusive":
+                        io.notify(
+                            f"Certo: {rung.name} ended inconclusive: nothing in the project "
+                            "could be checked, so there is no signal to escalate on. "
+                            "Escalation needs a project with something to check, such as "
+                            "tests or a build."
+                        )
+                    decide(
+                        "escalation_stop",
+                        rung.name,
+                        f"{rung.name} ended {result.ended}, which doesn't escalate.",
                     )
-                break
-            stop = (
-                f"it was the last rung ({number} of {total})"
-                if number == total
-                else _escalation_stop_reason(cfg, deadline, rungs)
+                    break
+                stop = (
+                    f"it was the last rung ({number} of {total})"
+                    if number == total
+                    else _escalation_stop_reason(cfg, deadline, rungs)
+                )
+                nxt = ladder.rungs[number] if number < total else None
+                if (
+                    not stop
+                    and nxt is not None
+                    and cfg.interactive
+                    and io.on_escalate is not None
+                    and not io.on_escalate(_escalation_question(result, nxt, rungs))
+                ):
+                    stop = "you chose not to try the next model"
+                if stop:
+                    io.notify(f"Certo: {rung.name} ended {result.ended}; escalation stops: {stop}.")
+                    decide(
+                        "escalation_stop", rung.name, f"{rung.name} ended {result.ended}; {stop}."
+                    )
+                    if outcome is None:
+                        raise last_error  # type: ignore[misc]
+                    break
+                line = climb_line(result, nxt, number + 1, total)
+                io.notify(line)
+                kind = "climb_provider_failure" if outcome is None else "climb_quality_failure"
+                decide(kind, nxt.name, line.removeprefix("Certo: "))
+                failing_output = "\n\n---\n\n".join(_check_followup(c) for c in failing)
+    except BaseException as exc:
+        captured_error = exc
+        raise
+    finally:
+        write_model_decisions(cfg.workspace, decisions)
+        if cfg.artifacts_dir:
+            final = final_outcome if captured_error is None else None
+            write_run_artifacts(
+                artifacts_dir=cfg.artifacts_dir,
+                run_id=run_id,
+                project=project,
+                task=task,
+                execution=cfg.execution,
+                model=rungs[-1].model if rungs else ladder.rungs[0].entry.model,
+                model_selection="escalate",
+                started_at=started_at,
+                ended_at=datetime.now(UTC).isoformat(),
+                messages=[m.model_dump(mode="json") for m in io.all_messages],
+                outcome=final,
+                error=str(captured_error) if captured_error is not None else None,
+                combined_metrics={},
+                per_model_metrics=per_model_metrics,
+                run_summary=summarize_run(
+                    time.monotonic() - run_started, per_model_metrics
+                ).to_dict(),
+                rungs=rung_dicts(rungs, final_rung if captured_error is None else None),
             )
-            nxt = ladder.rungs[number] if number < total else None
-            if (
-                not stop
-                and nxt is not None
-                and cfg.interactive
-                and io.on_escalate is not None
-                and not io.on_escalate(_escalation_question(result, nxt, rungs))
-            ):
-                stop = "you chose not to try the next model"
-            if stop:
-                io.notify(f"Certo: {rung.name} ended {result.ended}; escalation stops: {stop}.")
-                if outcome is None:
-                    raise last_error  # type: ignore[misc]
-                break
-            io.notify(climb_line(result, nxt, number + 1, total))
-            failing_output = "\n\n---\n\n".join(_check_followup(c) for c in failing)
 
-    if final_outcome is None:
-        # Every rung that ran ended in a provider failure.
-        raise last_error  # type: ignore[misc]
-    if final_rung != rungs[-1].number:
-        # The last rung failed at the provider level after an earlier verdict:
-        # that is the error to report, not the older verdict.
+    if final_outcome is None or final_rung != rungs[-1].number:
+        # Every rung that ran ended in a provider failure, or the last one did.
         raise last_error  # type: ignore[misc]
     return replace(
         final_outcome,
         rungs=tuple(rungs),
         final_rung=final_rung,
+        model_decisions=tuple(decisions),
         run_summary=summarize_run(time.monotonic() - run_started, per_model_metrics),
     )
 

@@ -80,6 +80,7 @@ def write_run_artifacts(
     combined_metrics: dict[str, Any],
     per_model_metrics: dict[str, dict[str, Any]],
     run_summary: dict[str, Any] | None = None,
+    rungs: list[dict[str, Any]] | None = None,
 ) -> None:
     """Write `metadata.json`/`transcript.json`/`metrics.json` for one run.
 
@@ -115,6 +116,10 @@ def write_run_artifacts(
         # Running time, models used, total tokens and cost — run_summary.py.
         "run_summary": run_summary,
     }
+    if rungs is not None:
+        # Escalation only: one entry per rung (escalation.RungResult). Each
+        # rung also has its own folder under rungs/ next to this one.
+        metadata["rungs"] = rungs
 
     with open(os.path.join(run_dir, "metadata.json"), "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2)

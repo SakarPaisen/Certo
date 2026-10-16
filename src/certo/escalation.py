@@ -323,6 +323,12 @@ class RungResult:
         }
 
 
+def rung_dicts(rungs: Sequence[RungResult], final_rung: int | None) -> list[dict[str, Any]]:
+    """The rung list for artifacts and server results: each rung's facts,
+    and which one gave the final verdict."""
+    return [{**r.to_dict(), "final": r.number == final_rung} for r in rungs]
+
+
 def _files(paths: tuple[str, ...]) -> str:
     if not paths:
         return "none"

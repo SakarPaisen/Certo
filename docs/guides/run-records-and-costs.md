@@ -56,11 +56,26 @@ in a project's git history. Runs are never overwritten. In server mode,
 | `transcript.json` | Every message of the run. |
 | `metrics.json` | Tokens and cost: `summary` (same as above), `combined`, and `per_model`. |
 
+An escalation run (`--escalate`) also gets a `rungs` list in
+`metadata.json`, and one folder per rung under `rungs/` (for example
+`rungs/1-qwen-local/`, `rungs/2-gpt-luna/`), each with its own
+`metadata.json`, `transcript.json` and `metrics.json`, so every model's
+part can be read on its own. The run summary then ends with one line per
+rung and the rung that produced the final result:
+
+```text
+  Rungs:
+    1. local (ollama/q): no_progress, 1 fix attempt, 1m 00s, 0 tokens, $0.0000
+    2. mid (openai/m): verified, 0 fix attempts, 30.0s, 0 tokens, $0.0000
+  Final result from rung 2 (mid).
+```
+
 ## Model decisions
 
 With automatic model selection, `MODEL_DECISIONS.md` in the project folder
-records which model was chosen and why. It is written whether or not
-`CERTO_ARTIFACTS_DIR` is set. See
+records which model was chosen and why. With escalation it records the
+ladder, how it was built, every climb with its reason, and why the climb
+stopped. It is written whether or not `CERTO_ARTIFACTS_DIR` is set. See
 [Pick models automatically](pick-models-automatically.md).
 
 ## Related
