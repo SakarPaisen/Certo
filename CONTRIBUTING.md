@@ -9,8 +9,77 @@ uv pip install -e ".[dev]"
 uv run pytest -q     # no API key needed
 ```
 
-See [`CLAUDE.md`](CLAUDE.md) for the project's working rules and
-[`MANUAL.md`](MANUAL.md) for how the harness behaves.
+See [`CLAUDE.md`](CLAUDE.md) for the project's working rules,
+[`docs/`](docs/README.md) for how Certo behaves, and
+[`ROADMAP.md`](ROADMAP.md) for status and the reasons behind design
+decisions.
+
+Only needed for Docker mode or server mode:
+
+```bash
+uv pip install -e ".[sandbox]"    # openhands-workspace, openhands-agent-server
+uv pip install -e ".[server]"     # fastapi, uvicorn, httpx
+```
+
+`openhands-sdk` and `openhands-tools` are a matched set: always install or
+upgrade both together, at the same version (see `pyproject.toml`).
+
+## Tests
+
+```bash
+uv run pytest -q
+uv run ruff check .
+uv run ruff format --check .
+```
+
+- `tests/` mirrors `src/certo/`. Tool executors are tested directly, with
+  no model and no network.
+- The end-to-end tests in `tests/test_runner.py` make real model calls and
+  **skip** when `CERTO_LLM_MODEL`/`CERTO_LLM_API_KEY` aren't configured, so
+  the suite passes with no key.
+- Tests that need a toolchain (`npm`, `go`, `cargo`) skip when it is
+  missing; tests about a tool being absent (`mvn`, `mypy`) skip when it is
+  installed.
+- The `server` and `sandbox` tests skip when those extras aren't
+  installed.
+- `tests/test_docs.py` keeps `docs/` honest: it fails when a `CERTO_*`
+  setting, a command, subcommand or flag, or a verification state is
+  missing from its reference page, or when a link between Markdown files
+  is broken. If you add a setting or a flag, add it to
+  `docs/reference/configuration.md` or `docs/reference/commands.md`.
+
+### Release check (installed wheel)
+
+The test suite runs inside the dev venv, where pytest and every dev tool
+are installed. That once hid a real bug: Certo 0.1.0 verified projects with
+its own interpreter, which only worked in the dev venv. So before a
+release, check the wheel the way users install it:
+
+```bash
+scripts/release_check.sh                 # build the wheel, then check it
+scripts/release_check.sh --wheel PATH    # check an already-built wheel
+scripts/release_check.sh --with-llm      # also run a real agent task
+```
+
+It installs the wheel with `uv tool install` into a throwaway tool folder
+and a throwaway `XDG_CONFIG_HOME`, and runs every command from an empty
+temp folder, so no repo file, `.env` or user settings file is read. It
+checks `certo --version` and `--help`; `certo init --yes --no-check` (the
+user file with mode `600`, the sample folder without `.env`, a second
+`init` refused, `certo check` naming the user file and reporting the
+missing key, `init --local`, and `init` with no terminal); and
+`certo verify` on three fixtures:
+
+| Fixture | Expected |
+|---|---|
+| passing Python project | `Verification: verified`, exit `0` |
+| failing Python project | `Verification: failed`, exit `1` |
+| tests import a package installed only in the project's own `.venv` | `verified`, exit `0`; pytest installed into that `.venv`; nothing installed into Certo's own environment |
+
+`--with-llm` also runs a real task with whatever `CERTO_LLM_*` variables
+are exported and expects `Verification: verified`. The script needs `uv`
+and network access. Run it directly, not through `uv run`. The release
+workflow runs the non-LLM part against the exact wheel it publishes.
 
 ## Versioning
 

@@ -3,8 +3,9 @@
 #
 # Consulted only when CERTO_MODEL_SELECTION=auto (or --auto-model). With
 # the default (manual), none of this is read — CERTO_LLM_MODEL/CERTO_LLM_API_KEY from
-# .env are used exactly as they are today. See MANUAL.md "Automatic model
-# selection" for the full writeup.
+# .env are used exactly as they are today. See
+# docs/guides/pick-models-automatically.md and docs/reference/models-yaml.md
+# for the full writeup.
 #
 # =============================================================================
 # HOW RATINGS/WEIGHTS WORK — read this before scoring your own models

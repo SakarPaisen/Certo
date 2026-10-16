@@ -57,4 +57,4 @@ python3 wordle.py
   move the context slider in the Ollama app's settings. `ollama ps` shows
   the context a loaded model got.
 
-The full manual: https://github.com/alessioricco/certo/blob/main/MANUAL.md
+The full documentation: https://github.com/alessioricco/certo/blob/main/docs/README.md

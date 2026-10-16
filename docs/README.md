@@ -81,6 +81,39 @@ takes you from install to your first verified project.
 
 **Something went wrong?** See [Troubleshooting](troubleshooting.md).
 
+## Known limitations
+
+- **Server mode has no authentication.** Run it on `127.0.0.1` or behind
+  your own gateway. See [Safety](concepts/safety.md#server-mode).
+- **Verification only knows what the checks test.** Untested features can
+  be broken and still `verified`, and interactive menus are never
+  exercised. See [How verification works](concepts/how-verification-works.md#what-verification-cant-do).
+- **Some rules are only instructions to the model**, such as writing a
+  `README.md` or not asking questions. A model can ignore them.
+- **Covered languages:** Python, Node, Go, Rust and Java. Other projects,
+  and standalone HTML pages, end `inconclusive`. Java needs Maven or Gradle
+  installed. See [Verification by language](reference/verification-by-language.md).
+- **Docker mode needs an image built from a source checkout**, and
+  automatic model selection can't switch models in the middle of a Docker
+  run. See [Run in Docker](guides/run-in-docker.md).
+- **Small local models** often struggle with long, multi-step tasks. Coder
+  models do best. See [Ollama and local models](guides/ollama-and-local-models.md).
+- **Costs show as unknown** for models newer than your installed LiteLLM.
+- **New, empty folders:** the agent starts with a Python environment only
+  if the task mentions Python (or a Python tool such as pytest). Otherwise
+  packages the agent installs may land outside the project's environment,
+  and imports can fail during verification until they are installed again.
+- **A task that is exactly the name of an existing file** in the current
+  folder is read from that file.
+- **Interactive mode covers only the first part of a task**, and neither it
+  nor confirm mode works in server mode. See
+  [Interactive and confirm mode](guides/interactive-mode.md).
+- **The OpenAI-compatible endpoint** returns no verdict and doesn't replay
+  chat history. See [Run as a server](guides/run-as-a-server.md#use-it-from-an-openai-compatible-client).
+- **Third-party skill licenses** are detected with a simple text match,
+  and only `SKILL.md` folders can be installed. See
+  [Add skills and tools](guides/add-skills-and-tools.md#third-party-skills).
+
 ## For contributors
 
 How to work on Certo itself, run its tests and make a release is in

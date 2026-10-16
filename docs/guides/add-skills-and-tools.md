@@ -24,6 +24,22 @@ Certo ships with skills that load in every run:
   `fastapi-conventions`, and `pin-dependencies` (which fires when the agent
   edits `pyproject.toml` or `requirements*.txt`).
 
+The lifecycle skills and the words that trigger them:
+
+| Skill | Fires on | Covers |
+|---|---|---|
+| `repository-discovery` | implement, build, add, create, refactor, migrate, integrate, scaffold, inspect, explore | Find the project's real languages, tools, commands and conventions before assuming any. |
+| `requirements-analysis` | feature, requirement, bug, unclear, ambiguous, vague | Pin down the outcome, acceptance criteria, edge cases, and what "verified" means here. |
+| `implementation-planning` | refactor, architecture, redesign, restructure, rearchitect | Read the code first, plan the smallest change, avoid unrelated edits. |
+| `testing-and-verification` | test, implement, fix, bug | Use the project's own checks, add focused tests, never weaken a test to pass. |
+| `debugging-and-failure-repair` | error, fail, failing, failed, traceback, exception, crash, broken | Start from the real error, find the cause, make a small fix, run the check again. |
+| `security-review` | auth, authentication, authorization, login, password, token, secret, credential, session, payment, api, database, deploy, production | Secrets, injection, access control, unsafe defaults, data leaks. |
+| `documentation-and-operational-readiness` | api, config, configuration, setup, install, deploy, cli, endpoint | Keep the README, setup steps and configuration docs in step with the change. |
+| `completion-and-release-readiness` | release, deploy, production, ship, launch, pull request, PR | A final review before finishing; never claim success while a check fails. |
+
+The agent is also told to apply these skills when they fit even if no
+trigger word appears, and to skip them for trivial changes.
+
 A skill only guides the agent. Reading a skill never replaces Certo's own
 checks.
 

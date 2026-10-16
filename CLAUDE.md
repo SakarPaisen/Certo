@@ -135,36 +135,53 @@ identify a focused check that could disconfirm the current hypothesis, make
 the smallest coherent change, and run that check immediately afterward. Use
 the applicable skills rather than duplicating their detailed guidance here.
 
-## Keep MANUAL.md up to date
+## Keep docs/ up to date
 
-`MANUAL.md` is the user-facing operational reference (setup, config reference,
-CLI flags, execution modes, projects, custom tools, known limitations,
-troubleshooting) — `README.md` is only a quickstart that points to it. Any
-change that adds or changes user-facing behavior must update the relevant
-`MANUAL.md` section **in the same change**, not as a follow-up:
+`docs/` is the user-facing documentation: short pages in four kinds, kept
+separate — `getting-started.md` (one path, start to finish), `guides/` (how
+to do one thing), `reference/` (complete and exact), `concepts/` (why and
+how) — plus `troubleshooting.md`. `docs/README.md` routes readers to them.
+`README.md` is only a quickstart that links into `docs/` with absolute
+GitHub URLs (it is also the PyPI page). `MANUAL.md` is now only a redirect
+table from the old manual's sections to the new pages.
 
-- A new/changed CLI flag or env var → update its table/reference entry.
-- A new execution mode or backend → update "Execution modes".
-- A new custom tool, or a change to how tools register (e.g. local vs Docker)
-  → update "Custom tools".
+Any change to a command, flag, setting, verdict, behaviour or known
+limitation must update the matching `docs/` page **in the same change**,
+not as a follow-up:
+
+- A new/changed command, subcommand or flag → `docs/reference/commands.md`
+  (and the guide that uses it).
+- A new/changed `CERTO_*` setting → `docs/reference/configuration.md`.
+- A new/changed verification state or exit code → `docs/reference/verdicts.md`.
+- A change to what is checked per language → `docs/reference/verification-by-language.md`.
+- A new execution mode, backend, server endpoint, or a change to how tools
+  register → its guide and reference page.
 - A newly discovered gotcha, bug workaround, or limitation (like the
-  `python-dotenv` inline-comment quirk, or the absolute-path requirement on
-  `file_editor`) → add it to "Known limitations" or "Troubleshooting" instead
-  of letting it live only in a commit message or PR description.
+  `python-dotenv` inline-comment quirk) → `docs/troubleshooting.md` or the
+  "Known limitations" list in `docs/README.md`, instead of letting it live
+  only in a commit message or PR description.
 
-Prefer editing `MANUAL.md` over re-explaining these things in README — keep
-README a short pointer, not a second copy that can drift out of sync.
+`tests/test_docs.py` enforces part of this: it fails when a `CERTO_*`
+setting, an argparse flag or subcommand, or a verification state is missing
+from its reference page, or when a relative link between Markdown files
+points at a missing file or heading. It can't check that prose is still
+true, so read the matching page when behaviour changes.
+
+Write for users, in plain language (many readers aren't native English
+speakers): output samples come from real runs or tests, not invented.
+Maintainer notes ("verified live", SDK source references, bug archaeology)
+stay in `ROADMAP.md` or `CONTRIBUTING.md`, not in `docs/`.
 
 Update documentation only when behavior, configuration, architecture, or a
 known limitation changes. Keep implementation history in `ROADMAP.md` and
-avoid duplicating the same detail across `CLAUDE.md`, `MANUAL.md`, and
+avoid duplicating the same detail across `CLAUDE.md`, `docs/`, and
 `ROADMAP.md`.
 
 ## Keep ROADMAP.md up to date
 
 `ROADMAP.md` is internal planning memory — milestone status, the optional-
 feature backlog, known limitations from an architecture/internal angle (not
-the user-facing ones, those go in `MANUAL.md`), and a decisions log recording
+the user-facing ones, those go in `docs/`), and a decisions log recording
 *why* key choices were made. It exists so a future session doesn't have to
 re-derive project history from conversation scrollback. Update it in the same
 change whenever:

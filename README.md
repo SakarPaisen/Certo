@@ -45,7 +45,7 @@ Verification: verified
 
 ### Without `certo init`
 
-Set two variables instead, in your shell, in a `.env` in the folder you run `certo` from, or in `~/.config/certo/.env` for every folder ([details](https://github.com/alessioricco/certo/blob/main/MANUAL.md#where-settings-come-from)):
+Set two variables instead, in your shell, in a `.env` in the folder you run `certo` from, or in `~/.config/certo/.env` for every folder ([details](https://github.com/alessioricco/certo/blob/main/docs/reference/configuration.md#where-certo-looks)):
 
 ```bash
 export CERTO_LLM_MODEL=anthropic/claude-sonnet-5-5   # or openai/..., gemini/..., deepseek/...
@@ -75,7 +75,7 @@ export CERTO_LLM_BASE_URL=http://localhost:11434
 | `incomplete` | The agent left items on its own to-do list unfinished. |
 | `budget_exhausted` | The task ran out of its time budget. |
 
-The exit code is nonzero for every failure state, so Certo works in scripts and CI. Add `--require-verification` to make `inconclusive` fail too. The full list of states is in the [manual](https://github.com/alessioricco/certo/blob/main/MANUAL.md#test-verification).
+The exit code is nonzero for every failure state, so Certo works in scripts and CI. Add `--require-verification` to make `inconclusive` fail too. Every state and its exit code: [Verdicts](https://github.com/alessioricco/certo/blob/main/docs/reference/verdicts.md).
 
 ## Features
 
@@ -120,12 +120,15 @@ Certo is built on the [OpenHands Software Agent SDK](https://docs.openhands.dev/
 - Under Docker, automatic model selection makes the initial pick but does not fall back mid-task.
 - Small local models can struggle with multi-step tool use. A coder-tuned model gives the best results.
 
-The full list is in the [manual](https://github.com/alessioricco/certo/blob/main/MANUAL.md#known-limitations).
+The full list is in the [documentation](https://github.com/alessioricco/certo/blob/main/docs/README.md#known-limitations).
 
 ## Documentation
 
-- [MANUAL.md](https://github.com/alessioricco/certo/blob/main/MANUAL.md): configuration, CLI flags, server API, skills, custom tools
-- [ROADMAP.md](https://github.com/alessioricco/certo/blob/main/ROADMAP.md): status, backlog, and the log of every agent failure that shaped the design
+- [Documentation home](https://github.com/alessioricco/certo/blob/main/docs/README.md): guides, reference and concepts, organised by what you want to do
+- [Getting started](https://github.com/alessioricco/certo/blob/main/docs/getting-started.md): install, `certo init`, your first task, and reading the verdict
+- [Troubleshooting](https://github.com/alessioricco/certo/blob/main/docs/troubleshooting.md): the problems people actually hit, with their fix
+- [Why agents lie](https://github.com/alessioricco/certo/blob/main/docs/concepts/why-agents-lie.md): the real cases of agents claiming "done", and how Certo catches each one
+- [ROADMAP.md](https://github.com/alessioricco/certo/blob/main/ROADMAP.md): status, backlog, and design decisions
 
 ## Contributing
 

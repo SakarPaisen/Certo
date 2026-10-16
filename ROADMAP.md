@@ -1,7 +1,7 @@
 # Roadmap & Status
 
 Internal planning memory: what's implemented, what's left, known limitations,
-and why key decisions were made. This is **not** user docs — see `MANUAL.md`
+and why key decisions were made. This is **not** user docs — see `docs/`
 for how to actually use the harness, and `docs/SPEC.md` for the original
 build plan.
 
@@ -29,7 +29,7 @@ build plan.
 
 ## What's implemented
 
-Per-module reference. See `MANUAL.md` for user-facing behavior; see the
+Per-module reference. See `docs/` for user-facing behavior; see the
 decisions log below for *why* a given design was chosen.
 
 - **`config.py`** — env parsing, model-agnostic (`CERTO_LLM_MODEL` prefix selects
@@ -288,13 +288,27 @@ decisions log below for *why* a given design was chosen.
   Dockerfile nor `src/` is there, so a first Docker run fails unless the
   image was already built from a checkout. Options: ship the Dockerfile
   and tool source as package data and build from a temp context, or
-  publish a prebuilt image. Undecided; documented in MANUAL "Known
+  publish a prebuilt image. Undecided; documented in
+  `docs/guides/run-in-docker.md` and in `docs/README.md`'s "Known
   limitations".
+- **Bugs found while writing `docs/` (2026-10-16), not fixed yet:**
+  - `cargo clippy` is planned unconditionally whenever `cargo` exists, so a
+    toolchain without the clippy component makes a Rust project `failed`
+    (`error: no such command: clippy`, exit 101) instead of `unavailable`.
+    Reproduced with a `cargo` shim. Workaround documented in
+    `docs/troubleshooting.md`: `rustup component add clippy`.
+  - `WS /tasks/stream` and `/v1/chat/completions` call `stream_task`
+    without `run_id`/`project`, so with `CERTO_ARTIFACTS_DIR` set their
+    records land under `_unscoped/<new uuid>` even when a `project` was
+    sent. Only `POST /tasks` files them under the project and task id.
+  - `llm_check.explain()` always says "in .env" (e.g. "Check
+    CERTO_LLM_API_KEY in .env"), although since 0.1.5 the value usually
+    comes from the user settings file or the environment.
 - **`/v1/chat/completions` doesn't surface `verification_state`** — its wire
   format has no natural field for it; a caller using only that adapter gets
   the agent's final text with no independent verification signal.
 
-## Known limitations (internal/architectural — see MANUAL.md for user-facing ones)
+## Known limitations (internal/architectural — see `docs/` for user-facing ones)
 
 **SDK/tooling gotchas** (re-verify on any SDK upgrade — see CLAUDE.md golden
 rule 2):
@@ -894,3 +908,20 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   them, so a generated project carries no Certo file. Silenced with
   `CERTO_NO_WORKTREE_WARNING`, a setting rather than a flag, so the user
   file can turn it off everywhere.
+- **User docs moved from one `MANUAL.md` to a `docs/` folder in the repo,
+  not a GitHub wiki.** The manual had grown to ~2,300 lines mixing three
+  readers: newcomers, people looking up a flag, and maintainers. A wiki is
+  versioned apart from the code, can't be changed in the same commit as
+  the behaviour it describes, and can't be tested; `docs/` can. Structure:
+  one getting-started path, task guides, exact reference pages, and
+  concept pages, kept separate so each page has one reader (a
+  "Diátaxis"-style split), plus troubleshooting written as symptom →
+  cause → fix. Plain GitHub Markdown, no site generator yet. Staleness:
+  `tests/test_docs.py` derives the lists from the code (settings recorded
+  while `load_config()` runs, argparse parsers walked for every flag and
+  subcommand, `VERIFICATION_STATES` and `_FAILING_STATES` for the verdict
+  table) and fails on a missing entry or a broken relative link or
+  heading anchor; prose correctness is still a review duty (CLAUDE.md).
+  Maintainer-only notes ("verified live", SDK line references) stay here,
+  not in `docs/`. `MANUAL.md` became a redirect table so old links and
+  code comments that name a manual section still lead somewhere.
