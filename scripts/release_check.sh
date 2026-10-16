@@ -106,7 +106,9 @@ echo "$last_output" | grep -q "certo init" && pass "help mentions certo init" ||
 echo "== certo init"
 # No provider key may leak in from the caller: --yes would use it.
 noenv=(env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u CERTO_LLM_MODEL -u CERTO_LLM_API_KEY -u CERTO_LLM_BASE_URL)
-mode() { stat -f '%Lp' "$1" 2>/dev/null || stat -c '%a' "$1"; }
+# GNU stat first: on Linux `stat -f` means "file system status" and succeeds
+# with the wrong output, while macOS stat rejects -c and falls back.
+mode() { stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"; }
 run init 0 "  certo tasks/wordle.md --project wordle" "${noenv[@]}" "$certo" init --yes --no-check </dev/null
 [ -f "$user_env" ] && pass "init --yes wrote the user settings file" || fail "init --yes did not write $user_env"
 [ "$(mode "$user_env")" = 600 ] && pass "the user file has mode 600" || fail "the user file has mode $(mode "$user_env"), expected 600"
