@@ -158,7 +158,8 @@ def _build_parser() -> argparse.ArgumentParser:
         epilog=(
             "Other commands: certo init [FOLDER] creates a ready-to-use workspace; "
             "certo check tests that the configured model works; certo verify [PATH] "
-            "checks a project without running an agent. Each takes --help."
+            "checks a project without running an agent; certo bench compares models on "
+            "tasks with hidden tests. Each takes --help."
         ),
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -360,7 +361,7 @@ def verify_main(argv: list[str]) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else list(argv)
-    # `verify`, `init` and `check` are subcommands only as the exact, whole
+    # `verify`, `init`, `check` and `bench` are subcommands only as the exact, whole
     # first argument. A task is always one argument (quoted), so "verify the
     # login flow" or "init a repo" can never match, and `certo -- verify`
     # still runs the one-word task.
@@ -370,6 +371,10 @@ def main(argv: list[str] | None = None) -> int:
         return init_main(argv[1:])
     if argv and argv[0] == "check":
         return check_main(argv[1:])
+    if argv and argv[0] == "bench":
+        from .bench import bench_main
+
+        return bench_main(argv[1:])
     args = _build_parser().parse_args(argv)
 
     try:
