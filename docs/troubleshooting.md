@@ -295,6 +295,11 @@ runs part of it on the CPU.
 column shows a CPU share, use a smaller model (for example
 `qwen2.5-coder:7b` instead of `qwen3-coder:30b`) or a smaller quantization.
 
+If one step takes more than 5 minutes, the call to the model hits its
+timeout and starts over, so the step never finishes. Raise
+`CERTO_LLM_TIMEOUT_SECONDS` (or `timeout_seconds` in `models.yaml`), for
+example to `900`. See [Ollama and local models](guides/ollama-and-local-models.md#make-sure-the-model-fits-in-memory).
+
 ## Verdicts
 
 ### `inconclusive`: the project has no tests

@@ -47,6 +47,8 @@ DEFAULT_THIRD_PARTY_SKILLS_LOCK = "./third_party_skills.lock.json"
 DEFAULT_VERIFY_TESTS = "always"
 DEFAULT_MAX_VERIFY_RETRIES = 2
 DEFAULT_MAX_TASK_SECONDS = 1800
+# The SDK's own default for one model call (`LLM.timeout`). 0 means no limit.
+DEFAULT_LLM_TIMEOUT_SECONDS = 300
 DEFAULT_DOCKER_IMAGE = "certo/agent-server:local"
 DEFAULT_DOCKER_PLATFORM = (
     "linux/arm64" if _platform.machine().lower() in ("arm64", "aarch64") else "linux/amd64"
@@ -145,6 +147,11 @@ class Config:
     # `build_llm`). "off" is normalized to "none", which llm.py turns into
     # an explicit "send no reasoning parameter at all".
     reasoning_effort: str | None = None
+
+    # CERTO_LLM_TIMEOUT_SECONDS: how long one model call may take before it
+    # fails (passed to the SDK's `LLM.timeout`; 0 = no limit). Slow local
+    # models can need more than the 300-second default.
+    llm_timeout_seconds: int = DEFAULT_LLM_TIMEOUT_SECONDS
 
     # Server-mode task registry persistence (see task_store.py). Default
     # ("memory", no TTL) is byte-for-byte the pre-existing behavior — this
@@ -450,6 +457,9 @@ def load_config(
             + _old_llm_names_hint(env, "API_KEY", "BASE_URL")
         )
     reasoning_effort = _clean_reasoning_effort(env.get(LLM_ENV_PREFIX + "REASONING_EFFORT"))
+    llm_timeout_seconds = _parse_nonnegative_int(
+        env, "LLM_TIMEOUT_SECONDS", default=DEFAULT_LLM_TIMEOUT_SECONDS
+    )
 
     workspace = _get(env, "WORKSPACE") or DEFAULT_WORKSPACE
     max_iterations = _parse_positive_int(
@@ -601,6 +611,7 @@ def load_config(
         max_verify_retries=max_verify_retries,
         max_task_seconds=max_task_seconds,
         reasoning_effort=reasoning_effort,
+        llm_timeout_seconds=llm_timeout_seconds,
         task_store=task_store,
         task_ttl_seconds=task_ttl_seconds,
         task_store_sqlite_path=task_store_sqlite_path,
@@ -635,9 +646,11 @@ def override_llm(
     api_key: str | None = None,
     base_url: str | None = None,
     reasoning_effort: str | None = None,
+    timeout_seconds: int | None = None,
 ) -> Config:
     """Return a copy of `cfg` with CERTO_LLM_MODEL/CERTO_LLM_API_KEY/
-    CERTO_LLM_BASE_URL/CERTO_LLM_REASONING_EFFORT overridden.
+    CERTO_LLM_BASE_URL/CERTO_LLM_REASONING_EFFORT/CERTO_LLM_TIMEOUT_SECONDS
+    overridden.
 
     Lets a single call (CLI flag or a server request field) swap provider/model
     (or just the reasoning effort, independent of provider) for one run without
@@ -647,7 +660,7 @@ def override_llm(
     the api_key-or-base_url-required rule from `load_config` — `cfg` already
     satisfied it, and an override is additive, not a fresh load.
     """
-    updates: dict[str, str | None] = {}
+    updates: dict[str, str | int | None] = {}
     if model is not None:
         cleaned_model = _clean(model)
         if cleaned_model is None:
@@ -659,6 +672,10 @@ def override_llm(
         updates["base_url"] = _clean(base_url)
     if reasoning_effort is not None:
         updates["reasoning_effort"] = _clean_reasoning_effort(reasoning_effort)
+    if timeout_seconds is not None:
+        if timeout_seconds < 0:
+            raise ConfigError(f"LLM timeout must be zero or more seconds, got {timeout_seconds}.")
+        updates["llm_timeout_seconds"] = timeout_seconds
     return replace(cfg, **updates) if updates else cfg
 
 

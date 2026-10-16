@@ -20,6 +20,7 @@ models:
     model: ollama/qwen3-coder:30b
     base_url: http://localhost:11434
     activated: false
+    timeout_seconds: 1200
   - name: cloud
     model: anthropic/claude-sonnet-5-5
     api_key: sk-test
@@ -148,6 +149,7 @@ def test_run_config_takes_everything_from_the_catalog_entry(tmp_path, monkeypatc
         "low",
     )
     assert cloud.workspace == "/ws"
+    assert (local.llm_timeout_seconds, cloud.llm_timeout_seconds) == (1200, 300)
     assert cloud.skills_dir.startswith("/iso") and cloud.third_party_skills_lock.startswith("/iso")
     assert (cloud.model_selection, cloud.confirm_mode, cloud.interactive) == (
         "manual",

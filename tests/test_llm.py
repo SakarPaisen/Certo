@@ -164,3 +164,12 @@ def test_ollama_request_never_asks_for_thinking(fake_ollama_url, model, effort):
 
     assert _FakeOllama.bodies
     assert all("think" not in body for body in _FakeOllama.bodies)
+
+
+def test_build_llm_uses_the_configured_timeout():
+    assert build_llm(load_config(_base_env())).timeout == 300
+    assert build_llm(load_config(_base_env(CERTO_LLM_TIMEOUT_SECONDS="1200"))).timeout == 1200
+
+
+def test_build_llm_timeout_zero_means_no_limit():
+    assert build_llm(load_config(_base_env(CERTO_LLM_TIMEOUT_SECONDS="0"))).timeout is None

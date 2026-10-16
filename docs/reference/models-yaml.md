@@ -41,6 +41,7 @@ task_profiles:   # optional
 | `api_key` | no | As `CERTO_LLM_API_KEY`. Empty means no key. |
 | `base_url` | no | As `CERTO_LLM_BASE_URL`. Empty means the provider's default. |
 | `reasoning_effort` | no | As `CERTO_LLM_REASONING_EFFORT`. Empty means the default. |
+| `timeout_seconds` | no | As `CERTO_LLM_TIMEOUT_SECONDS`: how long one call to this model may take, a whole number of seconds. Default `300`; `0` means no limit. |
 | `description` | no | Shown when `--interactive` asks you to pick a model. |
 | `ratings` | no | A map of axis name to number, usually 0 to 5. |
 | `activated` | no | `true` (default) or `false`. A `false` entry is still checked for errors, but never scored, chosen or used as a fallback. |

@@ -330,3 +330,34 @@ def test_rank_candidates_raises_when_every_model_is_deactivated():
 
     with pytest.raises(ModelCatalogError, match="activated"):
         rank_candidates(catalog, {"reasoning": 1})
+
+
+# --- timeout_seconds -------------------------------------------------------------
+
+
+def test_timeout_seconds_defaults_to_300_and_can_be_set(tmp_path):
+    catalog = load_model_catalog(
+        _write(
+            tmp_path,
+            """
+models:
+  - name: cloud
+    model: openai/gpt-4o
+  - name: slow-local
+    model: ollama/qwen3-coder:30b
+    timeout_seconds: 1200
+  - name: no-limit
+    model: ollama/big
+    timeout_seconds: 0
+""",
+        )
+    )
+
+    assert [m.timeout_seconds for m in catalog.models] == [300, 1200, 0]
+
+
+@pytest.mark.parametrize("value", ["-1", "'600'", "1.5", "true"])
+def test_timeout_seconds_must_be_a_whole_number_of_seconds(tmp_path, value):
+    text = f"models:\n  - name: m\n    model: openai/gpt-4o\n    timeout_seconds: {value}\n"
+    with pytest.raises(ModelCatalogError, match="timeout_seconds"):
+        load_model_catalog(_write(tmp_path, text))

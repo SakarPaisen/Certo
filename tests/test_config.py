@@ -845,3 +845,29 @@ def test_missing_model_error_lists_the_three_places(sources):
     assert str(folder) in message
     assert str(user) in message
     assert "certo init" in message
+
+
+# --- CERTO_LLM_TIMEOUT_SECONDS ---------------------------------------------------
+
+
+def test_llm_timeout_defaults_to_300_seconds():
+    assert load_config(_base_env()).llm_timeout_seconds == 300
+
+
+@pytest.mark.parametrize(("value", "expected"), [("900", 900), ("0", 0), (" ", 300)])
+def test_llm_timeout_is_read_from_the_environment(value, expected):
+    cfg = load_config(_base_env(CERTO_LLM_TIMEOUT_SECONDS=value))
+    assert cfg.llm_timeout_seconds == expected
+
+
+@pytest.mark.parametrize("value", ["-1", "ten", "1.5"])
+def test_llm_timeout_rejects_bad_values(value):
+    with pytest.raises(ConfigError, match="CERTO_LLM_TIMEOUT_SECONDS"):
+        load_config(_base_env(CERTO_LLM_TIMEOUT_SECONDS=value))
+
+
+def test_override_llm_timeout_only():
+    cfg = override_llm(load_config(_base_env()), timeout_seconds=1200)
+    assert cfg.llm_timeout_seconds == 1200
+    with pytest.raises(ConfigError):
+        override_llm(cfg, timeout_seconds=-5)

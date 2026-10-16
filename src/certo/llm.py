@@ -52,5 +52,7 @@ def build_llm(cfg: Config, *, usage_id: str = "certo") -> LLM:
         model=cfg.model,
         base_url=cfg.base_url,
         api_key=SecretStr(cfg.api_key) if cfg.api_key else None,
+        # 0 means no limit, which the SDK spells None.
+        timeout=cfg.llm_timeout_seconds or None,
         **_reasoning_effort_kwargs(cfg),
     )

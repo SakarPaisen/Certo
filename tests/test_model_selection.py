@@ -221,3 +221,14 @@ def test_write_model_decisions_overwrites_rather_than_duplicating_the_header(tmp
     assert content.count("# Model Decisions") == 1
     assert "initial" in content
     assert "escalation_api_failure" in content
+
+
+def test_llm_for_entry_uses_the_entrys_timeout_not_the_env_one():
+    cfg = _cfg(llm_timeout_seconds=50)
+    slow = _entry(
+        "local", model="ollama/m", base_url="http://localhost:11434", timeout_seconds=1200
+    )
+    default = _entry("hosted", model="openai/gpt-4o", api_key="sk-openai")
+
+    assert llm_for_entry(cfg, slow, usage_id="certo:local").timeout == 1200
+    assert llm_for_entry(cfg, default, usage_id="certo:hosted").timeout == 300

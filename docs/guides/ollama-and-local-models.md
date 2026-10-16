@@ -75,6 +75,20 @@ Check with `ollama ps` while the model is loaded: the `PROCESSOR` column
 should say `100% GPU`. If it shows a CPU share, pick a smaller model, or a
 smaller quantization of the same model.
 
+**Slow answers and the call timeout.** One call to the model may take 300
+seconds. A call that takes longer fails and is tried again from the start,
+up to 5 more times, so a model that needs 400 seconds per answer never
+gets one, and spends the whole time budget trying. If your model is slow
+but you want to use it anyway, raise the limit:
+
+```bash
+CERTO_LLM_TIMEOUT_SECONDS=900
+```
+
+In `models.yaml`, set it per model with `timeout_seconds: 900`. A longer
+call timeout also makes the whole task longer, so you may need to raise
+`CERTO_MAX_TASK_SECONDS` too.
+
 ## Use Ollama on another machine
 
 Ollama listens only on its own machine by default. On the machine that runs

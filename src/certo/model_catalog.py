@@ -30,6 +30,8 @@ from typing import Any
 
 import yaml
 
+from .config import DEFAULT_LLM_TIMEOUT_SECONDS
+
 
 class ModelCatalogError(ValueError):
     """Raised when `models.yaml` is missing, malformed, or fails schema
@@ -50,6 +52,9 @@ class ModelCatalogEntry:
     api_key: str | None = None
     base_url: str | None = None
     reasoning_effort: str | None = None
+    # How long one call to this model may take; 0 = no limit. Not inherited
+    # from CERTO_LLM_TIMEOUT_SECONDS: an entry is a complete model spec.
+    timeout_seconds: int = DEFAULT_LLM_TIMEOUT_SECONDS
     description: str = ""
     ratings: dict[str, float] = field(default_factory=dict)
     activated: bool = True
@@ -107,6 +112,18 @@ def _parse_ratings(data: dict, *, context: str) -> dict[str, float]:
     return ratings
 
 
+def _parse_timeout(data: dict, *, context: str) -> int:
+    if data.get("timeout_seconds") is None:
+        return DEFAULT_LLM_TIMEOUT_SECONDS
+    value = data["timeout_seconds"]
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ModelCatalogError(
+            f"{context}: 'timeout_seconds' must be zero or a positive whole number "
+            f"of seconds, got {value!r}."
+        )
+    return value
+
+
 def _parse_activated(data: dict, *, context: str) -> bool:
     if "activated" not in data:
         return True
@@ -128,6 +145,7 @@ def _parse_model_entry(data: Any) -> ModelCatalogEntry:
         api_key=_optional_str(data, "api_key"),
         base_url=_optional_str(data, "base_url"),
         reasoning_effort=_optional_str(data, "reasoning_effort"),
+        timeout_seconds=_parse_timeout(data, context=context),
         description=(_optional_str(data, "description") or ""),
         ratings=_parse_ratings(data, context=context),
         activated=_parse_activated(data, context=context),

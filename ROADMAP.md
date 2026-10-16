@@ -971,6 +971,17 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   Maintainer-only notes ("verified live", SDK line references) stay here,
   not in `docs/`. `MANUAL.md` became a redirect table so old links and
   code comments that name a manual section still lead somewhere.
+- **The model-call timeout is a setting: `CERTO_LLM_TIMEOUT_SECONDS`
+  and per-entry `timeout_seconds` in `models.yaml`, both default 300**
+  (0.1.8, user request: local models went past 300 s). It is the SDK's own
+  `LLM.timeout` (default 300, `None` = no limit, which `0` maps to). It
+  matters more than it looks: the SDK retries `litellm.Timeout` (in
+  `LLM_RETRY_EXCEPTIONS`, `num_retries=5`) and each retry restarts the
+  generation, so a model needing 400 s per answer never gets one and spends
+  ~30 min, the whole default task budget. A catalog entry doesn't inherit
+  the `.env` value (entries are complete specs, like `api_key`). The
+  verification checks' own 300-second limit is unrelated and unchanged.
+  `certo check`/`check-llm` keep their short timeout.
 - **Command-line resume state lives in the project's `.certo/`, built on
   the SDK's own conversation persistence** (0.1.7, user's choice of
   location). The task store was server-only, so an interrupted CLI run

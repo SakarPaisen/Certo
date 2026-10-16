@@ -70,6 +70,7 @@ models:
     api_key: ""                      # same meaning as CERTO_LLM_API_KEY
     base_url: ""                     # same meaning as CERTO_LLM_BASE_URL (blank = provider default)
     reasoning_effort: ""             # same meaning as CERTO_LLM_REASONING_EFFORT (blank = SDK default; common values: none/minimal/low/medium/high/xhigh/max)
+    timeout_seconds: 300             # seconds one call may take, as CERTO_LLM_TIMEOUT_SECONDS (default 300; 0 = no limit)
     description: >
       Flagship model — the strongest option for hard, multi-step reasoning
       and the trickiest code. Reach for it on gnarly debugging and large
@@ -420,6 +421,7 @@ models:
     api_key: ""
     base_url: "http://localhost:11434"
     reasoning_effort: ""
+    timeout_seconds: 900             # a local model on a slow machine can need more than the default 300
     description: >
       Alibaba's open-weight, code-specialized Qwen3-Coder (30B total / 3.3B
       active MoE, ~19GB at Q4_K_M, 256K native context — the practical

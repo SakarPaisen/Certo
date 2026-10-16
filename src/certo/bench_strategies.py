@@ -92,6 +92,7 @@ def run_config(entry: ModelCatalogEntry, workspace: str, isolation_dir: str) -> 
         api_key=entry.api_key or "",
         base_url=entry.base_url or "",
         reasoning_effort=entry.reasoning_effort or "",
+        timeout_seconds=entry.timeout_seconds,
     )
 
 
