@@ -132,6 +132,21 @@ def test_wheel_ships_the_builtin_skill_catalog(built):
     assert any(n.startswith("lifecycle/") for n in shipped)
 
 
+def test_wheel_ships_the_benchmark_task_set(built):
+    # `certo bench` runs from an installed wheel: every task file, hidden
+    # tests and reference solutions included, must be in it.
+    names = set(_wheel_names(built["wheel"]))
+    root = _REPO_ROOT / "src/certo/benchmark_tasks"
+    repo = {
+        "certo/benchmark_tasks/" + p.relative_to(root).as_posix()
+        for p in root.rglob("*")
+        if p.is_file() and "__pycache__" not in p.parts
+    }
+    assert "certo/benchmark_tasks/VERSION" in repo
+    assert any("/hidden_tests/" in n for n in repo)
+    assert repo <= names
+
+
 def test_wheel_ships_the_certo_init_starter_files(built):
     # `certo init` works offline: everything it writes comes from the package.
     names = set(_wheel_names(built["wheel"]))
