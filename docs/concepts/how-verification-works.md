@@ -109,6 +109,10 @@ Be clear about the limits:
 - **It only knows what the checks test.** If the tests don't cover a
   feature, a broken feature can still be `verified`. Certo makes the agent
   honest about the tests; it doesn't make the tests complete.
+- **It goes by the check's exit code.** A test runner that exits
+  successfully when it finds no tests (such as `node --test`) makes a
+  project with no tests `verified`. See
+  [Verification by language](../reference/verification-by-language.md#node-in-detail).
 - **It can't drive interactive programs.** The Python start-up run has no
   input, so menus and prompts aren't exercised.
 - **Some rules are only instructions.** Writing a `README.md`, using

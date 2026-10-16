@@ -34,6 +34,13 @@ setting comes from and makes one small call to the model.
   [`no_progress`](#no_progress), [`retry_exhausted`](#retry_exhausted),
   [`budget_exhausted`](#budget_exhausted),
   [Rust fails on `cargo clippy`](#a-rust-project-fails-on-cargo-clippy)
+- Benchmark: [no bench.yaml or models.yaml](#certo-bench-no-benchyaml-or-modelsyaml),
+  [unknown model](#certo-bench-unknown-model),
+  [`--parallel` refused](#certo-bench---parallel-is-refused),
+  [nothing starts](#certo-bench-nothing-starts),
+  [results folder refused](#certo-bench-the-results-folder-is-refused),
+  [Node tasks show "hidden tests error"](#certo-bench-node-tasks-show-hidden-tests-error),
+  [verified with no tests](#certo-bench-a-node-run-is-verified-but-fooled)
 - Other: [uncommitted changes warning](#warning-uncommitted-changes),
   [wrong path or read-only file system](#the-agent-writes-to-the-wrong-path),
   [`init` refuses to write](#certo-init-says-a-file-already-exists),
@@ -417,6 +424,103 @@ the missing clippy component as a failure (a known bug: it should be a
 limitation).
 
 **Fix:** install the component: `rustup component add clippy`.
+
+## Benchmark (`certo bench`)
+
+### `certo bench`: no bench.yaml or models.yaml
+
+**You see:**
+
+```text
+Configuration error: benchmark file not found: bench.yaml. Copy bench.yaml.example to bench.yaml and name the models.yaml entries to compare.
+```
+
+or `the models file './models.yaml' doesn't exist. The benchmark takes its
+models, by name, from models.yaml`.
+
+**Cause:** the benchmark reads its models from `models.yaml`, by name, and
+what to compare from `bench.yaml`. It never uses `.env`.
+
+**Fix:** copy `bench.yaml.example` to `bench.yaml` and `models.yaml.example`
+to `models.yaml`, then fill in the models to compare. Use `--config` for
+another benchmark file, or `models_file` in it for another models file.
+See [Benchmark models and strategies](guides/benchmark.md).
+
+### `certo bench`: unknown model
+
+**You see:**
+
+```text
+Configuration error: bench.yaml: arm 'sonnet': unknown model 'sonet'. The models file has: qwen-local, sonnet.
+```
+
+**Cause:** an arm's `model` must be the `name` of an entry in
+`models.yaml`, not a LiteLLM model id.
+
+**Fix:** use one of the names the message lists.
+
+### `certo bench`: `--parallel` is refused
+
+**You see:**
+
+```text
+Configuration error: --parallel needs cloud models only; qwen-local runs locally, and a local server serves one model at a time. Run without --parallel.
+```
+
+**Cause:** one arm uses a model served on your machine or network, which
+can serve only one run at a time.
+
+**Fix:** run without `--parallel`, or put the cloud arms in a benchmark
+file of their own and run that one in parallel.
+
+### `certo bench`: nothing starts
+
+**You see:** the plan, then `Not a terminal, so nothing was started: add
+--yes to run the benchmark.`
+
+**Cause:** the benchmark can cost money, so it asks before starting, and
+without a terminal it can't ask.
+
+**Fix:** read the plan and its cost estimate, then run again with `--yes`.
+Add `--max-cost` to cap the spending.
+
+### `certo bench`: the results folder is refused
+
+**You see:** `out already has benchmark results. Add --resume to continue
+them, or choose another --out folder.`, or `--resume: out was made with
+different tasks, arms, repeats or models.`
+
+**Cause:** a results folder holds one benchmark. Certo won't mix runs of
+two different benchmarks in it.
+
+**Fix:** to continue the same benchmark, use `--resume` with the original
+`bench.yaml`. To run a changed one, choose a new `--out` folder (or leave
+`--out` out for a new dated folder).
+
+### `certo bench`: Node tasks show "hidden tests error"
+
+**You see:** progress lines like `...; hidden tests error; ...` for
+`slugify`, `token-bucket` or `semver-order`, and `node is not installed`
+in the run's JSON.
+
+**Cause:** the Node tasks are graded with `node --test`, and Node isn't
+installed.
+
+**Fix:** install Node 18 or newer, or leave the Node tasks out with a
+`tasks:` list in `bench.yaml`.
+
+### `certo bench`: a Node run is verified but fooled
+
+**You see:** a run with verdict `verified` and failed hidden tests, often
+on a Node task where the agent wrote no tests.
+
+**Cause:** a known gap in Certo: `node --test` exits successfully when it
+finds no test files, so Certo counts "no tests" as a pass. See
+[Verification by language](reference/verification-by-language.md#node-in-detail).
+
+**Fix:** nothing to fix in the benchmark: counting these runs is what
+"fooled" is for. In your own projects, check that `npm test` really runs
+tests.
 
 ## Other problems
 
