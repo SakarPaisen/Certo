@@ -1,0 +1,313 @@
+# Commands
+
+Every command, subcommand and flag Certo installs. It is for looking
+things up; for a walk-through, see [Getting started](../getting-started.md).
+
+Certo installs three commands: `certo`, `certo-server` and `certo-admin`.
+`certo` also has three subcommands: `certo verify`, `certo init` and
+`certo check`. Every command and subcommand accepts `-h` / `--help`.
+
+All three commands hide the OpenHands SDK's start-up banner. Set
+`OPENHANDS_SUPPRESS_BANNER=0` to see it.
+
+## `certo`
+
+Run a task through the agent, then verify the result.
+
+```text
+certo TASK [--project NAME] [--execution {local,docker}] [--model MODEL]
+           [--api-key KEY] [--base-url URL] [--reasoning-effort LEVEL]
+           [--agents-md TEXT] [--interactive] [--auto-model]
+           [--require-verification] [--acceptance-checks JSON_OR_FILE]
+```
+
+**`TASK`** (required) is one of, checked in this order:
+
+1. an `http://` or `https://` URL: the page is downloaded (15-second
+   limit) and used as the task;
+2. the path of an existing file: the file is read (UTF-8);
+3. anything else: the text itself is the task.
+
+An empty file or page is an error. Only `http` and `https` URLs are
+fetched. Note: if your task text is exactly the name of a file in the
+current folder, the file is read instead.
+
+| Flag | Default | Effect |
+|---|---|---|
+| `--version` | | Print the version, e.g. `certo 0.1.5`, and exit. |
+| `--project NAME` | none | Work in `CERTO_PROJECTS_DIR/NAME`, created if missing. Without it, Certo works in `CERTO_WORKSPACE` (default: the current folder). `NAME` must be a relative path with no `..`, and must stay inside `CERTO_PROJECTS_DIR`. |
+| `--execution {local,docker}` | `CERTO_EXECUTION` | Where the agent's tools run, for this run. See [Run in Docker](../guides/run-in-docker.md). |
+| `--model MODEL` | `CERTO_LLM_MODEL` | Model for this run only. |
+| `--api-key KEY` | `CERTO_LLM_API_KEY` | API key for this run only. It ends up in your shell history. |
+| `--base-url URL` | `CERTO_LLM_BASE_URL` | Server address for this run only. |
+| `--reasoning-effort LEVEL` | `CERTO_LLM_REASONING_EFFORT` | Reasoning effort for this run only: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, or any value the provider accepts. `none` or `off` turns it off. |
+| `--agents-md TEXT` | none | Write `TEXT` as the project's `AGENTS.md` before the task. Needs `--project`. |
+| `--interactive` | off (`CERTO_INTERACTIVE`) | Let the agent stop and ask you questions. See [Interactive and confirm mode](../guides/interactive-mode.md). |
+| `--auto-model` | off (`CERTO_MODEL_SELECTION`) | Pick the model from `models.yaml`. See [Pick models automatically](../guides/pick-models-automatically.md). |
+| `--require-verification` | off | Exit 1 for `inconclusive` too. |
+| `--acceptance-checks JSON_OR_FILE` | none | Extra file checks for this task, as inline JSON or a JSON file. See [Acceptance checks](../guides/acceptance-checks.md). |
+
+**Output.** With `--project`, the first line is
+`Project workspace: <path>`. A warning about uncommitted changes may
+follow (see [Work on an existing project](../guides/work-on-an-existing-project.md)).
+At the end: the agent's last message (or Certo's last note), the
+`Model used:` line with `--auto-model`, then `Verification: <verdict>`,
+any limitations as `-` lines, and the run summary.
+
+**Exit code.** 0 for `verified` and `inconclusive`; 1 for every other
+verdict, for a configuration error (`Configuration error: ...`) and for a
+run-time error (`Error: ...`). With `--require-verification`,
+`inconclusive` exits 1. See [Verdicts](verdicts.md).
+
+`verify`, `init` and `check` are subcommands only when they are the whole
+first argument. `certo "verify the login flow"` runs a task. To run the
+one-word task `verify`, write `certo -- verify`.
+
+## `certo verify`
+
+Run Certo's verification on a project, with no agent and no model.
+
+```text
+certo verify [PATH] [--require-verification]
+```
+
+| Argument or flag | Default | Effect |
+|---|---|---|
+| `PATH` | `.` | The project folder. |
+| `--require-verification` | off | Exit 1 for `inconclusive` too. |
+
+It needs no settings and reads no `.env`. It may create the project's
+`.venv` and install pytest into it. It always runs locally, once, with no
+retries. Exit code: 0 for `verified` and `inconclusive`, 1 for `failed`
+and `timed_out`, and 1 if `PATH` is not a folder. See
+[Verify in CI](../guides/verify-in-ci.md).
+
+## `certo init`
+
+Save your model settings and create a folder with sample tasks.
+
+```text
+certo init [FOLDER] [--provider {openai,anthropic,gemini,ollama,other}]
+                    [--model ID] [--base-url URL] [--global | --local]
+                    [--no-samples] [--no-check] [--yes] [--force]
+```
+
+| Argument or flag | Effect |
+|---|---|
+| `FOLDER` | The sample folder to create. Default: `./certo-workspace`. |
+| `--provider {openai,anthropic,gemini,ollama,other}` | Skip the provider question. |
+| `--model ID` | Skip the model question. Without `--provider`, the provider comes from the model's prefix. |
+| `--base-url URL` | Skip the Ollama address question. Also sets `CERTO_LLM_BASE_URL` for any provider. |
+| `--global` | Save for all projects, in the user settings file. Skip the "Save these settings for" question. |
+| `--local` | Save in `FOLDER/.env` only. Skip that question. |
+| `--no-samples` | With `--global`: don't create the sample folder. |
+| `--no-check` | Don't make the test call to the model. |
+| `--yes`, `-y` | Ask nothing and accept every default: all projects (unless `--local`), plus the sample folder. A key is used only from the provider's exported variable. |
+| `--force` | Write into a folder that isn't empty, or over an existing `FOLDER/.env`. With nothing asked (`--yes`, or no terminal), also needed to replace an existing user settings file. |
+
+**Where settings go.** "All projects on this computer" (the default) writes
+the user settings file, `~/.config/certo/.env` (or
+`$XDG_CONFIG_HOME/certo/.env`). "This folder only" writes `FOLDER/.env`.
+Both are written with permissions `600`. The file holds your chosen lines,
+then every other provider's lines commented out.
+
+**The sample folder** gets `.gitignore` (`.env`, `projects/`,
+`artifacts/`; an existing file only gains missing lines), `tasks/wordle.md`
+and `tasks/asteroids.md`, and a `README.md` with next steps. A `README.md`
+that `init` didn't write is never replaced. With "All projects", the
+folder gets no `.env`, and a folder that already has files is skipped.
+
+**Questions**, on a terminal: provider; model; API key (hidden), or the
+Ollama address and installed model; where to save; whether to create the
+sample folder. If you already have a user settings file, `init` shows its
+provider and model (never the key) and asks before replacing it. Nothing
+is written until the last answer, so Ctrl-C leaves everything as it was
+(exit 130).
+
+**Without a terminal** and without `--provider`, `--model` or `--yes`,
+`init` asks nothing and writes `FOLDER/.env` with every provider commented
+out. Without a terminal, settings go to `FOLDER/.env` unless `--global` or
+`--yes` is given.
+
+There is no `--api-key` flag, on purpose: a key on the command line is
+saved in your shell history.
+
+## `certo check`
+
+Check that the configured model works.
+
+```text
+certo check [--timeout SECONDS]
+```
+
+| Flag | Default | Effect |
+|---|---|---|
+| `--timeout SECONDS` | `120` | How long to wait for the answer. A local model may need time to load. |
+
+It reads the settings like a run does, prints each LLM setting and where
+it came from (`environment variable`, `./.env (<path>)` or
+`user settings (<path>)`; the key only as `set` or `not set`), then sends
+one request that offers the model a tool. It passes only if the model
+answers with a tool call. Exit code 0 on success, 1 otherwise. Every
+message and its fix: [Troubleshooting](../troubleshooting.md).
+
+## `certo-server`
+
+Run Certo as an HTTP and WebSocket server. Needs the `server` extra.
+
+```text
+certo-server [--host HOST] [--port PORT]
+```
+
+| Flag | Default | Effect |
+|---|---|---|
+| `--version` | | Print the version and exit. |
+| `--host HOST` | `127.0.0.1` | Address to listen on. The server has no authentication. |
+| `--port PORT` | `8000` | Port to listen on. |
+
+It needs valid settings at start-up. Endpoints: [Server API](server-api.md).
+Guide: [Run as a server](../guides/run-as-a-server.md).
+
+## `certo-admin`
+
+Maintenance: server task records, third-party skills, and a plain model
+check. It reads the same settings as `certo`.
+
+| Flag | Effect |
+|---|---|
+| `--version` | Print the version and exit. |
+
+### `certo-admin show`
+
+```text
+certo-admin show TASK_ID
+```
+
+Print one task record's summary from the task store (`CERTO_TASK_STORE`).
+
+### `certo-admin delete-task`
+
+```text
+certo-admin delete-task TASK_ID
+```
+
+Delete one task record. Exit 1 if it doesn't exist.
+
+### `certo-admin delete-project`
+
+```text
+certo-admin delete-project PROJECT
+```
+
+Delete every task record for a project. Deleting nothing is not an error.
+
+### `certo-admin purge`
+
+```text
+certo-admin purge [--ttl-seconds N]
+```
+
+| Flag | Default | Effect |
+|---|---|---|
+| `--ttl-seconds N` | `CERTO_TASK_TTL_SECONDS` | Delete finished records older than `N` seconds. |
+
+Refuses to run (exit 1, nothing deleted) when the value is `0` or less,
+because `0` means "keep forever".
+
+### `certo-admin check-llm`
+
+```text
+certo-admin check-llm [--model MODEL] [--base-url URL] [--reasoning-effort LEVEL] [--timeout SECONDS]
+```
+
+| Flag | Default | Effect |
+|---|---|---|
+| `--model MODEL` | `CERTO_LLM_MODEL` | Model to check. |
+| `--base-url URL` | `CERTO_LLM_BASE_URL` | Server address to check. |
+| `--reasoning-effort LEVEL` | `CERTO_LLM_REASONING_EFFORT` | Reasoning effort for the check. |
+| `--timeout SECONDS` | `60` | How long to wait. There are no retries. |
+
+An older, simpler check than `certo check`: it asks for a plain text answer
+and passes on any non-empty text, without testing tool calling. On failure
+it prints the kind of error (`authentication`, `rate_limit`, `timeout`,
+`unavailable`, `model_not_found`, `bad_request`, `setup`, `no_reply` or
+`error`) and a hint. The key always comes from `CERTO_LLM_API_KEY` and is
+removed from any error text. Exit 0 on success, 1 otherwise.
+
+### `certo-admin skills`
+
+Manage third-party skills. Guide:
+[Add skills and tools](../guides/add-skills-and-tools.md#third-party-skills).
+
+#### `certo-admin skills install`
+
+```text
+certo-admin skills install SOURCE PATH [--ref REF]
+```
+
+| Argument or flag | Effect |
+|---|---|
+| `SOURCE` | `github:owner/repo`, or an `https://` git URL with no credentials in it. |
+| `PATH` | The skill's folder inside the repository, e.g. `skills/pdf`. It must contain a `SKILL.md`. |
+| `--ref REF` | Branch, tag or commit. Default: the repository's default branch. |
+
+The skill is installed **disabled**. Certo prints its source, commit,
+license and any warnings. A name that a first-party skill already uses is
+refused.
+
+#### `certo-admin skills list`
+
+```text
+certo-admin skills list
+```
+
+List installed skills with their state, license and commit.
+
+#### `certo-admin skills enable`
+
+```text
+certo-admin skills enable NAME [--accept-unknown-license]
+```
+
+| Flag | Effect |
+|---|---|
+| `--accept-unknown-license` | Needed to enable a skill whose license is `unknown`. Read the license first. |
+
+#### `certo-admin skills disable`
+
+```text
+certo-admin skills disable NAME
+```
+
+Stop giving the skill to the agent. The files stay.
+
+#### `certo-admin skills update`
+
+```text
+certo-admin skills update NAME [--ref REF]
+```
+
+| Flag | Effect |
+|---|---|
+| `--ref REF` | Default: the ref originally requested. |
+
+Download again. If the content or the license changed, the skill is
+disabled again and an unknown-license acceptance is cleared.
+
+#### `certo-admin skills remove`
+
+```text
+certo-admin skills remove NAME
+```
+
+Delete the skill's files and its lockfile entry.
+
+#### `certo-admin skills sync`
+
+```text
+certo-admin skills sync
+```
+
+Restore every skill in the lockfile at its recorded commit, and check
+every file against its recorded hash. A skill whose files don't match is
+not installed (exit 1). Never changes which skills are enabled.
