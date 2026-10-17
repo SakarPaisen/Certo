@@ -170,7 +170,7 @@ derived ladder is computed, is
 
 | Field | Default | Meaning |
 |---|---|---|
-| `cost_axis` | `cost` | The rating axis that means cost-effectiveness. A model's capability, for escalation, is the sum of its ratings on every other axis (usually `reasoning + precision + code`); the cost axis only breaks ties. |
+| `cost_axis` | `cost` | The rating axis that means cost-effectiveness. A model's capability, for escalation, is the sum of its ratings on every other axis (usually `reasoning + precision + code`). A derived ladder uses the cost axis to start from the cheapest models and to leave out a model that another one beats at the same price or less. |
 | `max_rungs` | `3` | The longest ladder Certo builds from the ratings. A whole number, at least 2. |
 | `ladders` | none | Ladders you write yourself, by name. |
 

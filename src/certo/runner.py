@@ -1664,8 +1664,8 @@ def _ladder_reason(ladder: ResolvedLadder) -> str:
         reason = (
             "Derived from the active models' ratings: capability is the sum of each "
             f"model's ratings except '{ladder.cost_axis}' (usually reasoning + precision + "
-            "code); least capable first, ties to the cheaper model then the name; the "
-            "longest ladder is escalation.max_rungs."
+            "code); the best of the cheapest models first, then only models more capable "
+            "than every cheaper one; the longest ladder is escalation.max_rungs."
         )
     else:
         reason = f"Explicit ladder '{ladder.name}' from models_list.yaml."

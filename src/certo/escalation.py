@@ -9,12 +9,17 @@ Derived order (the same for every task):
 - capability = the sum of a model's ratings on every axis except the cost
   axis (`escalation.cost_axis`, default `cost`): with the usual axes,
   reasoning + precision + code. Task profiles are not used;
-- ascending capability; ties: higher cost rating first (a higher `cost`
-  rating means cheaper), then the model name;
-- at most `max_rungs` rungs: with n models and k rungs, rung j (0-based)
-  is model number floor(j * (n - 1) / (k - 1) + 0.5), so the first rung is
-  the least capable model, the last rung the most capable one, and the
-  ones between are spread evenly.
+- the best of the cheapest: from the cheapest cost rating to the most
+  expensive (a higher `cost` rating means cheaper; no cost rating counts
+  as the most expensive), most capable first within one cost rating, then
+  the model name, a model is kept only when it is more capable than every
+  model kept before it. A model another one beats at the same price or
+  less is left out, and named in `skipped`. When no model has a cost
+  rating, there is no price to compare: least capable first, then the name;
+- at most `max_rungs` rungs: with n kept models and k rungs, rung j
+  (0-based) is model number floor(j * (n - 1) / (k - 1) + 0.5), so the
+  first rung is the best of the cheapest models, the last rung the most
+  capable one, and the ones between are spread evenly.
 
 Pure: no SDK, no network. The run loop lives in runner.py.
 """
@@ -107,13 +112,26 @@ def derive_ladder(catalog: ModelCatalog) -> ResolvedLadder:
     if not active:
         raise EscalationError("No model is enabled in models.yaml, so there is nothing to climb.")
     scored = [_rung(m, settings.cost_axis) for m in active]
-    scored.sort(key=lambda r: (r.capability, -(r.cost_rating or 0.0), r.name))
-    chosen = tuple(scored[i] for i in spread_indices(len(scored), settings.max_rungs))
+    if all(r.cost_rating is None for r in scored):
+        # No prices to compare: least capable first, as no model is cheaper.
+        scored.sort(key=lambda r: (r.capability, r.name))
+        chosen = tuple(scored[i] for i in spread_indices(len(scored), settings.max_rungs))
+        return ResolvedLadder(kind="derived", name=None, rungs=chosen, cost_axis=settings.cost_axis)
+    scored.sort(key=lambda r: (-(r.cost_rating or 0.0), -r.capability, r.name))
+    kept: list[Rung] = []
+    beaten: list[str] = []
+    for rung in scored:
+        if kept and rung.capability <= kept[-1].capability:
+            beaten.append(f"{rung.name} ({kept[-1].name} is at least as capable and costs no more)")
+        else:
+            kept.append(rung)
+    chosen = tuple(kept[i] for i in spread_indices(len(kept), settings.max_rungs))
     return ResolvedLadder(
         kind="derived",
         name=None,
         rungs=chosen,
         cost_axis=settings.cost_axis,
+        skipped=tuple(beaten),
     )
 
 

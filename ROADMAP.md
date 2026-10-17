@@ -1050,10 +1050,26 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   always wins; `--escalate` with no name uses `default`, else derives.
   Derived: capability = the plain sum of a model's ratings except the cost
   axis (`cost`, configurable), i.e. reasoning + precision + code with the
-  usual axes, ascending, ties to the higher cost rating then the name; capped at `max_rungs` (default 3, minimum 2) by
-  floor(j(n-1)/(k-1)+0.5), which keeps the least and most capable model
+  usual axes; capped at `max_rungs` (default 3, minimum 2) by
+  floor(j(n-1)/(k-1)+0.5), which keeps the first and last kept model
   and spreads the rest. Deterministic, printed, written to
   MODEL_DECISIONS.md.
+- **Derived ladders start from the best of the cheapest, not the weakest**
+  (0.1.11, user's call; supersedes "ascending capability, ties to the
+  higher cost rating" from 0.1.9). Weakest-first put a model on the first
+  rung that another one beat at the same price (a real catalog: devstral 5
+  ahead of qwen3.8 8, both free, and the 3-rung spread then cut qwen3.8
+  entirely). Now: cheapest cost rating first, most capable within it, then
+  keep a model only if it beats every model kept before it (the Pareto
+  front of cost against capability); the beaten ones go in
+  `ResolvedLadder.skipped` with the model that beats them, shown by
+  `certo check` and before a run. No cost rating = most expensive; no cost
+  rating anywhere = the old capability order (no price to compare, else
+  only one rung would be left). Speed was considered for the first rung
+  but the catalog has no speed data, and a `speed` rating would count as
+  capability. Changes the derived ladder of a bench `escalate` arm with no
+  `models:`. **Not benchmarked** on a local and a cloud model yet
+  (working agreement 2): no session with both has run it.
 - **The model catalog is split from personal settings (0.1.10, user's
   design):** `models_list.yaml` (model ids, descriptions, ratings,
   `reasoning_effort`, `timeout_seconds`, task profiles, escalation

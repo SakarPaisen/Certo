@@ -76,31 +76,47 @@ def test_spread_keeps_the_first_and_last_and_spreads_the_rest(n, k, expected):
     assert spread_indices(n, k) == expected
 
 
-def test_derived_ladder_orders_by_capability_and_keeps_three_rungs(tmp_path):
+def test_derived_ladder_keeps_the_best_of_the_cheapest(tmp_path):
     ladder = derive_ladder(_catalog(tmp_path, "escalation: {max_rungs: 5}\n"))
 
     assert ladder.kind == "derived"
     # capability (reasoning + code, cost left out): tiny 2, local 5, mid 7, twin 7, strong 10.
-    # mid and twin tie: the cheaper (higher cost rating) goes first.
-    assert _names(ladder) == ["tiny", "local", "mid", "twin", "strong"]
-    assert [r.capability for r in ladder.rungs] == [2, 5, 7, 7, 10]
+    # tiny costs the same as local and is weaker; twin costs more than mid and
+    # is no better. Neither is in the ladder.
+    assert _names(ladder) == ["local", "mid", "strong"]
+    assert [r.capability for r in ladder.rungs] == [5, 7, 10]
+    assert ladder.skipped == (
+        "tiny (local is at least as capable and costs no more)",
+        "twin (mid is at least as capable and costs no more)",
+    )
 
 
 def test_derived_ladder_is_capped_by_max_rungs(tmp_path):
-    ladder = derive_ladder(_catalog(tmp_path))
-    # 5 active models, 3 rungs: the least capable, the middle one, the strongest.
-    assert _names(ladder) == ["tiny", "mid", "strong"]
+    # twin at 8: four models each beat every cheaper one (local 5, mid 7, twin 8, strong 10).
+    text = _CATALOG.replace("{reasoning: 4, code: 3, cost: 3}", "{reasoning: 4, code: 4, cost: 3}")
+    ladder = derive_ladder(_catalog(tmp_path, text=text))
+    # 4 kept models, 3 rungs: the best of the cheapest, one between, the strongest.
+    assert _names(ladder) == ["local", "twin", "strong"]
 
 
 def test_ties_on_capability_and_cost_go_to_the_name(tmp_path):
     text = _CATALOG.replace("{reasoning: 4, code: 3, cost: 3}", "{reasoning: 3, code: 4, cost: 4}")
     ladder = derive_ladder(_catalog(tmp_path, "escalation: {max_rungs: 5}\n", text))
-    assert _names(ladder)[2:4] == ["mid", "twin"]
+    assert _names(ladder) == ["local", "mid", "strong"]
+    assert "twin (mid is at least as capable and costs no more)" in ladder.skipped
+
+
+def test_a_model_without_a_cost_rating_counts_as_the_most_expensive(tmp_path):
+    text = _CATALOG.replace("{reasoning: 4, code: 3, cost: 3}", "{reasoning: 4, code: 3}")
+    ladder = derive_ladder(_catalog(tmp_path, "escalation: {max_rungs: 5}\n", text))
+    assert _names(ladder) == ["local", "mid", "strong"]
+    assert "twin (strong is at least as capable and costs no more)" in ladder.skipped
 
 
 def test_inactive_models_are_never_in_a_derived_ladder(tmp_path):
     ladder = derive_ladder(_catalog(tmp_path, "escalation: {max_rungs: 9}\n"))
     assert "parked" not in _names(ladder)
+    assert not any(s.startswith("parked") for s in ladder.skipped)
 
 
 def test_task_profiles_dont_change_a_derived_ladder(tmp_path):
@@ -110,8 +126,8 @@ def test_task_profiles_dont_change_a_derived_ladder(tmp_path):
     ladder = derive_ladder(catalog)
 
     assert ladder.label == "derived ladder (from the ratings)"
-    assert _names(ladder) == ["tiny", "local", "mid", "twin", "strong"]
-    assert [r.capability for r in ladder.rungs] == [2, 5, 7, 7, 10]
+    assert _names(ladder) == ["local", "mid", "strong"]
+    assert [r.capability for r in ladder.rungs] == [5, 7, 10]
 
 
 def test_capability_is_the_plain_sum_of_every_axis_but_cost():
@@ -130,17 +146,22 @@ def test_the_cost_axis_is_configurable(tmp_path):
         _catalog(tmp_path, "escalation: {cost_axis: price, max_rungs: 5}\n", text)
     )
     assert ladder.cost_axis == "price"
-    assert [r.capability for r in ladder.rungs] == [2, 5, 7, 7, 10]
+    assert _names(ladder) == ["local", "mid", "strong"]
+    assert [r.capability for r in ladder.rungs] == [5, 7, 10]
     assert ladder.rungs[0].cost_rating == 5
 
 
 def test_a_cost_rating_under_another_name_counts_as_capability_without_cost_axis(tmp_path):
     text = _CATALOG.replace("cost:", "price:")
     ladder = derive_ladder(_catalog(tmp_path, "escalation: {max_rungs: 5}\n", text))
-    # 'price' is an ordinary axis unless escalation.cost_axis names it.
+    # 'price' is an ordinary axis unless escalation.cost_axis names it. With
+    # no cost rating anywhere there is no price to compare: least capable
+    # first, nothing left out.
     assert ladder.rungs[0].cost_rating is None
     assert ladder.rungs[0].name == "tiny"
     assert ladder.rungs[0].capability == 7  # reasoning 1 + code 1 + price 5
+    assert _names(ladder) == ["tiny", "local", "twin", "mid", "strong"]
+    assert ladder.skipped == ()
 
 
 _LADDERS = """escalation:
@@ -219,9 +240,13 @@ def test_describe_a_derived_ladder(tmp_path):
     lines = describe_ladder(derive_ladder(_catalog(tmp_path)))
     assert lines == [
         "Escalation: derived ladder (from the ratings), 3 rung(s):",
-        "  1. tiny (capability 2, cost rating 5)",
+        "  1. local (capability 5, cost rating 5)",
         "  2. mid (capability 7, cost rating 4)",
         "  3. strong (capability 10, cost rating 2)",
+        (
+            "  Skipped: tiny (local is at least as capable and costs no more), "
+            "twin (mid is at least as capable and costs no more)"
+        ),
     ]
 
 

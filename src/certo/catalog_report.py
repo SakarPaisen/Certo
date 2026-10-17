@@ -73,6 +73,8 @@ def _catalog_lines(catalog: ModelCatalog) -> list[str]:
     else:
         rungs = " -> ".join(describe_rung(r, scores=True) for r in derived.rungs)
         lines.append(f"  Derived ladder: {rungs}")
+        if derived.skipped:
+            lines.append(f"  Left out of the derived ladder: {', '.join(derived.skipped)}")
     return lines
 
 

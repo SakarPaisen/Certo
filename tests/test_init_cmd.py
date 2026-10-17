@@ -1054,6 +1054,19 @@ def test_certo_check_reports_the_catalog(tmp_path, monkeypatch, checks):
     assert [c.model for c in checks] == ["openai/main"]  # no --models: only the main model
 
 
+def test_certo_check_names_the_models_left_out_of_the_derived_ladder(tmp_path, monkeypatch, checks):
+    # gemma-local active: as cheap as qwen-local and weaker, so it isn't a rung.
+    catalog = _CATALOG.replace("    activated: false\n", "")
+    code, text = _check_with_catalog(tmp_path, monkeypatch, catalog)
+
+    assert code == 0
+    assert "Derived ladder: qwen-local (capability 5, cost rating 5) -> gpt-luna" in text
+    assert (
+        "Left out of the derived ladder: gemma-local "
+        "(qwen-local is at least as capable and costs no more)"
+    ) in text
+
+
 def test_certo_check_exits_1_on_a_catalog_error(tmp_path, monkeypatch, checks):
     broken = _CATALOG.replace("      - model: gpt-luna\n", "      - model: gpt-lunaa\n")
     code, text = _check_with_catalog(tmp_path, monkeypatch, broken)

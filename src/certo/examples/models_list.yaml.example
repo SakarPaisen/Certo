@@ -608,8 +608,9 @@ task_profiles:
 # =============================================================================
 #
 # Optional. With no `escalation:` section at all, `--escalate` builds a
-# "derived" ladder from the active models' ratings: least capable first,
-# most capable last, at most `max_rungs` long (see
+# "derived" ladder from the active models' ratings: the best of the
+# cheapest models first, then only models more capable than every cheaper
+# one, most capable last, at most `max_rungs` long (see
 # docs/guides/escalate-between-models.md). An explicit ladder written here
 # always wins over the derived one.
 #

@@ -87,14 +87,20 @@ before the run starts.
    profiles are not used: they only steer `--auto-model`. If your cost
    rating has another name, set `escalation.cost_axis` to it, or it counts
    as capability.
-2. **Order.** Least capable first. When two models have the same
-   capability, the cheaper one goes first (in Certo's ratings, a higher
-   `cost` means cheaper), then the one whose name comes first.
+2. **The best of the cheapest.** Certo starts from the cheapest models
+   (in Certo's ratings, a higher `cost` means cheaper) and takes the most
+   capable of them. Then it moves to more expensive models, and keeps one
+   only when it is more capable than every model already kept. A model
+   that another model beats at the same price or less is left out: paying
+   more must buy more. When two models tie on cost and capability, the
+   one whose name comes first is kept. A model with no cost rating counts
+   as the most expensive. If no model has a cost rating, there is no price
+   to compare, and Certo keeps every model, least capable first.
 3. **Length.** At most `escalation.max_rungs` rungs (default 3). With *n*
-   models and *k* rungs, rung *j* (counting from 0) is model number
+   kept models and *k* rungs, rung *j* (counting from 0) is model number
    floor(*j* × (*n* − 1) / (*k* − 1) + 0.5) in that order. So the first
-   rung is always the least capable model, the last rung the most capable
-   one, and the rungs between are spread evenly.
+   rung is always the best of the cheapest models, the last rung the most
+   capable one, and the rungs between are spread evenly.
 
 **A worked example.** Five active models, rated like this:
 
@@ -107,19 +113,21 @@ before the run starts.
 | claude-opus | 5 | 5 | 5 | 1 |
 
 Capabilities (reasoning + precision + code) are qwen 7, gemma 7, luna 9,
-sonnet 13, opus 15. qwen and gemma tie, and both have cost 5, so the name
-decides: gemma first. With 3 rungs out of 5 models, Certo keeps models 0,
-2 and 4:
+sonnet 13, opus 15. qwen, gemma and luna all have cost 5, and luna is the
+most capable of them, so qwen and gemma are left out. sonnet and opus each
+beat every cheaper model, so both stay:
 
 ```text
 Escalation: derived ladder (from the ratings), 3 rung(s):
-  1. gemma-local (capability 7, cost rating 5)
-  2. gpt-luna (capability 9, cost rating 5)
+  1. gpt-luna (capability 9, cost rating 5)
+  2. claude-sonnet (capability 13, cost rating 3)
   3. claude-opus (capability 15, cost rating 1)
+  Skipped: gemma-local (gpt-luna is at least as capable and costs no more), qwen-local (gpt-luna is at least as capable and costs no more)
 ```
 
-Raise `max_rungs` to keep claude-sonnet too, or write an explicit ladder
-(for example to start on qwen-local, the coding model).
+The ratings know nothing about speed. If you would rather start on a
+faster or more specialised model (for example qwen-local, the coding
+model), write an explicit ladder.
 
 ## What makes Certo climb
 

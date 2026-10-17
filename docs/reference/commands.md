@@ -165,7 +165,8 @@ answers with a tool call. Every message and its fix:
 [where Certo looks](models-yaml.md#where-certo-looks)), `certo check` also
 reports them: which files it found, the active and inactive models, how
 many listed models aren't used, each ladder with its usable rungs, the
-ladder Certo would build from the ratings, and every error and warning
+ladder Certo would build from the ratings (and the models it leaves out
+of it, with the model that beats each one), and every error and warning
 (see [Checks](models-yaml.md#checks)). A missing file is an error with the
 command that copies its example. Keys are never printed. For example:
 
