@@ -389,6 +389,84 @@ decisions log below for *why* a given design was chosen.
   format has no natural field for it; a caller using only that adapter gets
   the agent's final text with no independent verification signal.
 
+## Backlog — growth (proposed 2026-10-17, not started)
+
+Goal: people use Certo for complex, multi-language apps and trust its
+verdicts. The pitch is the name: Certo checks the work, and can say how
+often it would have been fooled. Every quality item is judged by `certo
+bench` on a local and a cloud model (working agreements 2 and 3). Order
+inside each group is the suggested priority; suggested overall start:
+bench task set v2, milestone mode, independent spec tests, GitHub Action.
+
+**1. Prove it publicly**
+- **Published benchmark results per release** —
+  `docs/benchmark/baseline-<version>.md` (local vs cloud, fooled rate,
+  cost per solved task) and a README badge. Needs one complete run (see
+  "No benchmark baseline yet" above).
+- **Bench task set v2: app-scale tasks** — today's 9 are small and mostly
+  single-file. Add multi-file, multi-language ones: Go REST API with a
+  database, React frontend + API, Rust CLI with subcommands, a fix inside
+  an existing mid-size repo. Bump the task-set `VERSION`; results stay
+  comparable only within one version.
+- **Pull-request CI workflow with a ruff gate** — only `release.yml`
+  exists, and `main` has lint/format findings to clear first.
+
+**2. Complex tasks**
+- **Milestone mode** — split a big task into milestones, each with its own
+  acceptance checks; run and verify them one at a time, building on
+  `--resume`/`STATUS.md`. The main step from "small task" to "app".
+- **Independent acceptance tests from the spec** — before building, a
+  separate conversation (optionally another model) writes tests from the
+  task text only; the builder may not edit them. Brings the benchmark's
+  hidden-test idea to real runs (the agent's own tests share its
+  misunderstandings: Hanoi, Wordle).
+- **Context management for long runs** — the SDK's own conversation
+  condensing (verify-first, golden rule 1), plus a warning when a local
+  model's context window is too small for the task (qwen3.8 at 32K).
+- **Checkpoints and rollback** — a git snapshot per fix attempt and per
+  escalation rung, so a bad attempt can be undone; also the basis for the
+  escalation "restart" mode above.
+
+**3. Languages and frameworks**
+- **Run-the-app verification** — start a server and probe an HTTP
+  endpoint; build a frontend and load it in a headless browser (the SDK
+  ships a browser tool) for a blank page or console errors. The web
+  counterpart of the entry-point smoke run.
+- **Close the existing verification gaps** — jest/vitest, ESLint/`tsc`
+  inference, the clippy bug, Node "no tests" = verified, a Maven/Gradle
+  toolchain in the Docker image (all listed above).
+- **New ecosystems** — in order: C#/.NET, PHP (Composer), Ruby, Kotlin/
+  Android (Gradle), C/C++ (CMake), Swift.
+- **Framework skills with verification recipes** — Django, FastAPI,
+  Next.js, Spring, Rails, Laravel.
+
+**4. Adoption**
+- **GitHub Action** — an issue labelled `certo` becomes a pull request
+  with the verdict and checks in its description. Likely the strongest
+  adoption lever.
+- **MCP server** — so Claude Desktop, Cursor, Zed and similar can call
+  Certo as a tool and get the verdict back (the OpenAI-compatible endpoint
+  can't carry it).
+- **Run report** — an HTML/Markdown summary per run: what changed, which
+  checks ran, cost, why the verdict. Built from the existing artifacts.
+- **Live progress view** in the terminal: current milestone, last check,
+  cost so far.
+- **Prebuilt Docker image** — fixes "Docker execution from a pip install"
+  above and makes the safe mode one command.
+- **Docs website and gallery** — `docs/` is plain Markdown with no site
+  generator; add a site, a gallery of apps built with Certo (verdict and
+  cost each), and a short demo video.
+
+**5. Best harness for local models**
+- **Per-tier tuning** — shorter prompts and stricter tool-call repair for
+  small models, gated by model tier and measured on both tiers.
+- **`certo doctor` for Ollama** — model pulled, context size, thinking
+  mode, measured tokens per second.
+- **Measured speed and context in the catalog** — filled from real runs,
+  not guessed, so ladders can weigh speed (the "fastest of the cheapest"
+  question; today's ratings have no speed data, and a `speed` rating
+  would count as capability).
+
 ## Known limitations (internal/architectural — see `docs/` for user-facing ones)
 
 **SDK/tooling gotchas** (re-verify on any SDK upgrade — see CLAUDE.md golden
