@@ -161,8 +161,8 @@ class SingleStrategy:
 class EscalateStrategy:
     """Start on the cheapest model, climb to a stronger one only when
     Certo's verdict shows the model couldn't finish: what `certo --escalate`
-    does. `models: [a, b, ...]` is an explicit ladder; without it, each task
-    gets the ladder derived from the active models' ratings."""
+    does. `models: [a, b, ...]` is an explicit ladder; without it, the
+    ladder derived from the active models' ratings."""
 
     name = "escalate"
     description = "a ladder of models, climbing on verification failure"
@@ -190,9 +190,9 @@ class EscalateStrategy:
     def run(self, ctx, params):
         catalog = ctx.model_catalog
         if params["models"] is None:
-            ladder = derive_ladder(catalog, ctx.task_text)
+            ladder = derive_ladder(catalog)
         else:
-            ladder = ladder_from_models(catalog, params["models"], ctx.task_text)
+            ladder = ladder_from_models(catalog, params["models"])
         cfg = run_config(ladder.rungs[0].entry, ctx.workspace, ctx.isolation_dir)
         outcome = ctx.stream(ctx.task_text, cfg=cfg, ladder=ladder)
         rungs = tuple(

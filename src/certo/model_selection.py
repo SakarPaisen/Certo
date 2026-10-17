@@ -164,15 +164,10 @@ def write_model_decisions(workspace: str, decisions: Sequence[ModelDecisionRecor
         return
     sections = []
     for d in decisions:
-        lines = [
-            f"## {d.kind} — {d.timestamp}",
-            "",
-            f"Reason: {d.reason}",
-            "",
-            f"Task profile: `{d.task_profile}` (weights: {d.weights})",
-            "",
-            f"{d.list_title}:",
-        ]
+        lines = [f"## {d.kind} — {d.timestamp}", "", f"Reason: {d.reason}", ""]
+        if d.task_profile:  # escalation ladders don't use task profiles
+            lines += [f"Task profile: `{d.task_profile}` (weights: {d.weights})", ""]
+        lines.append(f"{d.list_title}:")
         for name, score in d.ranked:
             label = f"**{name}**" if name == d.chosen else name
             lines.append(f"- {label} ({d.score_label} {score:.2f})")

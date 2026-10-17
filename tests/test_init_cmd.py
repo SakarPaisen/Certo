@@ -1045,7 +1045,7 @@ def test_certo_check_reports_the_catalog(tmp_path, monkeypatch, checks):
     assert "Ladder 'default': qwen-local -> gpt-luna -> claude-sonnet" in text
     assert "Ladder 'local-only': qwen-local (1 rung(s) skipped)" in text
     assert (
-        "Derived ladder (task profile 'default'): qwen-local (capability 5, cost rating 5) "
+        "Derived ladder: qwen-local (capability 5, cost rating 5) "
         "-> gpt-luna (capability 7, cost rating 4) -> claude-sonnet (capability 10, cost rating 2)"
     ) in text
     assert "Warning: Ladder 'local-only', rung 2: gemma-local has 'activated: false'" in text

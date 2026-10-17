@@ -526,7 +526,6 @@ def main(argv: list[str] | None = None) -> int:
         try:
             ladder = load_ladder(
                 cfg.models_file,
-                task,
                 cfg.escalation_ladder or None,
                 on_warning=lambda w: print(f"Warning (models.yaml): {w}", file=sys.stderr),
             )

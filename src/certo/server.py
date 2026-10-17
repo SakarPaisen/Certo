@@ -300,7 +300,7 @@ def create_app():
                 else None
             )
             ladder = (
-                load_ladder(cfg.models_file, request.task, cfg.escalation_ladder or None)
+                load_ladder(cfg.models_file, cfg.escalation_ladder or None)
                 if cfg.model_selection == "escalate"
                 else None
             )
@@ -373,7 +373,7 @@ def create_app():
                 else None
             )
             ladder = (
-                load_ladder(cfg.models_file, request.task, cfg.escalation_ladder or None)
+                load_ladder(cfg.models_file, cfg.escalation_ladder or None)
                 if cfg.model_selection == "escalate"
                 else None
             )

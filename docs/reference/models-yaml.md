@@ -107,7 +107,7 @@ derived ladder is computed, is
 
 | Field | Default | Meaning |
 |---|---|---|
-| `cost_axis` | `cost` | The rating axis that means cost-effectiveness. It is left out when Certo works out how capable a model is. |
+| `cost_axis` | `cost` | The rating axis that means cost-effectiveness. A model's capability, for escalation, is the sum of its ratings on every other axis (usually `reasoning + precision + code`); the cost axis only breaks ties. |
 | `max_rungs` | `3` | The longest ladder Certo builds from the ratings. A whole number, at least 2. |
 | `ladders` | none | Ladders you write yourself, by name. |
 
@@ -176,6 +176,6 @@ Warnings:
   counts as 0;
 - an active model has no `api_key` and no `base_url`: it works only if the
   provider's own key variable (such as `OPENAI_API_KEY`) is set;
-- a ladder goes from a more capable model to a less capable one, under the
-  `default` task profile. Allowed, since you may know better, but check
-  the order.
+- a ladder goes from a more capable model to a less capable one
+  (capability: the sum of the ratings except the cost axis). Allowed,
+  since you may know better, but check the order.

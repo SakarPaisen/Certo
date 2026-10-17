@@ -74,14 +74,15 @@ An explicit ladder always wins over a derived one.
 ### A derived ladder
 
 With no `escalation` section, or no ladder named `default`, Certo builds
-the ladder from your ratings. It is the same every time for the same task,
-and printed before the run starts.
+the ladder from your ratings. It is the same for every task, and printed
+before the run starts.
 
-1. **Capability.** Certo picks the task profile the same way
-   `--auto-model` does (see [Pick models automatically](pick-models-automatically.md)).
-   A model's capability is that profile's weighted sum of its ratings,
-   over every axis **except the cost axis** (`cost`, or
-   `escalation.cost_axis`).
+1. **Capability.** A model's capability is the sum of its ratings on
+   every axis **except the cost axis** (`cost`, or `escalation.cost_axis`).
+   With the usual axes that is `reasoning + precision + code`. Task
+   profiles are not used: they only steer `--auto-model`. If your cost
+   rating has another name, set `escalation.cost_axis` to it, or it counts
+   as capability.
 2. **Order.** Least capable first. When two models have the same
    capability, the cheaper one goes first (in Certo's ratings, a higher
    `cost` means cheaper), then the one whose name comes first.
@@ -101,30 +102,20 @@ and printed before the run starts.
 | claude-sonnet | 4 | 4 | 5 | 3 |
 | claude-opus | 5 | 5 | 5 | 1 |
 
-For "Build a Wordle game", no profile matches, so the `default` profile
-(every weight 1) applies. Without the cost axis, capabilities are qwen 7,
-gemma 7, luna 9, sonnet 13, opus 15. qwen and gemma tie, and both have
-cost 5, so the name decides: gemma first. With 3 rungs out of 5 models,
-Certo keeps models 0, 2 and 4:
+Capabilities (reasoning + precision + code) are qwen 7, gemma 7, luna 9,
+sonnet 13, opus 15. qwen and gemma tie, and both have cost 5, so the name
+decides: gemma first. With 3 rungs out of 5 models, Certo keeps models 0,
+2 and 4:
 
 ```text
-Escalation: derived ladder (task profile 'default'), 3 rung(s):
+Escalation: derived ladder (from the ratings), 3 rung(s):
   1. gemma-local (capability 7, cost rating 5)
   2. gpt-luna (capability 9, cost rating 5)
   3. claude-opus (capability 15, cost rating 1)
 ```
 
-For "Fix the bug in the parser", the `debugging` profile matches (weights
-reasoning 3, precision 2, code 2), and the order changes:
-
-```text
-Escalation: derived ladder (task profile 'debugging'), 3 rung(s):
-  1. qwen-local (capability 16, cost rating 5)
-  2. gpt-luna (capability 21, cost rating 5)
-  3. claude-opus (capability 35, cost rating 1)
-```
-
-Raise `max_rungs` to keep claude-sonnet too, or write an explicit ladder.
+Raise `max_rungs` to keep claude-sonnet too, or write an explicit ladder
+(for example to start on qwen-local, the coding model).
 
 ## What makes Certo climb
 

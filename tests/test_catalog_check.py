@@ -194,8 +194,8 @@ def test_a_ladder_whose_capability_goes_down(tmp_path):
     assert report.ok
     assert report.warnings == [
         (
-            "Ladder 'x': local (capability 4) comes after strong (capability 10) but is less "
-            "capable under the default task profile. Allowed, but check the order."
+            "Ladder 'x': local (capability 4) comes after strong (capability 10) but is rated "
+            "less capable. Allowed, but check the order."
         )
     ]
 

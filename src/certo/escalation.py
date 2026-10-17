@@ -4,11 +4,11 @@ A ladder is explicit (written under `escalation.ladders` in `models.yaml`)
 or derived from the active models' ratings. Both resolve to a
 `ResolvedLadder`, printed before a run and written to MODEL_DECISIONS.md.
 
-Derived order, for one task:
+Derived order (the same for every task):
 
-- capability = the matched task profile's weighted sum over every axis
-  except the cost axis (`escalation.cost_axis`, default `cost`), using the
-  same classification as `--auto-model`;
+- capability = the sum of a model's ratings on every axis except the cost
+  axis (`escalation.cost_axis`, default `cost`): with the usual axes,
+  reasoning + precision + code. Task profiles are not used;
 - ascending capability; ties: higher cost rating first (a higher `cost`
   rating means cheaper), then the model name;
 - at most `max_rungs` rungs: with n models and k rungs, rung j (0-based)
@@ -34,7 +34,6 @@ from .model_catalog import (
     ModelCatalog,
     ModelCatalogEntry,
     capability,
-    classify_task,
 )
 from .run_summary import RunSummary, format_duration
 
@@ -67,8 +66,6 @@ class ResolvedLadder:
     kind: str  # "explicit" | "derived"
     name: str | None  # the ladder's name; None when derived
     rungs: tuple[Rung, ...]
-    task_profile: str
-    weights: dict[str, float]
     cost_axis: str
     escalate_on_acceptance_failed: bool = False
     # Plain-language notes on rungs left out (inactive models).
@@ -77,7 +74,7 @@ class ResolvedLadder:
     @property
     def label(self) -> str:
         if self.kind == "derived":
-            return f"derived ladder (task profile '{self.task_profile}')"
+            return "derived ladder (from the ratings)"
         return f"explicit ladder '{self.name}'"
 
     def escalates_on(self, verdict: str) -> bool:
@@ -94,38 +91,34 @@ def spread_indices(n: int, k: int) -> list[int]:
     return [math.floor(j * (n - 1) / (k - 1) + 0.5) for j in range(k)]
 
 
-def _rung(entry: ModelCatalogEntry, weights, cost_axis, retries=None, effort=None) -> Rung:
+def _rung(entry: ModelCatalogEntry, cost_axis: str, retries=None, effort=None) -> Rung:
     return Rung(
         entry=entry,
         retries=retries,
         reasoning_effort=effort,
-        capability=capability(entry, weights, cost_axis),
+        capability=capability(entry, cost_axis),
         cost_rating=entry.ratings.get(cost_axis),
     )
 
 
-def derive_ladder(catalog: ModelCatalog, task: str) -> ResolvedLadder:
+def derive_ladder(catalog: ModelCatalog) -> ResolvedLadder:
     settings = catalog.escalation
-    profile = classify_task(task, catalog)
     active = [m for m in catalog.models if m.activated]
     if not active:
         raise EscalationError("Every model has 'activated: false', so there is nothing to climb.")
-    scored = [_rung(m, profile.weights, settings.cost_axis) for m in active]
+    scored = [_rung(m, settings.cost_axis) for m in active]
     scored.sort(key=lambda r: (r.capability, -(r.cost_rating or 0.0), r.name))
     chosen = tuple(scored[i] for i in spread_indices(len(scored), settings.max_rungs))
     return ResolvedLadder(
         kind="derived",
         name=None,
         rungs=chosen,
-        task_profile=profile.name,
-        weights=dict(profile.weights),
         cost_axis=settings.cost_axis,
     )
 
 
-def explicit_ladder(catalog: ModelCatalog, ladder: Ladder, task: str) -> ResolvedLadder:
+def explicit_ladder(catalog: ModelCatalog, ladder: Ladder) -> ResolvedLadder:
     settings = catalog.escalation
-    profile = classify_task(task, catalog)
     by_name = {m.name: m for m in catalog.models}
     usable = usable_rungs(ladder, catalog)
     skipped = tuple(
@@ -139,15 +132,13 @@ def explicit_ladder(catalog: ModelCatalog, ladder: Ladder, task: str) -> Resolve
             "has 'activated: false'."
         )
     rungs = tuple(
-        _rung(by_name[r.model], profile.weights, settings.cost_axis, r.retries, r.reasoning_effort)
+        _rung(by_name[r.model], settings.cost_axis, r.retries, r.reasoning_effort)
         for r in usable
     )
     return ResolvedLadder(
         kind="explicit",
         name=ladder.name,
         rungs=rungs,
-        task_profile=profile.name,
-        weights=dict(profile.weights),
         cost_axis=settings.cost_axis,
         escalate_on_acceptance_failed=ladder.escalate_on_acceptance_failed,
         skipped=skipped,
@@ -155,14 +146,14 @@ def explicit_ladder(catalog: ModelCatalog, ladder: Ladder, task: str) -> Resolve
 
 
 def ladder_from_models(
-    catalog: ModelCatalog, names: Sequence[str], task: str, *, name: str = "models"
+    catalog: ModelCatalog, names: Sequence[str], *, name: str = "models"
 ) -> ResolvedLadder:
     """An explicit ladder from a list of model names (`certo bench` arms)."""
     ladder = Ladder(name=name, rungs=tuple(LadderRung(model=n) for n in names))
-    return explicit_ladder(catalog, ladder, task)
+    return explicit_ladder(catalog, ladder)
 
 
-def resolve_ladder(catalog: ModelCatalog, task: str, name: str | None) -> ResolvedLadder:
+def resolve_ladder(catalog: ModelCatalog, name: str | None) -> ResolvedLadder:
     """The ladder `--escalate [NAME]` uses: the named one; with no name, the
     ladder called `default` when it exists, else a derived one."""
     ladders = catalog.escalation.ladders
@@ -172,20 +163,19 @@ def resolve_ladder(catalog: ModelCatalog, task: str, name: str | None) -> Resolv
             raise EscalationError(
                 f"There is no escalation ladder named '{name}' in models.yaml. Ladders: {known}."
             )
-        return explicit_ladder(catalog, ladders[name], task)
+        return explicit_ladder(catalog, ladders[name])
     if "default" in ladders:
-        return explicit_ladder(catalog, ladders["default"], task)
-    return derive_ladder(catalog, task)
+        return explicit_ladder(catalog, ladders["default"])
+    return derive_ladder(catalog)
 
 
 def load_ladder(
     models_file: str,
-    task: str,
     name: str | None,
     *,
     on_warning: Callable[[str], None] | None = None,
 ) -> ResolvedLadder:
-    """Load and check `models.yaml`, then resolve the ladder for `task`.
+    """Load and check `models.yaml`, then resolve the ladder.
     Raises `EscalationError` or `ModelCatalogError` (both `ValueError`s)
     with a message for the user."""
     if not os.path.isfile(models_file):
@@ -195,7 +185,7 @@ def load_ladder(
             "or set CERTO_MODELS_FILE."
         )
     catalog = load_checked_catalog(models_file, on_warning=on_warning)
-    return resolve_ladder(catalog, task, name)
+    return resolve_ladder(catalog, name)
 
 
 def describe_rung(rung: Rung, *, scores: bool) -> str:

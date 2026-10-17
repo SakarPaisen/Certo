@@ -371,10 +371,12 @@ def score_entry(entry: ModelCatalogEntry, weights: dict[str, float]) -> float:
     return sum(entry.ratings.get(axis, 0.0) * weight for axis, weight in weights.items())
 
 
-def capability(entry: ModelCatalogEntry, weights: dict[str, float], cost_axis: str) -> float:
-    """How capable a model is for a task: the profile's weighted sum over
-    every axis except the cost axis (escalation orders models by this)."""
-    return score_entry(entry, {a: w for a, w in weights.items() if a != cost_axis})
+def capability(entry: ModelCatalogEntry, cost_axis: str) -> float:
+    """How capable a model is, for escalation: the plain sum of its ratings
+    on every axis except the cost axis. With the usual axes that is
+    reasoning + precision + code. Task profiles don't change it: a ladder
+    climbs by general capability, the same for every task."""
+    return sum(value for axis, value in entry.ratings.items() if axis != cost_axis)
 
 
 def rank_candidates(catalog: ModelCatalog, weights: dict[str, float]) -> list[ModelCatalogEntry]:

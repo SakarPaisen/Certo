@@ -179,7 +179,7 @@ decisions log below for *why* a given design was chosen.
   warnings as plain sentences); `load_checked_catalog` is how
   `--auto-model`, `--escalate` and `certo bench` load the file.
   `escalation.py` (pure) resolves a `ResolvedLadder` (explicit, or derived
-  per task), defines `ESCALATING_VERDICTS`, `RungResult`, the
+  from the ratings), defines `ESCALATING_VERDICTS`, `RungResult`, the
   before/after `workspace_listing`/`FileChanges` and `handoff_message`.
   `runner._stream_escalation` is the loop: one fresh `Conversation` per
   rung in the same workspace, reusing `_run_stream_task_phases` and
@@ -1038,12 +1038,21 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   a warning; a ladder left empty is an error.
 - **Ladders are explicit or derived.** Explicit (`escalation.ladders`)
   always wins; `--escalate` with no name uses `default`, else derives.
-  Derived: capability = matched profile's weighted sum without the cost
-  axis (`cost`, configurable), ascending, ties to the higher cost rating
-  then the name; capped at `max_rungs` (default 3, minimum 2) by
+  Derived: capability = the plain sum of a model's ratings except the cost
+  axis (`cost`, configurable), i.e. reasoning + precision + code with the
+  usual axes, ascending, ties to the higher cost rating then the name; capped at `max_rungs` (default 3, minimum 2) by
   floor(j(n-1)/(k-1)+0.5), which keeps the least and most capable model
   and spreads the rest. Deterministic, printed, written to
   MODEL_DECISIONS.md.
+- **Capability ignores task profiles** (changed before release, user's
+  call, with `models.yaml.example`'s rating comments as the source of
+  truth). The brief first had the matched profile's weighted sum; the
+  ratings are now anchored to cross-provider benchmarks, and a ladder
+  climbs by general capability, so the same ladder serves every task and
+  the ladder printed by `certo check` is the one a run uses. The sum is
+  over every axis but the cost axis (not hard-coded to the three names),
+  so a catalog with other axis names still orders; a cost rating under
+  another name must be named by `escalation.cost_axis`.
 - **What climbs:** `retry_exhausted`, `no_progress`, `timed_out`,
   `incomplete`, `stuck`; `acceptance_failed` only when the ladder opts in.
   Never `inconclusive` (no signal: a stronger model faces the same blank),
@@ -1086,7 +1095,7 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   over hiding it in `completion_contract` or leaving SQL stores without
   it). Old rows read as `None`.
 - **Bench `strategy: escalate`:** `models: [...]` (at least two, active, no
-  repeats) or derived per task; `escalation.ladders` in `models.yaml` are
+  repeats) or derived; `escalation.ladders` in `models.yaml` are
   not used, so an arm states its ladder in `bench.yaml`. "Cost per solved
   task" is added for every arm (also meaningful for `single`); rung
   shares only for escalate arms; existing columns unchanged.

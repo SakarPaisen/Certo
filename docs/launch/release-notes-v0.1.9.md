@@ -21,8 +21,9 @@ an error** (before, the benchmark ignored the flag). If an existing
   because there is nothing to act on.
   - **Explicit or derived ladders.** Write ladders under
     `escalation.ladders` in `models.yaml`, or let Certo build one from the
-    active models' ratings: least capable first, at most three rungs by
-    default. The ladder is printed before the run.
+    active models' ratings: capability = reasoning + precision + code,
+    least capable first, at most three rungs by default. The ladder is
+    printed before the run.
   - **A fresh conversation per rung.** The next model gets the files as
     they are, the original task, the real failing check output, and a short
     note Certo writes from what it recorded. Never the previous model's
@@ -45,7 +46,7 @@ an error** (before, the benchmark ignored the flag). If an existing
   `--escalate`, `certo bench` and `certo check`, with messages that name
   the model or ladder at fault.
 - **`strategy: escalate` in `certo bench`**, with an explicit list of
-  models or a derived ladder per task. `results.md` gains **cost per
+  models or the derived ladder. `results.md` gains **cost per
   solved task** for every arm, and for escalate arms **which rung produced
   the final result**.
 

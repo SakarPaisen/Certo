@@ -66,8 +66,8 @@ def _ladder(tmp_path, name=None, models=None):
     path.write_text(_CATALOG)
     catalog = load_model_catalog(str(path))
     if models is not None:
-        return ladder_from_models(catalog, models, "task")
-    return resolve_ladder(catalog, "task", name)
+        return ladder_from_models(catalog, models)
+    return resolve_ladder(catalog, name)
 
 
 def _check(name="pytest", status="failed", output="E   assert 2 == 3"):
@@ -451,8 +451,9 @@ def test_model_decisions_explains_a_derived_ladder(tmp_path, fake_run):
     fake_run.script[:] = [("verified", 0, {})]
     _run(tmp_path, _derived(tmp_path))
     text = (tmp_path / "MODEL_DECISIONS.md").read_text()
-    assert "Derived from the active models' ratings for task profile 'default'" in text
-    assert "without the 'cost' axis" in text
+    assert "Derived from the active models' ratings: capability is the sum" in text
+    assert "except 'cost' (usually reasoning + precision + code)" in text
+    assert "Task profile:" not in text
 
 
 def _derived(tmp_path):
@@ -460,7 +461,7 @@ def _derived(tmp_path):
 
     path = tmp_path / "models.yaml"
     path.write_text(_CATALOG)
-    return derive_ladder(load_model_catalog(str(path)), "task")
+    return derive_ladder(load_model_catalog(str(path)))
 
 
 def test_model_decisions_is_written_even_when_a_rung_raises(tmp_path, fake_run):

@@ -61,7 +61,7 @@ couldn't finish.
 
 | Key | Meaning |
 |---|---|
-| `models` | Optional. A list of at least two model names, in the order to climb. Without it, each task gets the ladder Certo builds from the active models' ratings, for that task's profile. |
+| `models` | Optional. A list of at least two model names, in the order to climb. Without it, the arm uses the ladder Certo builds from the active models' ratings. |
 
 ```yaml
 arms:
@@ -89,8 +89,9 @@ is its `models` list, or a derived one.
 - Problems in `models.yaml` are checked as for every command (see
   [models.yaml](models-yaml.md#checks)): errors stop the benchmark,
   warnings are printed with the plan.
-- `task_profiles` and `escalation` settings in `models.yaml` are used only
-  by a derived `escalate` arm, to build its ladder.
+- `task_profiles` in `models.yaml` are not used. The `escalation`
+  settings (`cost_axis`, `max_rungs`) are used only by a derived
+  `escalate` arm, to build its ladder.
 
 ## Strategies to come
 

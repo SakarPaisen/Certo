@@ -57,12 +57,12 @@ def _catalog_lines(catalog: ModelCatalog) -> list[str]:
         note = f" ({skipped} rung(s) skipped)" if skipped else ""
         lines.append(f"  Ladder '{ladder.name}': {rungs}{note}")
     try:
-        derived = derive_ladder(catalog, "")
+        derived = derive_ladder(catalog)
     except EscalationError:
         lines.append("  Derived ladder: none (no active model)")
     else:
         rungs = " -> ".join(describe_rung(r, scores=True) for r in derived.rungs)
-        lines.append(f"  Derived ladder (task profile '{derived.task_profile}'): {rungs}")
+        lines.append(f"  Derived ladder: {rungs}")
     return lines
 
 

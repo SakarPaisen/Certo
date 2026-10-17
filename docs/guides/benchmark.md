@@ -74,7 +74,7 @@ arms:
 `strategy: single` means one model and the normal Certo run, exactly what
 `certo "<task>"` does. `strategy: escalate` climbs a ladder of models,
 like `certo --escalate`: give it `models: [a, b]` for a fixed ladder, or no
-`models` for the ladder Certo derives per task. Start from
+`models` for the ladder Certo derives from the ratings. Start from
 [bench.yaml.example](../../bench.yaml.example); every field is in the
 [bench.yaml reference](../reference/bench-yaml.md).
 

@@ -20,7 +20,6 @@ from .model_catalog import (
     ModelCatalogEntry,
     ModelCatalogError,
     capability,
-    classify_task,
     load_model_catalog,
 )
 
@@ -68,7 +67,6 @@ def check_catalog(catalog: ModelCatalog) -> CatalogReport:
             "'cost')."
         )
 
-    default_weights = classify_task("", catalog).weights
     for ladder in settings.ladders.values():
         where = f"Ladder {ladder.name!r}"
         seen: set[tuple[str, str | None]] = set()
@@ -103,15 +101,15 @@ def check_catalog(catalog: ModelCatalog) -> CatalogReport:
                 f"{where} has only one usable rung ({usable[0].model}), so it can't escalate."
             )
         scores = [
-            (r.model, capability(by_name[r.model], default_weights, settings.cost_axis))
+            (r.model, capability(by_name[r.model], settings.cost_axis))
             for r in usable
         ]
         for (low_name, low), (high_name, high) in pairwise(scores):
             if high < low:
                 warnings.append(
                     f"{where}: {high_name} (capability {high:g}) comes after {low_name} "
-                    f"(capability {low:g}) but is less capable under the default task "
-                    "profile. Allowed, but check the order."
+                    f"(capability {low:g}) but is rated less capable. Allowed, but check "
+                    "the order."
                 )
 
     weighted: dict[str, list[str]] = {}

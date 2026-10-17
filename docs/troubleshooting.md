@@ -487,7 +487,7 @@ once.
 | `... has only one usable rung (...), so it can't escalate` | Only one model in the ladder can be used. Add or activate another. |
 | `Model '...' has no rating for ..., which task profile(s) ... weigh: it counts as 0` | Add the missing ratings, or the model ranks lower than it should. |
 | `Model '...' has no api_key and no base_url` | It works only if the provider's own key variable (such as `OPENAI_API_KEY`) is set. Add `api_key` otherwise. |
-| `... (capability ...) comes after ... but is less capable under the default task profile` | Your explicit ladder climbs to a weaker model. Allowed, if that's what you meant. |
+| `... (capability ...) comes after ... but is rated less capable` | Your explicit ladder climbs to a weaker model. Allowed, if that's what you meant. |
 
 ### `--escalate` refuses to start
 

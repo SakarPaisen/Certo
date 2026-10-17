@@ -1186,7 +1186,6 @@ def stream_task(
     if ladder is None and cfg.model_selection == "escalate":
         ladder = load_ladder(
             cfg.models_file,
-            task,
             cfg.escalation_ladder or None,
             on_warning=lambda w: _emit_notice(emit, f"Certo: models.yaml: {w}"),
         )
@@ -1660,10 +1659,10 @@ def _escalation_question(previous: RungResult, nxt: Rung, rungs: Sequence[RungRe
 def _ladder_reason(ladder: ResolvedLadder) -> str:
     if ladder.kind == "derived":
         reason = (
-            f"Derived from the active models' ratings for task profile "
-            f"'{ladder.task_profile}': capability is the profile's weighted sum without "
-            f"the '{ladder.cost_axis}' axis; least capable first, ties to the cheaper model "
-            "then the name; the longest ladder is escalation.max_rungs."
+            "Derived from the active models' ratings: capability is the sum of each "
+            f"model's ratings except '{ladder.cost_axis}' (usually reasoning + precision + "
+            "code); least capable first, ties to the cheaper model then the name; the "
+            "longest ladder is escalation.max_rungs."
         )
     else:
         reason = f"Explicit ladder '{ladder.name}' from models.yaml."
@@ -1726,8 +1725,8 @@ def _stream_escalation(
             ModelDecisionRecord(
                 kind=kind,
                 timestamp=datetime.now(UTC).isoformat(),
-                task_profile=ladder.task_profile,
-                weights=dict(ladder.weights),
+                task_profile="",
+                weights={},
                 ranked=scores,
                 chosen=chosen,
                 reason=reason,

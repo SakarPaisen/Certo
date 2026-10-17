@@ -164,7 +164,7 @@ answers with a tool call. Every message and its fix:
 **The model catalog.** When a `models.yaml` exists (`./models.yaml`, or
 `CERTO_MODELS_FILE`), `certo check` also reports it: active and inactive
 models, each ladder with its usable rungs, the ladder Certo would build
-from the ratings for the `default` task profile, and every error and
+from the ratings, and every error and
 warning (see [models.yaml](models-yaml.md#checks)). Keys are never
 printed. For example:
 
@@ -174,7 +174,7 @@ Model catalog: models.yaml
   Inactive models: gemma-local
   Ladder 'default': qwen-local -> gpt-luna -> claude-sonnet
   Ladder 'local-only': qwen-local (1 rung(s) skipped)
-  Derived ladder (task profile 'default'): qwen-local (capability 5, cost rating 5) -> gpt-luna (capability 7, cost rating 4) -> claude-sonnet (capability 10, cost rating 2)
+  Derived ladder: qwen-local (capability 5, cost rating 5) -> gpt-luna (capability 7, cost rating 4) -> claude-sonnet (capability 10, cost rating 2)
   Warning: Ladder 'local-only', rung 2: gemma-local has 'activated: false', so this rung is skipped.
   Warning: Ladder 'local-only' has only one usable rung (qwen-local), so it can't escalate.
 ```

@@ -78,10 +78,9 @@ def test_spread_keeps_the_first_and_last_and_spreads_the_rest(n, k, expected):
 
 
 def test_derived_ladder_orders_by_capability_and_keeps_three_rungs(tmp_path):
-    ladder = derive_ladder(_catalog(tmp_path, "escalation: {max_rungs: 5}\n"), "do something")
+    ladder = derive_ladder(_catalog(tmp_path, "escalation: {max_rungs: 5}\n"))
 
     assert ladder.kind == "derived"
-    assert ladder.task_profile == "default"
     # capability (reasoning + code, cost left out): tiny 2, local 5, mid 7, twin 7, strong 10.
     # mid and twin tie: the cheaper (higher cost rating) goes first.
     assert _names(ladder) == ["tiny", "local", "mid", "twin", "strong"]
@@ -89,50 +88,60 @@ def test_derived_ladder_orders_by_capability_and_keeps_three_rungs(tmp_path):
 
 
 def test_derived_ladder_is_capped_by_max_rungs(tmp_path):
-    ladder = derive_ladder(_catalog(tmp_path), "do something")
+    ladder = derive_ladder(_catalog(tmp_path))
     # 5 active models, 3 rungs: the least capable, the middle one, the strongest.
     assert _names(ladder) == ["tiny", "mid", "strong"]
 
 
 def test_ties_on_capability_and_cost_go_to_the_name(tmp_path):
     text = _CATALOG.replace("{reasoning: 4, code: 3, cost: 3}", "{reasoning: 3, code: 4, cost: 4}")
-    ladder = derive_ladder(_catalog(tmp_path, "escalation: {max_rungs: 5}\n", text), "x")
+    ladder = derive_ladder(_catalog(tmp_path, "escalation: {max_rungs: 5}\n", text))
     assert _names(ladder)[2:4] == ["mid", "twin"]
 
 
 def test_inactive_models_are_never_in_a_derived_ladder(tmp_path):
-    ladder = derive_ladder(_catalog(tmp_path, "escalation: {max_rungs: 9}\n"), "x")
+    ladder = derive_ladder(_catalog(tmp_path, "escalation: {max_rungs: 9}\n"))
     assert "parked" not in _names(ladder)
 
 
-def test_a_different_task_profile_gives_a_different_order(tmp_path):
+def test_task_profiles_dont_change_a_derived_ladder(tmp_path):
+    """Capability is reasoning + code here (every axis but cost), whatever
+    profile the task would match for --auto-model."""
     catalog = _catalog(tmp_path, "escalation: {max_rungs: 5}\n")
-    coding = derive_ladder(catalog, "implement a parser")
-    thinking = derive_ladder(catalog, "design the storage layer")
+    ladder = derive_ladder(catalog)
 
-    assert coding.task_profile == "coding"
-    # code only: tiny 3, local 9, twin 9, mid 12, strong 15 (local before twin: cheaper).
-    assert _names(coding) == ["tiny", "local", "twin", "mid", "strong"]
-    assert thinking.task_profile == "thinking"
-    # reasoning only: tiny 3, local 6, mid 9, twin 12, strong 15.
-    assert _names(thinking) == ["tiny", "local", "mid", "twin", "strong"]
+    assert ladder.label == "derived ladder (from the ratings)"
+    assert _names(ladder) == ["tiny", "local", "mid", "twin", "strong"]
+    assert [r.capability for r in ladder.rungs] == [2, 5, 7, 7, 10]
+
+
+def test_capability_is_the_plain_sum_of_every_axis_but_cost():
+    from certo.model_catalog import ModelCatalogEntry, capability
+
+    entry = ModelCatalogEntry(
+        name="m", model="x/m", ratings={"reasoning": 3, "precision": 2, "code": 4, "cost": 5}
+    )
+    assert capability(entry, "cost") == 9
+    assert capability(entry, "precision") == 12  # a different cost axis is left out instead
 
 
 def test_the_cost_axis_is_configurable(tmp_path):
     text = _CATALOG.replace("cost:", "price:")
     ladder = derive_ladder(
-        _catalog(tmp_path, "escalation: {cost_axis: price, max_rungs: 5}\n", text), "x"
+        _catalog(tmp_path, "escalation: {cost_axis: price, max_rungs: 5}\n", text)
     )
     assert ladder.cost_axis == "price"
     assert [r.capability for r in ladder.rungs] == [2, 5, 7, 7, 10]
     assert ladder.rungs[0].cost_rating == 5
 
 
-def test_without_a_cost_rating_the_cost_axis_counts_toward_nothing(tmp_path):
+def test_a_cost_rating_under_another_name_counts_as_capability_without_cost_axis(tmp_path):
     text = _CATALOG.replace("cost:", "price:")
-    ladder = derive_ladder(_catalog(tmp_path, "escalation: {max_rungs: 5}\n", text), "x")
-    # 'price' is now an ordinary axis, but the default profile doesn't weigh it.
+    ladder = derive_ladder(_catalog(tmp_path, "escalation: {max_rungs: 5}\n", text))
+    # 'price' is an ordinary axis unless escalation.cost_axis names it.
     assert ladder.rungs[0].cost_rating is None
+    assert ladder.rungs[0].name == "tiny"
+    assert ladder.rungs[0].capability == 7  # reasoning 1 + code 1 + price 5
 
 
 _LADDERS = """escalation:
@@ -150,7 +159,7 @@ _LADDERS = """escalation:
 
 
 def test_an_explicit_default_ladder_wins_over_derivation(tmp_path):
-    ladder = resolve_ladder(_catalog(tmp_path, _LADDERS), "x", None)
+    ladder = resolve_ladder(_catalog(tmp_path, _LADDERS), None)
 
     assert ladder.kind == "explicit"
     assert ladder.name == "default"
@@ -161,31 +170,31 @@ def test_an_explicit_default_ladder_wins_over_derivation(tmp_path):
 
 
 def test_a_named_ladder(tmp_path):
-    assert _names(resolve_ladder(_catalog(tmp_path, _LADDERS), "x", "cloud")) == ["mid", "strong"]
+    assert _names(resolve_ladder(_catalog(tmp_path, _LADDERS), "cloud")) == ["mid", "strong"]
 
 
 def test_no_default_ladder_means_derived(tmp_path):
     text = _LADDERS.replace("    default:", "    other:")
-    assert resolve_ladder(_catalog(tmp_path, text), "x", None).kind == "derived"
+    assert resolve_ladder(_catalog(tmp_path, text), None).kind == "derived"
 
 
 def test_an_unknown_ladder_lists_the_ones_found(tmp_path):
     with pytest.raises(EscalationError, match="no escalation ladder named 'fast'.*cloud, default"):
-        resolve_ladder(_catalog(tmp_path, _LADDERS), "x", "fast")
+        resolve_ladder(_catalog(tmp_path, _LADDERS), "fast")
 
 
 def test_an_unknown_ladder_without_any_ladders(tmp_path):
     with pytest.raises(EscalationError, match="only a derived ladder is available"):
-        resolve_ladder(_catalog(tmp_path), "x", "fast")
+        resolve_ladder(_catalog(tmp_path), "fast")
 
 
 def test_a_ladder_from_model_names(tmp_path):
-    ladder = ladder_from_models(_catalog(tmp_path), ["local", "parked", "strong"], "x")
+    ladder = ladder_from_models(_catalog(tmp_path), ["local", "parked", "strong"])
     assert _names(ladder) == ["local", "strong"]
 
 
 def test_which_verdicts_escalate(tmp_path):
-    ladder = resolve_ladder(_catalog(tmp_path, _LADDERS), "x", "cloud")
+    ladder = resolve_ladder(_catalog(tmp_path, _LADDERS), "cloud")
     for verdict in ("retry_exhausted", "no_progress", "timed_out", "incomplete", "stuck"):
         assert ladder.escalates_on(verdict), verdict
     for verdict in (
@@ -203,14 +212,14 @@ def test_acceptance_failed_escalates_only_when_the_ladder_opts_in(tmp_path):
         _LADDERS
         + "    careful:\n      escalate_on_acceptance_failed: true\n      rungs:\n        - model: local\n        - model: strong\n"
     )
-    ladder = resolve_ladder(_catalog(tmp_path, text), "x", "careful")
+    ladder = resolve_ladder(_catalog(tmp_path, text), "careful")
     assert ladder.escalates_on("acceptance_failed")
 
 
 def test_describe_a_derived_ladder(tmp_path):
-    lines = describe_ladder(derive_ladder(_catalog(tmp_path), "x"))
+    lines = describe_ladder(derive_ladder(_catalog(tmp_path)))
     assert lines == [
-        "Escalation: derived ladder (task profile 'default'), 3 rung(s):",
+        "Escalation: derived ladder (from the ratings), 3 rung(s):",
         "  1. tiny (capability 2, cost rating 5)",
         "  2. mid (capability 7, cost rating 4)",
         "  3. strong (capability 10, cost rating 2)",
@@ -218,7 +227,7 @@ def test_describe_a_derived_ladder(tmp_path):
 
 
 def test_describe_an_explicit_ladder(tmp_path):
-    lines = describe_ladder(resolve_ladder(_catalog(tmp_path, _LADDERS), "x", None))
+    lines = describe_ladder(resolve_ladder(_catalog(tmp_path, _LADDERS), None))
     assert lines == [
         "Escalation: explicit ladder 'default', 2 rung(s):",
         "  1. local (1 fix attempt(s))",
