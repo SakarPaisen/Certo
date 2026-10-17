@@ -6,7 +6,8 @@ and how to run one task in a prepared workspace (`run`). The bench runner
 only uses this interface, so a later strategy, such as `best_of` (N
 attempts, the verifier picks), is one new class and one new entry here,
 with no change to the runner. `single` is one model; `escalate` climbs a
-ladder of models (escalation.py), explicit or derived per task.
+ladder of models (escalation.py), explicit or derived from the ratings
+(the same ladder for every task).
 
 Models always come from the `models.yaml` catalog, by name, and reach the
 normal Certo pipeline as an explicit configuration: never through `.env`.

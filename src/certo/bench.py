@@ -43,6 +43,7 @@ from .bench_tasks import (
     task_set_hash,
     task_set_version,
 )
+from .escalation import ESCALATING_VERDICTS, EscalationError, derive_ladder
 from .model_pricing import (
     ESTIMATE_INPUT_TOKENS,
     ESTIMATE_OUTPUT_TOKENS,
@@ -228,6 +229,68 @@ def _describe(record: dict[str, Any]) -> str:
     return f"{outcome}; hidden tests {hidden}; {_format_seconds(record['wall_seconds'])}; {cost}"
 
 
+def _plan_models(cfg: BenchConfig, arm: Arm) -> list[str]:
+    """The models an arm's runs can use, in order. For an escalate arm with
+    no `models:`, the ladder derived from the ratings (the same for every
+    task), not every active model."""
+    derived = arm.strategy == "escalate" and arm.params.get("models") is None
+    if derived and cfg.model_catalog is not None:
+        try:
+            return [r.name for r in derive_ladder(cfg.model_catalog).rungs]
+        except EscalationError:
+            pass
+    return list(arm.models)
+
+
+def climb_history(results_root: Path, cfg: BenchConfig) -> dict[str, tuple[int, int]]:
+    """For each model, from earlier results under `results_root`: (runs that
+    ended in a verdict an escalation climbs on, runs). A single-arm run and
+    each escalation rung count once. Only results of the same model id
+    count, so a renamed or changed entry starts over."""
+    history: dict[str, list[int]] = {}
+
+    def add(name: str, model: str, climbed: bool) -> None:
+        entry = cfg.catalog.get(name)
+        if entry is None or entry.model != model:
+            return
+        counts = history.setdefault(name, [0, 0])
+        counts[0] += climbed
+        counts[1] += 1
+
+    if not results_root.is_dir():
+        return {}
+    for folder in sorted(results_root.iterdir()):
+        if not (folder / "meta.json").is_file():
+            continue
+        for record in load_records(folder):
+            if record.get("rungs"):
+                for rung in record["rungs"]:
+                    climbed = rung.get("verdict") in ESCALATING_VERDICTS or bool(
+                        rung.get("failure")
+                    )
+                    add(rung.get("name", ""), rung.get("model", ""), climbed)
+            elif record.get("strategy") == "single" and len(record.get("models", [])) == 1:
+                model = record["models"][0]
+                climbed = record.get("verdict") in ESCALATING_VERDICTS or bool(record.get("error"))
+                add(model.get("name", ""), model.get("model", ""), climbed)
+    return {name: (c[0], c[1]) for name, c in history.items()}
+
+
+def likely_ladder_cost(costs: list[float], climb_rates: list[float | None]) -> float | None:
+    """The expected cost of one escalation run: each rung's cost times the
+    chance that the run gets that far. `climb_rates[i]` is the share of
+    earlier runs where rung i's model climbed; None (no history) for any
+    rung but the last means there is nothing to estimate from."""
+    if any(rate is None for rate in climb_rates[:-1]):
+        return None
+    total, reach = 0.0, 1.0
+    for i, cost in enumerate(costs):
+        total += cost * reach
+        if i < len(costs) - 1:
+            reach *= climb_rates[i]  # type: ignore[operator]
+    return total
+
+
 def _print_plan(cfg: BenchConfig, todo: list[PlannedRun], total: int, out_dir: Path) -> None:
     print("Benchmark plan")
     version = task_set_version(cfg.tasks_dir)
@@ -236,11 +299,14 @@ def _print_plan(cfg: BenchConfig, todo: list[PlannedRun], total: int, out_dir: P
         f"Repeats: {cfg.repeats}   Runs: {total}"
         + (f" ({len(todo)} left to run)" if len(todo) != total else "")
     )
-    estimate, unknown = 0.0, []
+    history = climb_history(out_dir.parent, cfg)
+    at_most, likely, unknown = 0.0, 0.0, []
+    likely_known = True
     for arm in cfg.arms:
         runs = sum(1 for p in todo if p.arm.name == arm.name)
-        parts = []
-        for name in arm.models:
+        names = _plan_models(cfg, arm)
+        parts, costs = [], []
+        for name in names:
             entry = cfg.catalog[name]
             per_run = estimate_run_cost(entry)
             if per_run == 0.0:
@@ -250,18 +316,35 @@ def _print_plan(cfg: BenchConfig, todo: list[PlannedRun], total: int, out_dir: P
                 unknown.append(name)
             else:
                 price = f"~${per_run:.2f} per run"
-                estimate += per_run * runs
+            costs.append(per_run or 0.0)
             parts.append(f"{name} ({entry.model}, {price})")
+        worst = sum(costs)
+        at_most += worst * runs
         note = ""
         if arm.strategy == "escalate":
             derived = arm.params.get("models") is None
-            note = (
-                " (ladder derived per task from these; the estimate assumes every rung runs)"
-                if derived
-                else " (the estimate assumes every rung runs)"
-            )
+            rates = [history[n][0] / history[n][1] if n in history else None for n in names]
+            expected = likely_ladder_cost(costs, rates)
+            notes = ["derived from the ratings, the same for every task"] if derived else []
+            notes.append(f"at most ~${worst:.2f} per run if every rung runs")
+            if expected is None:
+                likely_known = False
+                missing = [n for n, r in zip(names[:-1], rates[:-1], strict=True) if r is None]
+                notes.append(f"no earlier results for {', '.join(missing)} to say more")
+            else:
+                seen = sum(history[n][1] for n in names[:-1])
+                notes.append(
+                    f"likely ~${expected:.2f} per run, from {seen} earlier run(s) of the "
+                    "lower rungs"
+                )
+                likely += expected * runs
+            note = f" ({'; '.join(notes)})"
+        else:
+            likely += worst * runs
         print(f"  {arm.name}: {arm.strategy}, {'; '.join(parts)}, {runs} run(s){note}")
-    line = f"  Estimated cost: ~${estimate:.2f}"
+    line = f"  Estimated cost: at most ~${at_most:.2f}"
+    if likely_known and abs(likely - at_most) > 0.005:
+        line += f", likely ~${likely:.2f}"
     line += (
         f" (rough: assumes ~{ESTIMATE_INPUT_TOKENS // 1000}k input and "
         f"~{ESTIMATE_OUTPUT_TOKENS // 1000}k output tokens per run)"

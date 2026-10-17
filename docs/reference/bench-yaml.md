@@ -63,7 +63,7 @@ couldn't finish.
 
 | Key | Meaning |
 |---|---|
-| `models` | Optional. A list of at least two model names, in the order to climb. Without it, the arm uses the ladder Certo builds from the active models' ratings. |
+| `models` | Optional. A list of at least two model names, in the order to climb. Without it, the arm uses the ladder Certo builds from the active models' ratings: the same ladder for every task, printed in the plan. |
 
 ```yaml
 arms:

@@ -1151,6 +1151,20 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   capability. Changes the derived ladder of a bench `escalate` arm with no
   `models:`. **Not benchmarked** on a local and a cloud model yet
   (working agreement 2): no session with both has run it.
+- **Bench plan prices a derived escalate arm on its real ladder, and adds
+  a "likely" cost** (0.1.12, user's question). The plan priced every
+  active model for a derived arm (`Arm.models` holds them all), while a run
+  uses only `derive_ladder()`'s ≤ `max_rungs` rungs: $58.95 shown against
+  $24.30 worst case on a real file. The plan now derives the ladder;
+  `Arm.models` is unchanged because it feeds the `--resume` fingerprint.
+  "At most" stays (every rung runs), since it is the safe bound. "Likely"
+  = Σ rung cost × P(reaching it), the climb rates taken from earlier
+  results under the same parent folder: single-arm runs and escalation
+  rungs, an escalating verdict or an error/provider failure counting as a
+  climb, matched by name *and* model id. Shown only when every rung but
+  the last has history, rather than guessing. Token counts per run are
+  still the fixed 500k/20k guess; using recorded per-model cost is a
+  possible next step.
 - **The model catalog is split from personal settings (0.1.10, user's
   design):** `models_list.yaml` (model ids, descriptions, ratings,
   `reasoning_effort`, `timeout_seconds`, task profiles, escalation

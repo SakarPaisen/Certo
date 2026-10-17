@@ -346,3 +346,144 @@ def test_single_arm_records_have_no_rungs(tmp_path, project_venv):
     _run(_bench_file(tmp_path, ONE_ARM), out, FakeModel(project_venv))
     (record,) = _records(out)
     assert (record["rungs"], record["final_rung"]) == ([], None)
+
+
+# --- the plan's cost estimate for escalate arms ---------------------------------
+
+RATED = """
+models:
+  - name: local-coder
+    model: ollama/qwen3-coder:30b
+    base_url: http://localhost:11434
+    ratings: {reasoning: 2, code: 2, cost: 5}
+  - name: local-weak
+    model: ollama/tiny
+    base_url: http://localhost:11434
+    ratings: {reasoning: 1, code: 1, cost: 5}
+  - name: cloud-a
+    model: anthropic/test-model-a
+    api_key: sk-a
+    ratings: {reasoning: 3, code: 3, cost: 4}
+  - name: cloud-b
+    model: openai/test-model-b
+    api_key: sk-b
+    ratings: {reasoning: 5, code: 5, cost: 2}
+"""
+
+LADDER_ARMS = (
+    "  - {name: one, strategy: single, model: cloud-a}\n"
+    "  - {name: climb, strategy: escalate, models: [local-coder, cloud-a, cloud-b]}\n"
+    "  - {name: derived, strategy: escalate}\n"
+)
+
+PRICES = {"local-coder": 0.0, "local-weak": 0.0, "cloud-a": 1.0, "cloud-b": 4.0}
+
+
+def _rated_bench(tmp_path: Path) -> str:
+    from model_file_helpers import write_model_files
+
+    list_path, models_path = write_model_files(tmp_path, RATED)
+    path = tmp_path / "bench.yaml"
+    path.write_text(
+        f"models_file: {models_path}\nmodels_list_file: {list_path}\n"
+        f"tasks: [temperature-table, page-ranges]\nrepeats: 1\narms:\n{LADDER_ARMS}"
+    )
+    return str(path)
+
+
+def _earlier(root: Path, records: list[dict]) -> None:
+    folder = root / "20260101-000000"
+    (folder / "runs").mkdir(parents=True)
+    (folder / "meta.json").write_text("{}")
+    for i, record in enumerate(records):
+        (folder / "runs" / f"{i}.json").write_text(json.dumps(record))
+
+
+def _single(name: str, model: str, verdict: str | None, error: str | None = None) -> dict:
+    return {
+        "strategy": "single",
+        "models": [{"name": name, "model": model}],
+        "verdict": verdict,
+        "error": error,
+        "rungs": [],
+    }
+
+
+def _plan(tmp_path, monkeypatch, capsys) -> str:
+    monkeypatch.setattr(bench, "estimate_run_cost", lambda entry: PRICES[entry.name])
+    out = tmp_path / "results" / "new"
+    bench.bench_main(["--config", _rated_bench(tmp_path), "--out", str(out)], interactive=False)
+    return capsys.readouterr().out
+
+
+def test_likely_ladder_cost_weights_each_rung_by_the_chance_of_reaching_it():
+    # Rung 2 is reached half the time, rung 3 a quarter of the time.
+    assert bench.likely_ladder_cost([0.0, 1.0, 4.0], [0.5, 0.5, None]) == 0.5 + 1.0
+    assert bench.likely_ladder_cost([0.0, 1.0, 4.0], [0.0, 1.0, None]) == 0.0
+    # The last rung's own climb rate doesn't matter; any lower rung's does.
+    assert bench.likely_ladder_cost([1.0, 4.0], [1.0, None]) == 5.0
+    assert bench.likely_ladder_cost([0.0, 1.0, 4.0], [0.5, None, 0.5]) is None
+
+
+def test_a_derived_arm_is_planned_and_priced_on_its_ladder_only(tmp_path, monkeypatch, capsys):
+    out = _plan(tmp_path, monkeypatch, capsys)
+    # local-weak is as cheap as local-coder and weaker: never a rung, never priced.
+    assert "derived: escalate, local-coder (" in out
+    assert "local-weak" not in out
+    assert "derived from the ratings, the same for every task" in out
+    # one: 2 x $1; climb: 2 x $5; derived: 2 x $5 (local-coder, cloud-a, cloud-b).
+    assert "Estimated cost: at most ~$22.00 (" in out
+    assert "no earlier results for local-coder, cloud-a to say more" in out
+    assert "likely" not in out
+
+
+def test_earlier_results_give_a_likely_cost(tmp_path, monkeypatch, capsys):
+    _earlier(
+        tmp_path / "results",
+        [
+            # local-coder climbed 1 time in 2; cloud-a 1 time in 4.
+            _single("local-coder", "ollama/qwen3-coder:30b", "verified"),
+            _single("local-coder", "ollama/qwen3-coder:30b", "retry_exhausted"),
+            _single("cloud-a", "anthropic/test-model-a", "verified"),
+            _single("cloud-a", "anthropic/test-model-a", "inconclusive"),
+            {
+                "strategy": "escalate",
+                "models": [],
+                "verdict": "verified",
+                "rungs": [
+                    {"name": "cloud-a", "model": "anthropic/test-model-a", "verdict": "stuck"},
+                    {"name": "cloud-a", "model": "anthropic/test-model-a", "verdict": "verified"},
+                ],
+            },
+            # Another model id under the same name doesn't count.
+            _single("local-coder", "ollama/other", "stuck"),
+        ],
+    )
+    out = _plan(tmp_path, monkeypatch, capsys)
+    # Per escalation run: 0 + 1.0 x 0.5 + 4.0 x 0.5 x 0.25 = 1.0.
+    assert "likely ~$1.00 per run, from 6 earlier run(s) of the lower rungs" in out
+    # one 2 x $1 + climb 2 x $1 + derived 2 x $1.
+    assert "Estimated cost: at most ~$22.00, likely ~$6.00 (" in out
+
+
+def test_climb_history_counts_errors_and_provider_failures_as_climbs(tmp_path):
+    from certo.bench_config import load_bench_config
+
+    _earlier(
+        tmp_path / "results",
+        [
+            _single("cloud-b", "openai/test-model-b", None, error="RuntimeError: boom"),
+            {
+                "strategy": "escalate",
+                "rungs": [
+                    {"name": "cloud-a", "model": "anthropic/test-model-a", "failure": "rate limit"},
+                    {"name": "cloud-b", "model": "openai/test-model-b", "verdict": "verified"},
+                ],
+            },
+        ],
+    )
+    cfg = load_bench_config(_rated_bench(tmp_path))
+    assert bench.climb_history(tmp_path / "results", cfg) == {
+        "cloud-b": (1, 2),
+        "cloud-a": (1, 1),
+    }
