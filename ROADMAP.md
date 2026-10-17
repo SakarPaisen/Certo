@@ -461,8 +461,8 @@ bench task set v2, milestone mode, independent spec tests, GitHub Action.
   toolchain in the Docker image (all listed above).
 - **New ecosystems** — in order: C#/.NET, PHP (Composer), Ruby, Kotlin/
   Android (Gradle), C/C++ (CMake), Swift.
-- **Framework skills with verification recipes** — Django, FastAPI,
-  Next.js, Spring, Rails, Laravel.
+- **Framework skills with verification recipes** — listed in "Backlog —
+  built-in skills to make" below.
 
 **4. Adoption**
 - **GitHub Action** — an issue labelled `certo` becomes a pull request
@@ -490,6 +490,81 @@ bench task set v2, milestone mode, independent spec tests, GitHub Action.
   not guessed, so ladders can weigh speed (the "fastest of the cheapest"
   question; today's ratings have no speed data, and a `speed` rating
   would count as capability).
+
+## Backlog — built-in skills to make (proposed 2026-10-17, not started)
+
+The running list of **skills** to add to `src/certo/builtin_skills/`
+(shipped in the wheel, loaded for every run). Today there are 12: eight
+`lifecycle/` skills, `git/commit-conventions`, `python-web/fastapi-
+conventions` and `pin-dependencies`, `testing/pytest-conventions`. Add new
+skill ideas here; move an entry to "What's implemented" when it ships.
+
+**Rules for every new skill:**
+- **Short, narrowly triggered.** Every skill that fires costs prompt
+  context, which a local model with a 32K window can't spare, and the
+  lifecycle triggers are already broad ("add", "build", "test", "error").
+  Prefer `paths:` triggers (fire when the agent touches a file such as
+  `go.mod`) over keywords.
+- **Measured.** Each is checked with `certo bench` on a local and a cloud
+  model before release (working agreements 2 and 3): a skill that seems
+  helpful but crowds out the task is a net loss.
+- **Authored for Certo, not downloaded,** where it states Certo's own
+  checks (the lifecycle-skills decision); legacy `triggers:`/`paths:`
+  format so they really trigger.
+
+**1. Skills that make a project verifiable** (Certo-specific; first)
+- **`testable-interactive-apps`** — keep logic apart from input/output so
+  games and menus are testable without a terminal. Triggers: game,
+  interactive, menu, terminal. Targets the starter tasks (Wordle,
+  Asteroids) and the Hanoi case (#8).
+- **`python-environment`** — use the project's own `.venv`; never install
+  into Certo's interpreter or with `pip install --user`; declare a
+  dependency in `pyproject.toml` before using it. The agent-side half of
+  "confident but wrong" #9.
+- **`node-project-setup`** — a real `test` script with at least one test
+  (`node --test` or vitest), a `build` script, a committed lockfile, no
+  interactive scaffolders (`npm create vite` with flags). Covers "Node
+  with no tests counts as verified" and #2, #4.
+- **`cli-entry-points`** — `__main__` guard last, a closed stdin doesn't
+  hang, `--help` and non-interactive flags work, so the smoke run can
+  start the program (#8).
+- **`test-oracles`** — derive expected values independently, never by
+  copying the implementation's output; check a suspicious test against
+  its own setup before re-editing correct code (#7). May become a section
+  of `lifecycle/testing-and-verification` instead of its own skill.
+
+Suggested first three: `testable-interactive-apps`, `python-environment`,
+`node-project-setup` (each targets a recorded failure, and the bench's
+game and Node tasks can measure it).
+
+**2. Language skills** (path-triggered; one per ecosystem Certo verifies)
+Each says how to set the project up so Certo's checks for that language
+(`docs/reference/verification-by-language.md`) find it and pass.
+- **Go** (`go.mod`) — `go test ./...`, `go vet`, table-driven tests.
+- **Rust** (`Cargo.toml`) — `cargo test`, clippy, and the missing
+  clippy component gotcha.
+- **Java** (`pom.xml`, `build.gradle`) — commit the Maven/Gradle wrapper:
+  without a toolchain Certo can't verify.
+- **TypeScript** (`tsconfig.json`) — strict mode, `tsc --noEmit` as a
+  `typecheck` script (Certo runs it when defined).
+- **Python** — extend `pytest-conventions` with ruff/mypy setup in
+  `pyproject.toml` (Certo runs them when installed in the project env).
+- New ecosystems from the growth backlog (C#/.NET, PHP, Ruby, Kotlin,
+  C/C++, Swift) each get a skill when their verification lands.
+
+**3. Framework skills** (each with a verification recipe: how to build,
+test and smoke-check an app of that kind)
+- **Web frontend: Vite/React** — build, a test runner, a smoke test.
+- **Next.js**, **Express**.
+- **Django**; **FastAPI** — extend the existing `fastapi-conventions`
+  with its verification recipe.
+- **Spring**, **Rails**, **Laravel**.
+
+**4. App building blocks**
+- **`http-api-testing`** — the framework's test client, no real network
+  in tests.
+- **`database-basics`** — SQLite for small apps, migrations, an isolated
+  test database.
 
 ## Known limitations (internal/architectural — see `docs/` for user-facing ones)
 
