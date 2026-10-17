@@ -477,6 +477,25 @@ bench task set v2, milestone mode, independent spec tests, GitHub Action.
   cost so far.
 - **Prebuilt Docker image** — fixes "Docker execution from a pip install"
   above and makes the safe mode one command.
+- **`certo init models`: a setup helper for the model files** — `certo
+  init` covers one model (.env, Ollama model list, tool-call check), but
+  nothing helps with `models_list.yaml`/`models.yaml`, the heavy part of
+  using `--escalate`/`--auto-model`. Same style as `certo init` (a few
+  questions on a terminal, none without one, a real check at the end):
+  find provider keys in the environment or `.env` and the models on the
+  Ollama server; copy `models_list.yaml.example` to the user folder if
+  there is no list; offer the catalog entries the user can actually run
+  (an Ollama model not in the list gets "add it first", never invented
+  ratings); write `models.yaml`, a key from an environment variable as
+  `${VAR}`, never copied (verify first that `models.yaml` expands
+  `${VAR}`; add it if not); test each model with the `check --models`
+  tool-call check and deactivate failures, saying why; print the ladder
+  `--escalate` would use. The first-run path must still need no model
+  files: this is the second step, for escalation.
+- **`certo models update`** — compare the shipped example catalog with the
+  user's `models_list.yaml` (new models, changed ratings) and offer to
+  merge, since a release never touches the user's copy and keeping it
+  current is manual today.
 - **Docs website and gallery** — `docs/` is plain Markdown with no site
   generator; add a site, a gallery of apps built with Certo (verdict and
   cost each), and a short demo video.
