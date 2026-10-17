@@ -35,7 +35,8 @@ adds its time to every task: run the cloud model directly. Use
 in.
 
 Escalation is off unless you ask for it. Without `--escalate`, Certo runs
-exactly as before.
+exactly as before. To compare it with `--auto-model`, see
+[Auto-model or escalation](../concepts/auto-model-or-escalation.md).
 
 ## Set up a ladder
 
@@ -293,5 +294,7 @@ produced the final result** show where the money went. See
 
 - [models.yaml and models_list.yaml](../reference/models-yaml.md#escalation)
 - [Pick models automatically](pick-models-automatically.md)
+- [Auto-model or escalation](../concepts/auto-model-or-escalation.md):
+  how the two differ, and when to use which
 - [How verification works](../concepts/how-verification-works.md)
 - [Troubleshooting](../troubleshooting.md#model-files-and-escalation)

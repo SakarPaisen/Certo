@@ -60,6 +60,7 @@ takes you from install to your first verified project.
 | Answer the agent's questions, or approve each action | [Interactive and confirm mode](guides/interactive-mode.md) |
 | Let Certo choose the model for each task | [Pick models automatically](guides/pick-models-automatically.md) |
 | Start cheap, and pay for a stronger model only when needed | [Escalate between models](guides/escalate-between-models.md) |
+| Decide between automatic model choice and escalation | [Auto-model or escalation](concepts/auto-model-or-escalation.md) |
 | Check projects in CI | [Verify in CI](guides/verify-in-ci.md) |
 | Add my own pass/fail rules for a task | [Acceptance checks](guides/acceptance-checks.md) |
 | Run the agent inside a container | [Run in Docker](guides/run-in-docker.md) |
@@ -87,6 +88,7 @@ takes you from install to your first verified project.
 **Curious how it works?**
 
 - [How verification works](concepts/how-verification-works.md)
+- [Auto-model or escalation](concepts/auto-model-or-escalation.md)
 - [Why agents lie](concepts/why-agents-lie.md)
 - [Safety](concepts/safety.md)
 

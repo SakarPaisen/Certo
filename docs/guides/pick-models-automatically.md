@@ -151,7 +151,8 @@ Each fallback adds a section of its own, with the reason for the switch.
 on errors or failed fix attempts, inside one conversation. To start cheap
 and pay for a stronger model only when the cheap one's work fails
 verification, use [escalation](escalate-between-models.md) instead:
-`--escalate`. The two can't be combined.
+`--escalate`. The two can't be combined. How they differ, with use cases:
+[Auto-model or escalation](../concepts/auto-model-or-escalation.md).
 
 ## Related
 
