@@ -164,9 +164,10 @@ Each benchmark writes a folder, by default `bench-results/<date-time>/`:
 |---|---|
 | `results.md` | The summary to read and share. |
 | `results.csv` | One row per run, for a spreadsheet. |
+| `cost.json` | The real total cost, the cost per model, and the plan's estimate. |
 | `runs/*.json` | Every detail of each run. |
 | `workspaces/<run>/` | The code each run left behind (without `.venv` and `node_modules`). |
-| `meta.json` | Certo version, date, hardware, task set and the benchmark itself. |
+| `meta.json` | Certo version, date, hardware, task set, the benchmark itself, and the plan's cost estimate. |
 
 In `results.md`, per arm:
 
@@ -185,8 +186,23 @@ In `results.md`, per arm:
   less with an expensive one that solves more.
 
 A per-task table shows where each arm passes and fails. For `escalate`
-arms, a last section shows how often each rung produced the final result,
+arms, a section shows how often each rung produced the final result,
 for example `rung 1 (qwen-local): 4/9, rung 2 (gpt-luna): 5/9`.
+
+**The real cost.** The **Cost** section of `results.md` (and `cost.json`)
+gives what the benchmark really spent, from the recorded runs, next to what
+the plan estimated, and one row per model: its runs, its cost, and its
+average per run. An escalation run is split by rung, so each model is
+charged only for what it ran. The same total is printed at the end:
+
+```text
+Total cost: $1.5000 (the plan estimated at most ~$9.00, likely ~$3.50), for 3 of 12 runs
+```
+
+Costs come from LiteLLM's prices; `+ unknown` means a model had no price.
+When the benchmark is not finished, the line says how many runs it covers,
+as above.
+A results folder from before version 0.1.13 has no estimate to compare.
 
 **Keep the numbers in proportion.** With 9 tasks and 3 repeats, an arm has
 27 runs; a difference of two or three runs can be chance. Compare results

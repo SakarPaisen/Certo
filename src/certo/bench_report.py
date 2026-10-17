@@ -1,4 +1,5 @@
-"""Turn a benchmark results folder into `results.md` and `results.csv`.
+"""Turn a benchmark results folder into `results.md`, `results.csv` and
+`cost.json`.
 
 Works from the folder alone (`meta.json` plus `runs/*.json`), so an
 interrupted or resumed benchmark can always be reported. Pure: no SDK, no
@@ -54,6 +55,67 @@ def _cost(records: list[dict[str, Any]]) -> str:
     if all(r["cost_known"] for r in records):
         return f"${total:.4f}"
     return f"${total:.4f} + unknown"
+
+
+def cost_summary(meta: dict[str, Any], records: list[dict[str, Any]]) -> dict[str, Any]:
+    """The benchmark's real, recorded cost: in total, per model, and next to
+    the plan's estimate (kept in meta.json when the benchmark started).
+    Escalation runs are split by rung, so each model gets what it spent."""
+    per_model: dict[tuple[str, str], dict[str, Any]] = {}
+
+    def add(name: str, model: str, cost: float, known: bool) -> None:
+        row = per_model.setdefault(
+            (name, model), {"name": name, "model": model, "runs": 0, "cost": 0.0, "complete": True}
+        )
+        row["runs"] += 1
+        row["cost"] += cost
+        row["complete"] = row["complete"] and known
+
+    for r in records:
+        if r.get("rungs"):
+            for rung in r["rungs"]:
+                add(
+                    rung.get("name", ""),
+                    rung.get("model", ""),
+                    rung.get("cost", 0.0),
+                    rung.get("cost_known", True),
+                )
+        elif len(r.get("models", [])) == 1:
+            m = r["models"][0]
+            add(m["name"], m["model"], r["cost"], r["cost_known"])
+        elif r["cost"]:
+            add("(not attributed)", "", r["cost"], r["cost_known"])
+    models = sorted(per_model.values(), key=lambda row: (-row["cost"], row["name"]))
+    for row in models:
+        row["cost"] = round(row["cost"], 6)
+        row["average_per_run"] = round(row["cost"] / row["runs"], 6) if row["runs"] else 0.0
+    config = meta["config"]
+    return {
+        "total": round(sum(r["cost"] for r in records), 6),
+        "complete": all(r["cost_known"] for r in records),
+        "runs_recorded": len(records),
+        "runs_planned": len(config["tasks"]) * len(config["arms"]) * config["repeats"],
+        "per_model": models,
+        "estimate": meta.get("estimate"),
+    }
+
+
+def _money(value: float, complete: bool = True) -> str:
+    return f"${value:.4f}" + ("" if complete else " + unknown")
+
+
+def cost_line(summary: dict[str, Any]) -> str:
+    """One line: the real total, and what the plan estimated."""
+    line = f"Total cost: {_money(summary['total'], summary['complete'])}"
+    estimate = summary.get("estimate")
+    if estimate:
+        line += f" (the plan estimated at most ~${estimate['at_most']:.2f}"
+        if estimate.get("likely") is not None:
+            line += f", likely ~${estimate['likely']:.2f}"
+        line += ")"
+    if summary["runs_recorded"] != summary["runs_planned"]:
+        line += f", for {summary['runs_recorded']} of {summary['runs_planned']} runs"
+    return line
 
 
 def _cost_per_solved(records: list[dict[str, Any]]) -> str:
@@ -178,6 +240,22 @@ def render_markdown(meta: dict[str, Any], records: list[dict[str, Any]]) -> str:
             mine = [r for r in records if r["arm"] == arm]
             lines.append(f"- **{arm}:** {rung_shares(mine)}")
 
+    summary = cost_summary(meta, records)
+    lines += ["", "## Cost", "", cost_line(summary) + ".", ""]
+    lines += _table(
+        ["Model", "Model id", "Runs", "Cost", "Average per run"],
+        [
+            [
+                row["name"],
+                f"`{row['model']}`" if row["model"] else "-",
+                str(row["runs"]),
+                _money(row["cost"], row["complete"]),
+                _money(row["average_per_run"], row["complete"]),
+            ]
+            for row in summary["per_model"]
+        ],
+    )
+
     lines += [
         "",
         "## What the columns mean",
@@ -199,6 +277,10 @@ def render_markdown(meta: dict[str, Any], records: list[dict[str, Any]]) -> str:
         "- **Errors:** the run stopped with an error (for example, the provider failed).",
         "- **Median time:** wall time of one run, including Certo's checks and retries.",
         "- **Cost:** from LiteLLM's prices; `+ unknown` when a model has no price.",
+        (
+            "- **Cost per model:** what each model spent; an escalation run is split by "
+            "rung. A run counts once per model it used."
+        ),
         (
             "- **Cost per solved task:** the arm's total cost divided by the runs whose hidden "
             "tests passed."
@@ -240,4 +322,7 @@ def write_report(out_dir: Path) -> Path:
     markdown = out_dir / "results.md"
     markdown.write_text(render_markdown(meta, records), encoding="utf-8")
     write_csv(out_dir / "results.csv", records)
+    (out_dir / "cost.json").write_text(
+        json.dumps(cost_summary(meta, records), indent=2) + "\n", encoding="utf-8"
+    )
     return markdown

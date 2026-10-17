@@ -487,3 +487,17 @@ def test_climb_history_counts_errors_and_provider_failures_as_climbs(tmp_path):
         "cloud-b": (1, 2),
         "cloud-a": (1, 1),
     }
+
+
+def test_the_real_cost_is_printed_and_kept_with_the_estimate(tmp_path, project_venv, capsys):
+    out = tmp_path / "out"
+    _run(_bench_file(tmp_path, ONE_ARM), out, FakeModel(project_venv, cost=0.25))
+    printed = capsys.readouterr().out
+
+    meta = json.loads((out / "meta.json").read_text())
+    assert set(meta["estimate"]) == {"at_most", "likely"}
+    cost = json.loads((out / "cost.json").read_text())
+    assert cost["total"] == 0.25 and cost["runs_recorded"] == cost["runs_planned"] == 1
+    assert [m["name"] for m in cost["per_model"]] == ["cloud-a"]
+    assert "Total cost: $0.2500 (the plan estimated at most ~$" in printed
+    assert "## Cost" in (out / "results.md").read_text()

@@ -31,7 +31,7 @@ from typing import Any
 
 from . import __version__
 from .bench_config import DEFAULT_BENCH_FILE, Arm, BenchConfig, BenchConfigError, load_bench_config
-from .bench_report import arm_rows, write_report
+from .bench_report import arm_rows, cost_line, cost_summary, write_report
 from .bench_strategies import STRATEGIES, RunContext
 from .bench_tasks import (
     BUILTIN_TASKS_DIR,
@@ -291,7 +291,10 @@ def likely_ladder_cost(costs: list[float], climb_rates: list[float | None]) -> f
     return total
 
 
-def _print_plan(cfg: BenchConfig, todo: list[PlannedRun], total: int, out_dir: Path) -> None:
+def _print_plan(
+    cfg: BenchConfig, todo: list[PlannedRun], total: int, out_dir: Path
+) -> dict[str, float | None]:
+    """Print the plan; return the cost estimate, kept in meta.json."""
     print("Benchmark plan")
     version = task_set_version(cfg.tasks_dir)
     print(
@@ -355,6 +358,10 @@ def _print_plan(cfg: BenchConfig, todo: list[PlannedRun], total: int, out_dir: P
     for warning in cfg.catalog_warnings:
         print(f"  Warning (models.yaml): {warning}")
     print(f"  Results: {out_dir}")
+    return {
+        "at_most": round(at_most, 4),
+        "likely": round(likely, 4) if likely_known else None,
+    }
 
 
 def _confirm(yes: bool, interactive: bool) -> bool:
@@ -422,10 +429,10 @@ def _check_out_dir(cfg: BenchConfig, out_dir: Path, resume: bool) -> None:
         )
 
 
-def _init_out_dir(cfg: BenchConfig, out_dir: Path) -> None:
+def _init_out_dir(cfg: BenchConfig, out_dir: Path, estimate: dict[str, Any]) -> None:
     (out_dir / "runs").mkdir(parents=True, exist_ok=True)
     if not (out_dir / "meta.json").is_file():
-        _write_json(out_dir / "meta.json", _meta(cfg))
+        _write_json(out_dir / "meta.json", {**_meta(cfg), "estimate": estimate})
 
 
 def _default_stream(task: str, *, cfg, ladder=None) -> Any:
@@ -627,12 +634,12 @@ def bench_main(
         print(f"Configuration error: {exc}", file=sys.stderr)
         return 1
 
-    _print_plan(cfg, todo, len(planned), out_dir)
+    estimate = _print_plan(cfg, todo, len(planned), out_dir)
     if not todo:
         print("Every run is already recorded.")
     elif not _confirm(args.yes, on_terminal):
         return 1
-    _init_out_dir(cfg, out_dir)
+    _init_out_dir(cfg, out_dir, estimate)
 
     interrupted = stopped = False
     try:
@@ -674,4 +681,5 @@ def finish_report(cfg: BenchConfig, out_dir: Path, records: list[dict[str, Any]]
             f"{row['Verified']}, fooled {row['Fooled']}, caught {row['Caught']}, "
             f"cost {row['Cost']}"
         )
-    print(f"Results: {markdown} (and results.csv)")
+    print(cost_line(cost_summary(meta, records)))
+    print(f"Results: {markdown} (and results.csv, cost.json)")

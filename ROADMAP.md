@@ -353,6 +353,13 @@ decisions log below for *why* a given design was chosen.
   attempts, the verifier picks) is the planned next entry in
   `bench_strategies.STRATEGIES`. Each must be benchmarked on a local and a
   cloud model before release (CLAUDE.md working agreements).
+- **Bench estimates from recorded cost, not a token guess** — the plan
+  prices every run at a fixed ~500k input / ~20k output tokens. Since
+  0.1.13 each results folder's `cost.json` holds each model's real average
+  cost per run; the plan could use that (same model id, from earlier
+  results in the same parent folder) and fall back to the guess only for
+  models with no history, as the "likely" figure already does for climb
+  rates. Not built.
 - **Escalation: restart a rung from a clean workspace** — only "continue in
   the same files" exists. `_stream_escalation` takes the workspace listing
   before each rung, so a "restart" mode (copy the original files back
@@ -1163,8 +1170,16 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   rungs, an escalating verdict or an error/provider failure counting as a
   climb, matched by name *and* model id. Shown only when every rung but
   the last has history, rather than guessing. Token counts per run are
-  still the fixed 500k/20k guess; using recorded per-model cost is a
-  possible next step.
+  still the fixed 500k/20k guess (see the backlog item on recorded cost).
+- **Bench records its real cost per model, beside the estimate** (0.1.13,
+  user request). Per-run and per-arm cost already existed; missing were a
+  total, a per-model split and a comparison. `bench_report.cost_summary`
+  builds them from the run records alone (escalation split by rung via
+  each rung's own `cost`), written to `results.md` (## Cost), a new
+  `cost.json`, and printed at the end. The plan's estimate is stored in
+  `meta.json` (`estimate`) when the folder is created, outside
+  `config`, so the `--resume` fingerprint is unaffected; older folders
+  simply have none.
 - **The model catalog is split from personal settings (0.1.10, user's
   design):** `models_list.yaml` (model ids, descriptions, ratings,
   `reasoning_effort`, `timeout_seconds`, task profiles, escalation

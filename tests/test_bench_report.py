@@ -175,8 +175,7 @@ def test_which_rung_produced_the_final_result():
 
     assert "## Which rung produced the final result" in markdown
     assert (
-        "- **climb:** rung 1 (qwen): 1/4, rung 2 (sonnet): 2/4, no result (error): 1/4"
-        in markdown
+        "- **climb:** rung 1 (qwen): 1/4, rung 2 (sonnet): 2/4, no result (error): 1/4" in markdown
     )
 
 
@@ -189,3 +188,76 @@ def test_single_arms_keep_their_columns_and_get_no_rung_section():
         "Cost per solved task |"
     )
     assert "Which rung produced the final result" not in markdown.split("## What the")[0]
+
+
+# --- the real cost --------------------------------------------------------------------
+
+
+def test_cost_summary_totals_and_splits_escalation_by_rung():
+    from certo.bench_report import cost_line, cost_summary
+
+    meta = {**_escalate_meta(), "estimate": {"at_most": 9.0, "likely": 3.5}}
+    climb = _climb_record("slugify", 1, 2)
+    climb["cost"] = 0.75
+    climb["rungs"] = [
+        {"name": "qwen", "model": "ollama/qwen3-coder:30b", "cost": 0.0, "cost_known": True},
+        {"name": "sonnet", "model": "anthropic/claude-sonnet-5-5", "cost": 0.75},
+    ]
+    records = [
+        _record("cloud", "slugify", 1, verdict="verified", passed=True, cost=0.5),
+        _record("cloud", "page-ranges", 1, verdict="verified", passed=True, cost=0.25),
+        climb,
+    ]
+    summary = cost_summary(meta, records)
+
+    assert summary["total"] == 1.5 and summary["complete"]
+    assert summary["per_model"] == [
+        {
+            "name": "sonnet",
+            "model": "anthropic/claude-sonnet-5-5",
+            "runs": 3,
+            "cost": 1.5,
+            "complete": True,
+            "average_per_run": 0.5,
+        },
+        {
+            "name": "qwen",
+            "model": "ollama/qwen3-coder:30b",
+            "runs": 1,
+            "cost": 0.0,
+            "complete": True,
+            "average_per_run": 0.0,
+        },
+    ]
+    assert cost_line(summary) == (
+        "Total cost: $1.5000 (the plan estimated at most ~$9.00, likely ~$3.50), for 3 of 12 runs"
+    )
+
+
+def test_cost_line_without_an_estimate_or_a_known_price():
+    from certo.bench_report import cost_line, cost_summary
+
+    records = [_record("local", "slugify", 1, verdict="verified", passed=True, cost_known=False)]
+    # A results folder from before 0.1.12 has no estimate in meta.json.
+    assert cost_line(cost_summary(META, records)) == (
+        "Total cost: $0.0000 + unknown, for 1 of 8 runs"
+    )
+
+
+def test_results_md_has_a_cost_section_and_cost_json_is_written(tmp_path):
+    out = tmp_path / "out"
+    (out / "runs").mkdir(parents=True)
+    (out / "meta.json").write_text(
+        json.dumps({**META, "estimate": {"at_most": 2.0, "likely": None}})
+    )
+    for record in RECORDS:
+        (out / "runs" / f"{record['run_id']}.json").write_text(json.dumps(record))
+
+    markdown = write_report(out).read_text()
+    assert "## Cost" in markdown
+    assert "(the plan estimated at most ~$2.00)" in markdown
+    assert "| sonnet | `anthropic/claude-sonnet-5-5` |" in markdown
+
+    saved = json.loads((out / "cost.json").read_text())
+    assert saved["estimate"] == {"at_most": 2.0, "likely": None}
+    assert saved["total"] == round(sum(r["cost"] for r in RECORDS), 6)

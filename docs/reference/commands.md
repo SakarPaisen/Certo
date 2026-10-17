@@ -216,8 +216,8 @@ It reads only the benchmark file and the models file it names, never
 rough cost estimate: "at most" (every escalation rung runs) and, when
 earlier results in the same parent folder cover the lower rungs, "likely"
 (see [the cost estimate](../guides/benchmark.md#run-it)). While running, it prints one line per finished run.
-At the end it writes `results.md` and `results.csv` and prints a summary
-per arm. Guide: [Benchmark models and strategies](../guides/benchmark.md).
+At the end it writes `results.md`, `results.csv` and `cost.json`, and
+prints a summary per arm and the real total cost next to the estimate. Guide: [Benchmark models and strategies](../guides/benchmark.md).
 
 **Exit code.** 0 when the benchmark ran, whatever the models scored (also
 when stopped by `--max-cost`); 1 for a configuration error, or when the
