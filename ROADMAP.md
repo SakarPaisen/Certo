@@ -360,6 +360,23 @@ decisions log below for *why* a given design was chosen.
   results in the same parent folder) and fall back to the guess only for
   models with no history, as the "likely" figure already does for climb
   rates. Not built.
+- **Move task profiles and escalation ladders out of `models_list.yaml`**
+  (user's idea, 2026-10-17; not started). The list would hold only what
+  models exist (ids, ratings, descriptions: shared catalog data); a new
+  optional `model_policy.yaml` would hold how to choose among them
+  (`task_profiles:` and `escalation:`), the part most likely to differ per
+  project. One file for both, not two: `--auto-model` and `--escalate`
+  are two answers to the same question, and users already handle four
+  files. Same lookup as the others (`CERTO_MODEL_POLICY_FILE`, project
+  folder, user folder; first found used whole), shipped only as
+  `model_policy.yaml.example`. Unlike the list, a missing file is not an
+  error: built-in defaults (derived ladder, a `default` profile).
+  Migration: keep reading the sections from `models_list.yaml` for a
+  version or two with a warning naming what to move (cheaper than the
+  0.1.10 hard error, and the old layout isn't wrong, only out of date).
+  `catalog_check` validates ladder names across the two files; `bench.yaml`
+  gains `model_policy_file` for symmetry. Feature bump; docs: models-yaml
+  reference, both model guides, the auto-model/escalation concept page.
 - **Escalation: restart a rung from a clean workspace** — only "continue in
   the same files" exists. `_stream_escalation` takes the workspace listing
   before each rung, so a "restart" mode (copy the original files back
