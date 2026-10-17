@@ -22,7 +22,7 @@ build plan.
 |---|---|---|
 | 1 | Scaffold + config | Done |
 | 2 | llm/tools/agent/runner + hello-world e2e | Done, verified live |
-| 3 | Provider-swap live proof | **Blocked** — needs a 2nd provider key or a local model endpoint; user chose to skip rather than provide one |
+| 3 | Provider-swap live proof | **Unblocked, not run** — a local model (Ollama) and cloud keys are configured since 2026-10-17; run one task with two `CERTO_LLM_MODEL` values to close it |
 | 4 | Custom tool + test | Done — `run_tests_tool` |
 | 5 | CLI + README + execution-mode flag | Done, verified live |
 | 6 | Optional (section 9) | Docker execution: done. Server mode: done (REST async submit+poll, WS streaming, OpenAI-compatible `/v1/chat/completions`). Skills: done — shared catalog + per-project AGENTS.md. Every section-9 item is done. |
@@ -162,7 +162,7 @@ decisions log below for *why* a given design was chosen.
   own environment (pytest with its own ini and `PYTHONPATH=workspace`;
   `node --test`). `bench_config.py` validates `bench.yaml` against
   `models.yaml` names; `bench_strategies.STRATEGIES` is the registry
-  (`single` only), each strategy building an explicit `Config` from the
+  (`single`, `escalate`), each strategy building an explicit `Config` from the
   catalog entry (`run_config`, Certo defaults, isolated skill dirs, no
   `.env`). `bench.py` runs repeat-major, one JSON per run (atomic write),
   workspace snapshots, `--max-cost`, `--parallel` (cloud-only),
@@ -319,8 +319,8 @@ decisions log below for *why* a given design was chosen.
   ruff/mypy; no JS/TS lint-tool inference from config (see next item); no
   ecosystem beyond these six; Java verification is detection-only here and
   in the Docker image (no Maven/Gradle toolchain in either).
-- **Milestone 3 live provider-swap proof** — blocked on a second provider
-  key or local model endpoint.
+- **Milestone 3 live provider-swap proof** — no longer blocked (a local
+  Ollama model and cloud keys exist since 2026-10-17); not run yet.
 - **Third-party skills: narrow license detection, `SKILL.md`-only.** The
   license text heuristic covers 8 permissive licenses. Everything else is
   `unknown` and needs explicit acknowledgement. Legacy single-file `.md`
@@ -357,13 +357,15 @@ decisions log below for *why* a given design was chosen.
   the same files" exists. `_stream_escalation` takes the workspace listing
   before each rung, so a "restart" mode (copy the original files back
   before the next rung) is one more branch there; not built.
-- **Escalation not yet benchmarked live** — the 0.1.9 session had no
-  `models.yaml` with a local and a cloud model and no Ollama, so
-  `docs/benchmark/escalation-<version>.md` doesn't exist. Escalation under
+- **Escalation not yet benchmarked live** — local and cloud models are
+  available since 2026-10-17. Two `certo bench` runs that day (0.1.10 and
+  0.1.11) had an explicit local→cloud `escalate` arm but stopped at 13 of
+  108 runs, and neither used a derived ladder (the 0.1.11 change), so
+  `docs/benchmark/escalation-<version>.md` doesn't exist yet. Escalation under
   Docker is covered by fake-workspace tests only, not a real container.
 - **No benchmark baseline yet** — `docs/benchmark/baseline-<version>.md`
-  needs a session with a local and a cloud model in `models.yaml`; the
-  0.1.6 session had neither (no `models.yaml`, no Ollama).
+  needs one complete `certo bench` run on a local and a cloud model. The
+  models now exist (2026-10-17); the first runs that day were partial.
 - **Node "no tests" counts as verified** (found by `certo bench`'s first
   integration run, 2026-10-16): `node --test` exits 0 when it finds no test
   files, so `npm test` passes and the verdict is `verified` for a project
@@ -777,8 +779,8 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   fails loudly and the fix is one env var. `usage_id` changes are
   unversioned, since they're only per-run telemetry keys. The
   third-party skills lockfile never carried the old name.
-  GitHub repo rename/description/topics and PyPI are prepared but not
-  applied (`docs/launch/github-rename.md`). `docs/ROADMAP.txt` is a
+  The GitHub repo is renamed (`alessioricco/certo`) and Certo is on PyPI
+  since 0.1.0; `docs/launch/github-rename.md` is the historical checklist. `docs/ROADMAP.txt` is a
   frozen snapshot, so it keeps the old names on purpose.
 - **Live entrypoint-ordering/smoke-run test built its own throwaway
   `tmp_path` fixture, not `projects/hanoi/` or anything under `projects/`**
@@ -813,7 +815,8 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   `CERTO_ARTIFACTS_DIR`), and read defensively in the `finally` so a
   metrics failure can't mask the run's own outcome or exception.
 - **sdist is an explicit allowlist (`src/certo`, `tests`, the Dockerfile,
-  README/MANUAL/LICENSE, `.env.example`, `models.yaml.example`) plus
+  README/MANUAL/LICENSE, `.env.example`, `bench.yaml.example`; the model
+  examples ship inside `src/certo/examples/` since 0.1.10) plus
   explicit secret/state/cache excludes on both targets** — hatchling's
   default sdist relied on `.gitignore` alone to keep `.env`/`models.yaml`/
   `projects/` out, and shipped dev-only files (`.claude/`, `CLAUDE.md`,
@@ -1139,11 +1142,12 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   it). Old rows read as `None`.
 - **Bench `strategy: escalate`:** `models: [...]` (at least two, active, no
   repeats) or derived; `escalation.ladders` in `models.yaml` are
-  not used, so an arm states its ladder in `bench.yaml`. "Cost per solved
+  not used (in `models_list.yaml` since 0.1.10), so an arm states its
+  ladder in `bench.yaml`. "Cost per solved
   task" is added for every arm (also meaningful for `single`); rung
   shares only for escalate arms; existing columns unchanged.
 - **`certo bench` grades with hidden tests, takes models from
-  `models.yaml` by name, and puts strategies in a registry** (0.1.6).
+  `models.yaml` by name (since 0.1.10 the ratings are in `models_list.yaml`), and puts strategies in a registry** (0.1.6).
   Hidden tests, because the agent's own tests share its misunderstandings
   (the Hanoi and Wordle cases): only tests it never saw can show whether
   Certo was fooled, which is the number Certo exists to keep at zero.
