@@ -187,10 +187,11 @@ models:
       OpenAI's cheapest current tier: $0.10 in / $0.50 out per 1M (Sept
       2026, half of GPT-5.6 Luna). DeepSWE v1.1 66.6% at max effort;
       Terminal-Bench 4.0 16.4% (public leaderboard). OpenAI says its
-      factuality at high effort matches GPT-5.6 Sol, but it failed to
-      disclose a broken tool in 28.7% of an adversarial eval (Sol: 4.9%).
-      Same coding level as GPT-5.6 Luna at half the price — replaces it.
-    ratings: {reasoning: 3, precision: 3, code: 3, cost: 4}
+      factuality at high effort matches GPT-5.6 Sol and its alignment evals
+      improve on GPT-5.6 Luna; it still failed to disclose a broken tool in
+      28.7% of an adversarial eval (GPT-6 Sol: 4.9%). Same coding level as
+      GPT-5.6 Luna at half the price — replaces it.
+    ratings: {reasoning: 3, precision: 4, code: 3, cost: 4}
 
   - name: gpt-6.1-sol
     model: openai/gpt-6.1-sol
@@ -273,9 +274,11 @@ models:
       $0.20 in / $1.20 out per 1M since the 30 July 2026 cut. SWE-Bench Pro
       62.7%, Terminal-Bench 2.1 84.7%, Terminal-Bench 4.0 17.3%, GPQA
       92.3%, FrontierMath Tier 4 58.5%; MRCR 256K-512K only 41.3% (OpenAI
-      table). Codes as well as GPT-5.5 for a fraction of the price, but
-      gpt-6-luna now does the same at half its price.
-    ratings: {reasoning: 3, precision: 3, code: 3, cost: 4}
+      table), but at 256K GraphWalks BFS 81.3% beats GPT-5.5's 73.7%, so
+      precision holds for prompts of normal size. Codes as well as GPT-5.5
+      for a fraction of the price, but gpt-6-luna now does the same at half
+      its price.
+    ratings: {reasoning: 3, precision: 4, code: 3, cost: 4}
 
   - name: gpt-5.5
     model: openai/gpt-5.5
@@ -574,10 +577,12 @@ task_profiles:
 # enabled in models.yaml is skipped, with a notice.
 #
 # With the ratings above, the cheapest model at each capability level is:
-#   qwen3.6-35b-local (6, free) -> gpt-6-luna (9, ~$0.20) ->
-#   claude-haiku-5-5 (10, ~$0.20) -> claude-sonnet-5-5 / gpt-6.1-sol
-#   (13, ~$4) -> claude-opus-5-5 (15, ~$8)
+#   qwen3.6-35b-local (6, free) -> gpt-6-luna / claude-haiku-5-5
+#   (10, ~$0.20) -> claude-sonnet-5-5 / gpt-6.1-sol (13, ~$4) ->
+#   claude-opus-5-5 (15, ~$8)
 # (capability = reasoning + precision + code; price = blended per 1M).
+# At 10, claude-haiku-5-5 is the better coder (code 4 against 3): the
+# capability sum doesn't see that, so the example ladder names it.
 #
 # escalation:
 #   cost_axis: cost       # the rating axis that means cost-effectiveness (default: cost)
