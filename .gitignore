@@ -251,3 +251,5 @@ bench-results/
 
 # Claude Code personal overrides
 .claude/settings.local.json
+# Private project review and plan (not published)
+/PROJECT_REVIEW.md
