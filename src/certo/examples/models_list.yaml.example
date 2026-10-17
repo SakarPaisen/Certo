@@ -173,6 +173,21 @@ models:
       card comparison). Thinking traces eat a 32K window quickly.
     ratings: {reasoning: 2, precision: 2, code: 1, cost: 5}
 
+  - name: gemma4-31b-qat-local
+    model: ollama/gemma4:31b-it-qat
+    reasoning_effort: ""
+    timeout_seconds: 900             # same dense 31B as gemma4-31b-local
+    description: >
+      The same Gemma 4 31B, in Google's quantization-aware-trained 4-bit
+      version (19GB, 256K context). Trained to run at 4 bits, so it stays
+      closer to the full model than an ordinary 4-bit conversion: in
+      Unsloth's measurement of the equivalent GGUF, its top token agrees
+      with the reference 96.7% of the time, against 87.9% for a plain Q4_0.
+      Same benchmarks and limits as gemma4-31b-local; same ratings, since
+      the published scores are already full precision. Prefer it to the
+      plain tag.
+    ratings: {reasoning: 2, precision: 2, code: 1, cost: 5}
+
   - name: devstral-small-2-local
     model: ollama/devstral-small-2:24b
     reasoning_effort: ""             # no thinking mode: leave empty
