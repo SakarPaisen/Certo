@@ -4,13 +4,14 @@ The format of the benchmark file read by `certo bench`. It is for looking
 things up; the guide is [Benchmark models and strategies](../guides/benchmark.md).
 
 The default file is `./bench.yaml`; `certo bench --config FILE` reads
-another. It holds no keys: models are named from `models.yaml`. A commented
+another. It holds no keys: models are named from the model files. A commented
 example ships as [bench.yaml.example](../../bench.yaml.example).
 
 ## Layout
 
 ```yaml
-models_file: ./models.yaml   # optional
+models_file: ./models.yaml             # optional
+models_list_file: ./models_list.yaml   # optional
 tasks_dir: ./my-tasks        # optional
 tasks: all                   # or a list of task names
 repeats: 3
@@ -27,7 +28,8 @@ arms:
 | `arms` | **required** | A non-empty list of arms (below). |
 | `tasks` | `all` | `all`, or a list of task names. `certo bench --list-tasks` shows the names. |
 | `repeats` | `1` | Runs per task per arm, a whole number of at least 1. Results vary between runs, so more repeats give a fairer comparison. |
-| `models_file` | `./models.yaml` | The model catalog the arms name models from. |
+| `models_file` | looked up | Your personal `models.yaml`. Without it: `./models.yaml`, else `~/.config/certo/models.yaml`. `CERTO_MODELS_FILE` is not read. |
+| `models_list_file` | looked up | The model catalog, `models_list.yaml`, the same way. `CERTO_MODELS_LIST_FILE` is not read. |
 | `tasks_dir` | the bundled task set | A folder of your own tasks, in the same shape. |
 
 Any other key is an error. Relative paths are relative to the folder where
@@ -74,22 +76,23 @@ arms:
 
 Grading is the same as for every arm: the hidden tests decide. Each run
 records every rung that ran and which one gave the final verdict.
-`escalation.ladders` in `models.yaml` are not used here: an arm's ladder
+`escalation.ladders` in `models_list.yaml` are not used here: an arm's ladder
 is its `models` list, or a derived one.
 
 ## How models are used
 
-- The arm's model is taken from its `models.yaml` entry: `model`,
-  `api_key`, `base_url` and `reasoning_effort`. An empty field stays empty;
+- The arm's model is taken from the model files: its id, ratings,
+  `reasoning_effort` and `timeout_seconds` from the list, its `api_key`,
+  `base_url` and overrides from `models.yaml`. An empty field stays empty;
   it is never filled from `.env` or the environment's `CERTO_LLM_*`
   settings.
-- An arm that names a model with `activated: false` is an error: Certo
-  never uses an inactive model. Set `activated: true` on it to benchmark
-  it. (Before version 0.1.9 the flag was ignored here.)
-- Problems in `models.yaml` are checked as for every command (see
-  [models.yaml](models-yaml.md#checks)): errors stop the benchmark,
+- An arm can only name a model that `models.yaml` enables. A model that is
+  only in the list, or has `activated: false`, is an error that says how
+  to enable it. (Before version 0.1.9 `activated` was ignored here.)
+- Problems in the model files are checked as for every command (see
+  [Checks](models-yaml.md#checks)): errors stop the benchmark,
   warnings are printed with the plan.
-- `task_profiles` in `models.yaml` are not used. The `escalation`
+- `task_profiles` in `models_list.yaml` are not used. The `escalation`
   settings (`cost_axis`, `max_rungs`) are used only by a derived
   `escalate` arm, to build its ladder.
 

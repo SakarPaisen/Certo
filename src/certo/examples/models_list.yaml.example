@@ -1,0 +1,598 @@
+# models_list.yaml: the catalog of models Certo can choose from, with
+# their ratings, the task profiles and the escalation ladders. No keys,
+# no addresses: those are personal and go in models.yaml.
+#
+# Certo ships this file only as an example and never reads the example.
+# Copy it to models_list.yaml (in your project folder, or in
+# ~/.config/certo/) and edit it: add models, change ratings, write
+# ladders. A new Certo release updates this example, never your copy.
+#
+# Read by --auto-model, --escalate, certo bench and certo check, together
+# with models.yaml. With the default (manual) model selection, neither file
+# is read. See docs/reference/models-yaml.md,
+# docs/guides/pick-models-automatically.md and
+# docs/guides/escalate-between-models.md.
+#
+# =============================================================================
+# HOW RATINGS/WEIGHTS WORK — read this before scoring your own models
+# =============================================================================
+#
+# Each model gets a `ratings` map (whole numbers 1-5). Each task profile
+# (further down) gets a `weights` map over the same axis names. For
+# auto-selection a model's score for a task is:
+#
+#     score = sum( rating[axis] * weight[axis] for axis in weights )
+#
+# computed for every active model, then sorted descending into a ranked
+# fallback chain — see rank_candidates()/score_entry() in model_catalog.py.
+#
+# `--escalate` without an explicit ladder builds a "derived" ladder from
+# capability = reasoning + precision + code, climbing from the least to the
+# most capable model; `cost` is only used to break ties there.
+#
+# CONVENTION — on every axis, HIGHER = MORE DESIRABLE. This includes `cost`:
+#   reasoning / precision / code   5 = excellent, 1 = weak
+#   cost                           5 = cheapest (local = free), 1 = most expensive
+#                                   (NOT "how much it costs" — the opposite!)
+#
+# Why `cost` is inverted: every weight in this file is positive and scoring
+# is a plain weighted sum, so a positive weight always rewards a HIGHER
+# rating. Rating cost as cost-*effectiveness* keeps every axis on the same
+# arithmetic. If you add a custom axis, rate it the same way.
+#
+# Axis names are open-ended — add your own (e.g. `latency`) with zero code
+# changes. A model that doesn't rate itself on an axis a profile weights
+# contributes 0 for that axis, not an error.
+#
+# =============================================================================
+# RATING SCALE — the anchors behind the numbers in this file
+# =============================================================================
+#
+# The three capability axes are meant to be comparable ACROSS providers:
+# a 4 in `code` means the same thing for every model. 5 is the frontier as
+# of the date below (Claude Opus 5.5 / Fable 5.1, GPT-6 Astra, Gemini 4
+# Argon). When a new frontier ships, everything else may need to move down.
+#
+#   code       5  Terminal-Bench 4.0 >= ~55%  or  SWE-Bench Pro >= ~80%
+#              4  Terminal-Bench 4.0 ~35-54%  or  SWE-Bench Pro ~64-79%
+#              3  Terminal-Bench 4.0 ~15-34%  or  Terminal-Bench 2.1 >= ~80%
+#                 with SWE-Bench Pro ~58-63%
+#              2  SWE-Bench Pro ~45-57%  or  SWE-bench Verified ~65-80%
+#                 or  Terminal-Bench 2.0 ~45-65%
+#              1  below that (SWE-bench Verified < ~60%), or no reliable
+#                 multi-step agent loop
+#   reasoning  5  top of the Artificial Analysis Intelligence Index plus
+#                 FrontierMath Tier 4 >= ~85% / HLE (tools) >= ~60%
+#              4  AA Index just below the top, FrontierMath Tier 4 ~65-84%
+#              3  GPQA Diamond ~88-93%, weaker on frontier maths
+#              2  GPQA Diamond ~75-87%
+#              1  below that, or not measured on hard reasoning
+#   precision  No benchmark covers every provider. Proxies: hallucination /
+#              factuality evals, long-context retrieval (MRCR), tool-use
+#              evals (tau2, Toolathlon), instruction following (IFBench).
+#              The least certain axis everywhere — treat +/-1 as noise.
+#   cost       Blended price per 1M tokens at a 3:1 input:output mix,
+#              standard tier, list price (no batch, no cache):
+#              5 local/free · 4 < $1 · 3 $1-3 · 2 $3-10 · 1 > $10
+#
+# Benchmarks are vendor-reported unless a description says otherwise, and
+# were run at high/xhigh/max reasoning effort — which is why the cloud
+# reasoning models below set `reasoning_effort: "high"`. At lower effort,
+# expect less than the ratings say.
+#
+# Local models are rated as they run here: 4-bit quantized via Ollama with
+# a ~32K context window. Published scores used 128K+ context and 100+ agent
+# turns, so the local ratings are deliberately conservative. Make sure the
+# Ollama server really uses a large enough window (e.g. start it with
+# OLLAMA_CONTEXT_LENGTH=32768); otherwise prompts are silently truncated.
+#
+# Prices, model ids and benchmark numbers checked on 2026-10-17. They
+# change often — re-check provider pricing pages and LiteLLM's docs before
+# relying on one (see CLAUDE.md's "Model ID strings ... change over time").
+#
+# Which models Certo may use is decided in models.yaml, not here: a model
+# listed here but not in models.yaml is never used. models.yaml gives each
+# chosen model, by `name`, its api_key or base_url, `activated`, and any
+# overrides of the fields below.
+
+models:
+  # ===========================================================================
+  # LOCAL / SELF-HOSTED, OPEN-WEIGHT — served by Ollama (port 11434)
+  #
+  # Free to run, so cost: 5 for all of them. Tags checked against
+  # ollama.com/library on 2026-10-17. Listed weakest-first.
+  # ===========================================================================
+
+  - name: ollama-local
+    model: ollama/llama3
+    reasoning_effort: ""
+    timeout_seconds: 300
+    description: >
+      Meta Llama 3 8B. Old and small: fine for trivial, offline or
+      privacy-sensitive edits, but it cannot sustain a multi-step agent loop.
+      No current agentic-coding benchmark; rated by its size and age.
+    ratings: {reasoning: 1, precision: 1, code: 1, cost: 5}
+
+  - name: qwen3-local
+    model: ollama/qwen3
+    reasoning_effort: ""
+    timeout_seconds: 300
+    description: >
+      Alibaba Qwen3, untagged pull = the 8B variant (~5GB, hybrid
+      think/non-think). Small general model; no agentic-coding score found,
+      rated as an estimate. Superseded locally by qwen3.6 below.
+    ratings: {reasoning: 1, precision: 1, code: 1, cost: 5}
+
+  - name: glm-4.7-flash-local
+    model: ollama/glm-4.7-flash
+    reasoning_effort: ""
+    timeout_seconds: 900
+    description: >
+      Zhipu GLM-4.7-Flash (30B total / 3B active MoE, ~19GB at Q4_K_M).
+      General-purpose, not code-specialized. Use the plain `glm-4.7-flash`
+      tag, not `glm-4.7:cloud` (a 357B cloud model). No verified agentic
+      benchmark found on 2026-10-17 — ratings are an estimate; check with
+      `certo bench` before trusting them.
+    ratings: {reasoning: 2, precision: 1, code: 1, cost: 5}
+
+  - name: qwen3-coder-local
+    model: ollama/qwen3-coder:30b
+    reasoning_effort: ""
+    timeout_seconds: 900             # a local model on a slow machine can need more than the default 300
+    description: >
+      Alibaba Qwen3-Coder 30B-A3B (30B total / 3.3B active MoE, 19GB,
+      256K native context; July 2025). SWE-bench Verified ~49-52% in
+      published runs that used 128K context and 100+ turns; at 32K and Q4
+      it will do worse on long agent loops. Non-thinking model, no GPQA
+      score found. Fast thanks to 3.3B active params. Superseded by
+      qwen3.6-35b-local on every published coding benchmark.
+    ratings: {reasoning: 1, precision: 2, code: 1, cost: 5}
+
+  - name: gemma4-31b-local           # was `gemma3-local` (pointed at the 4B Gemma 3) — rename references in your ladders
+    model: ollama/gemma4:31b
+    reasoning_effort: ""
+    timeout_seconds: 900             # 31B dense: much slower per token than the 3B-active MoE models
+    description: >
+      Google Gemma 4 31B dense (19-20GB, 256K context, thinking mode;
+      needs a recent Ollama). Strong reasoner for its size: GPQA Diamond
+      84.3%, LiveCodeBench v6 80.0%, tau2 76.9%, MRCR 128K 66.4% (Google
+      model card, thinking on). Weak as a coding agent: SWE-bench Verified
+      52.0%, SWE-Bench Pro 35.7%, Terminal-Bench 2.0 42.9% (Qwen3.6 model
+      card comparison). Thinking traces eat a 32K window quickly.
+    ratings: {reasoning: 2, precision: 2, code: 1, cost: 5}
+
+  - name: qwen3.6-35b-local
+    model: ollama/qwen3.6:35b-a3b
+    reasoning_effort: ""
+    timeout_seconds: 900
+    description: >
+      Alibaba Qwen3.6-35B-A3B (35B total / 3B active MoE, ~23-24GB at
+      4-bit, hybrid thinking, April 2026). Best local coding agent in this
+      file: SWE-bench Verified 73.4%, SWE-Bench Pro 49.5%, Terminal-Bench
+      2.0 51.5%, LiveCodeBench v6 80.4% (official model card). OpenHands
+      recommends it as the first local model to try and an Ollama context
+      of at least ~22K. Some community GGUFs don't load in Ollama — use the
+      official `qwen3.6:35b-a3b` tag.
+    ratings: {reasoning: 2, precision: 2, code: 2, cost: 5}
+
+  # ===========================================================================
+  # OPENAI — CURRENT (GPT-6 family)
+  # ===========================================================================
+
+  - name: gpt-6-luna
+    model: openai/gpt-6-luna
+    reasoning_effort: "high"
+    timeout_seconds: 300
+    description: >
+      OpenAI's cheapest current tier: $0.10 in / $0.50 out per 1M (Sept
+      2026, half of GPT-5.6 Luna). DeepSWE v1.1 66.6% at max effort;
+      Terminal-Bench 4.0 16.4% (public leaderboard). OpenAI says its
+      factuality at high effort matches GPT-5.6 Sol, but it failed to
+      disclose a broken tool in 28.7% of an adversarial eval (Sol: 4.9%).
+      Same coding level as GPT-5.6 Luna at half the price — replaces it.
+    ratings: {reasoning: 3, precision: 3, code: 3, cost: 4}
+
+  - name: gpt-6.1-sol
+    model: openai/gpt-6.1-sol
+    reasoning_effort: "high"
+    timeout_seconds: 600
+    description: >
+      Balanced tier: $2 in / $10 out per 1M (cached input $0.10). OpenAI
+      reports it matches GPT-6 Astra on DeepSWE v1.1, comes within ~2 points
+      of Astra on OSWorld 2.0 and within 1.9 points on its factuality eval,
+      at about one-fifth of Astra's price. No Terminal-Bench 4.0 number
+      published yet, so code stays at 4. Replaces GPT-6 Sol (same price,
+      weaker), which is left out of this catalog.
+    ratings: {reasoning: 4, precision: 5, code: 4, cost: 2}
+
+  - name: gpt-6-astra
+    model: openai/gpt-6-astra
+    reasoning_effort: "high"
+    timeout_seconds: 600
+    description: >
+      OpenAI flagship: $10 in / $50 out per 1M. Terminal-Bench 4.0 57.9%,
+      DeepSWE v1.1 74.1%, GPQA Diamond 96.0%, FrontierMath Tier 4 97.6%,
+      MRCR 256K-512K 100%, internal hallucination rate 4.2% vs 12.2% for
+      GPT-5.6 Sol (OpenAI launch table). Use when correctness matters more
+      than cost.
+    ratings: {reasoning: 5, precision: 5, code: 5, cost: 1}
+
+  # ===========================================================================
+  # OPENAI — PREVIOUS GENERATIONS (kept for fallback / comparison)
+  #
+  # All of these are dominated by a GPT-6 model that is cheaper and at least
+  # as capable; leave them out of models.yaml unless you have a reason.
+  # ===========================================================================
+
+  - name: gpt-4.1-mini
+    model: openai/gpt-4.1-mini
+    reasoning_effort: ""
+    timeout_seconds: 300
+    description: >
+      Legacy non-reasoning small model: $0.40 in / $1.60 out per 1M.
+      Superseded by gpt-6-luna, which is cheaper and far stronger.
+      Rated as an estimate; no current agentic benchmark found.
+    ratings: {reasoning: 1, precision: 1, code: 1, cost: 4}
+
+  - name: gpt-4.1
+    model: openai/gpt-4.1
+    reasoning_effort: ""
+    timeout_seconds: 300
+    description: >
+      Legacy non-reasoning model: $2 in / $8 out per 1M. SWE-bench
+      Verified 54.6%. Good at plain instruction following, weak as an
+      agent. Superseded by gpt-6-luna on capability and price.
+    ratings: {reasoning: 1, precision: 2, code: 1, cost: 2}
+
+  - name: gpt-5.4-mini
+    model: openai/gpt-5.4-mini
+    reasoning_effort: "high"
+    timeout_seconds: 300
+    description: >
+      $0.75 in / $4.50 out per 1M. SWE-Bench Pro 54.4%, Terminal-Bench 2.0
+      60.0%, GPQA Diamond 88.0% (xhigh effort); MRCR 128K-256K 33.6%, so it
+      loses track in long contexts. Costs more than gpt-6-luna and
+      gpt-5.6-luna while scoring lower — a poor escalation rung.
+    ratings: {reasoning: 3, precision: 2, code: 2, cost: 3}
+
+  - name: gpt-5.4
+    model: openai/gpt-5.4
+    reasoning_effort: "high"
+    timeout_seconds: 300
+    description: >
+      $2.50 in / $15 out per 1M. SWE-Bench Pro 57.7%, Terminal-Bench 2.0
+      75.1%, GPQA Diamond 93.0%, MRCR 128K-256K 79.3%. Superseded by
+      gpt-6.1-sol, which is cheaper.
+    ratings: {reasoning: 3, precision: 3, code: 2, cost: 2}
+
+  - name: gpt-5.6-luna
+    model: openai/gpt-5.6-luna
+    reasoning_effort: "high"           # was "medium"; benchmarks below are at max effort
+    timeout_seconds: 300
+    description: >
+      $0.20 in / $1.20 out per 1M since the 30 July 2026 cut. SWE-Bench Pro
+      62.7%, Terminal-Bench 2.1 84.7%, Terminal-Bench 4.0 17.3%, GPQA
+      92.3%, FrontierMath Tier 4 58.5%; MRCR 256K-512K only 41.3% (OpenAI
+      table). Codes as well as GPT-5.5 for a fraction of the price, but
+      gpt-6-luna now does the same at half its price.
+    ratings: {reasoning: 3, precision: 3, code: 3, cost: 4}
+
+  - name: gpt-5.5
+    model: openai/gpt-5.5
+    reasoning_effort: "high"
+    timeout_seconds: 300
+    description: >
+      $5 in / $30 out per 1M. Terminal-Bench 2.0 82.7%, SWE-Bench Pro
+      58.6-59.4%, GPQA 93.6%, FrontierMath Tier 4 72.5%, MRCR 256K-512K
+      81.5%. Better than GPT-5.6 Luna on hard maths and long context, no
+      better at coding, at about 25x the price.
+    ratings: {reasoning: 4, precision: 4, code: 3, cost: 1}
+
+  - name: gpt-5.6-terra
+    model: openai/gpt-5.6-terra
+    reasoning_effort: "high"
+    timeout_seconds: 300
+    description: >
+      $2 in / $12 out per 1M after the July 2026 cut. SWE-Bench Pro 63.4%,
+      Terminal-Bench 2.1 87.4%, FrontierMath Tier 4 68.3%, MRCR 256K-512K
+      89.6% (OpenAI table). Superseded by gpt-6.1-sol at a lower price.
+    ratings: {reasoning: 4, precision: 4, code: 3, cost: 2}
+
+  - name: gpt-5.6-sol
+    model: openai/gpt-5.6-sol
+    reasoning_effort: "high"
+    timeout_seconds: 600
+    description: >
+      Standard list price $5 in / $30 out per 1M (a temporary discount ran
+      from 21 Aug 2026 for three months). SWE-Bench Pro 64.6%,
+      Terminal-Bench 2.1 88.8%, Terminal-Bench 4.0 37.3%, FrontierMath
+      Tier 4 83.0%. Superseded by gpt-6.1-sol, which is cheaper.
+    ratings: {reasoning: 4, precision: 4, code: 4, cost: 1}
+
+  # ===========================================================================
+  # ANTHROPIC — CURRENT (Claude 5.5 family + Fable 5.1)
+  # ===========================================================================
+
+  - name: claude-haiku-5-5
+    model: anthropic/claude-haiku-5-5
+    reasoning_effort: "high"           # API default is medium; benchmarks below are at max
+    timeout_seconds: 300
+    description: >
+      $0.10 in / $0.50 out per 1M for prompts up to 100K tokens; 5x that
+      ($0.50 / $2.50) above 100K. Terminal-Bench 4.0 39.2%, SWE-Bench Pro
+      64.8% (Anthropic, max effort). Strongest coder per dollar in this
+      file; watch the long-prompt price step if Certo sends big contexts.
+    ratings: {reasoning: 3, precision: 3, code: 4, cost: 4}
+
+  - name: claude-sonnet-5-5
+    model: anthropic/claude-sonnet-5-5
+    reasoning_effort: "high"
+    timeout_seconds: 600
+    description: >
+      $2 in / $10 out per 1M. Terminal-Bench 4.0 70.6% (64% in Artificial
+      Analysis' own run — above Opus 5.5 in both), SWE-Bench Pro 81.3%,
+      AA Intelligence Index 56. Frontier-level coder at mid-tier price;
+      Opus 5.5 still leads on hard reasoning and most other evals.
+    ratings: {reasoning: 4, precision: 4, code: 5, cost: 2}
+
+  - name: claude-opus-5-5
+    model: anthropic/claude-opus-5-5
+    reasoning_effort: "high"           # API default is medium
+    timeout_seconds: 600
+    description: >
+      $4 in / $20 out per 1M. Top of the Artificial Analysis Intelligence
+      Index (58, max effort). Terminal-Bench 4.0 66.4% at xhigh (59.6% in
+      AA's run), SWE-Bench Pro 89.9%. Anthropic's recommended default;
+      cheaper than Opus 5 and better on every shared benchmark.
+    ratings: {reasoning: 5, precision: 5, code: 5, cost: 2}
+
+  - name: claude-fable-5-1
+    model: anthropic/claude-fable-5-1
+    reasoning_effort: "high"
+    timeout_seconds: 600
+    description: >
+      $10 in / $50 out per 1M. Anthropic's model for the most demanding
+      reasoning and long-horizon agentic work: Terminal-Bench 4.0 55.8%,
+      SWE-Bench Pro 81.2%, FrontierMath Tier 4 87.8%, HLE with tools 65.0%.
+      Opus 5.5 posts higher numbers on the benchmarks both report, at less
+      than half the price — use Fable when Opus 5.5 falls short.
+    ratings: {reasoning: 5, precision: 5, code: 5, cost: 1}
+
+  # ===========================================================================
+  # ANTHROPIC — PREVIOUS GENERATIONS (legacy, still available)
+  # ===========================================================================
+
+  - name: claude-haiku-4-5
+    model: anthropic/claude-haiku-4-5-20251001
+    reasoning_effort: ""
+    timeout_seconds: 300
+    description: >
+      $1 in / $5 out per 1M. SWE-bench Verified 73.3%, but 0.0% on
+      Terminal-Bench 4.0. Superseded by claude-haiku-5-5, which is 10x
+      cheaper and far stronger.
+    ratings: {reasoning: 2, precision: 3, code: 2, cost: 3}
+
+  - name: claude-sonnet-5
+    model: anthropic/claude-sonnet-5
+    reasoning_effort: "high"
+    timeout_seconds: 300
+    description: >
+      $2 in / $10 out per 1M (the introductory price became permanent).
+      SWE-Bench Pro 63.2%, Terminal-Bench 2.1 80.4%, but Terminal-Bench 4.0
+      only 10.3%. Superseded by claude-sonnet-5-5 at the same price.
+    ratings: {reasoning: 3, precision: 3, code: 3, cost: 2}
+
+  - name: claude-opus-4-8
+    model: anthropic/claude-opus-4-8
+    reasoning_effort: "high"
+    timeout_seconds: 600
+    description: >
+      $5 in / $25 out per 1M. SWE-Bench Pro 69.2%, Terminal-Bench 2.1
+      78.9%, AA Intelligence Index 55.7, FrontierMath Tier 4 56.1% (OpenAI
+      comparison table). Superseded by claude-opus-5-5, which is cheaper.
+    ratings: {reasoning: 4, precision: 4, code: 4, cost: 2}
+
+  - name: claude-opus-5
+    model: anthropic/claude-opus-5
+    reasoning_effort: "high"
+    timeout_seconds: 600
+    description: >
+      $5 in / $25 out per 1M. Terminal-Bench 4.0 52.3%, DeepSWE v1.1 73.7%,
+      HLE with tools 63.6%, FrontierMath Tier 4 73.2%. Superseded by
+      claude-opus-5-5, which is cheaper and better on every shared row.
+    ratings: {reasoning: 5, precision: 4, code: 4, cost: 2}
+
+  # ===========================================================================
+  # GOOGLE — GEMINI (cloud only; Gemma above is the open-weight family)
+  # ===========================================================================
+
+  - name: gemini-3.1-pro
+    model: gemini/gemini-3.1-pro-preview
+    reasoning_effort: "high"
+    timeout_seconds: 300
+    description: >
+      Preview. $2 in / $12 out per 1M for prompts up to 200K ($4 / $18
+      above). SWE-Bench Pro 54.2%, Terminal-Bench 2.1 70.7%, GPQA 94.3%,
+      but DeepSWE v1.1 only 11.8% and AA Index 46.5 (OpenAI comparison
+      table). Superseded by gemini-4-argon at a similar price. Replaces the
+      old `gemini-3-pro-preview` entry, which is no longer on Google's
+      pricing page.
+    ratings: {reasoning: 3, precision: 3, code: 2, cost: 2}
+
+  - name: gemini-3.8-flash
+    model: gemini/gemini-3.8-flash
+    reasoning_effort: "high"
+    timeout_seconds: 300
+    description: >
+      $0.75 in / $3.75 out per 1M through 31 Dec 2026, then $1.50 / $7.50
+      (cost drops to 2 then). GPQA 95.3%, AA Index 58.7 vs 61.2 for
+      GPT-6 Astra on the same version, DeepSWE v1.1 73.8%, but
+      Terminal-Bench 4.0 only 19.1% (OpenAI comparison table). Strong
+      reasoner, middling terminal agent. Replaces the old
+      `gemini-3.7-flash` entry.
+    ratings: {reasoning: 4, precision: 3, code: 3, cost: 3}
+
+  - name: gemini-4-argon
+    model: gemini/gemini-4-argon
+    reasoning_effort: "high"           # defaults to medium
+    timeout_seconds: 600
+    description: >
+      Google's new flagship (GA 13 Oct 2026). $2 in / $10 out per 1M
+      through 30 Nov 2026, then $4 / $20. Terminal-Bench 4.0 57.4%,
+      DeepSWE v1.1 77.9% (Google table); AA Intelligence Index 53, tied
+      with GPT-6 Astra. Thinks heavily at high effort. Access was still
+      rolling out at launch and it may need Google's Interactions API —
+      check that LiteLLM supports it before activating.
+    ratings: {reasoning: 5, precision: 4, code: 5, cost: 2}
+
+  # ===========================================================================
+  # DEEPSEEK (cloud; open weights but far too large to run locally)
+  #
+  # Peak-hour prices shown; off-peak is half. `deepseek-v3.2` was removed:
+  # it is no longer on DeepSeek's pricing page.
+  # ===========================================================================
+
+  - name: deepseek-flash
+    model: deepseek/deepseek-flash
+    reasoning_effort: ""             # thinking is on by default; toggled by API parameter, not effort
+    timeout_seconds: 300
+    description: >
+      DeepSeek-V4.1-Flash, served as `deepseek-flash` (the old
+      `deepseek-v4-flash` name is still accepted and routed here). $0.30 in
+      / $1.20 out per 1M at peak, half off-peak. Vendor-reported:
+      Terminal-Bench 2.1 90.6%, Terminal-Bench 4.0 31.2%, DeepSWE v1.1
+      74.2%, GPQA 90.9% — none independently verified yet.
+    ratings: {reasoning: 3, precision: 3, code: 3, cost: 4}
+
+  - name: deepseek-v4-pro
+    model: deepseek/deepseek-v4-pro
+    reasoning_effort: ""
+    timeout_seconds: 300
+    description: >
+      DeepSeek-V4-Pro-0813. $1.32 in / $3.96 out per 1M at peak. SWE-Bench
+      Pro 52-55% (vendor); an independent CAISI run measured SWE-bench
+      Verified at 74.0% against the vendor's 80.6%. DeepSeek says V4.1-Flash
+      beats it, at a lower price.
+    ratings: {reasoning: 3, precision: 3, code: 2, cost: 3}
+
+  # ===========================================================================
+  # MOONSHOT AI — KIMI (cloud; open weights, ~1-2.8T params, not local)
+  # ===========================================================================
+
+  - name: kimi-k2.7-code
+    model: moonshot/kimi-k2.7-code
+    reasoning_effort: ""
+    timeout_seconds: 300
+    description: >
+      Coding-specialized, 256K context. $0.95 in / $4 out per 1M.
+      Artificial Analysis: Terminal-Bench 2.1 67.4%, GPQA 89.6%, IFBench
+      63.1%; DeepSWE 31%. Most of Moonshot's launch numbers are on its own
+      benchmarks.
+    ratings: {reasoning: 3, precision: 3, code: 2, cost: 3}
+
+  - name: kimi-k3
+    model: moonshot/kimi-k3
+    reasoning_effort: ""             # always-on max reasoning
+    timeout_seconds: 600
+    description: >
+      Moonshot flagship, 2.8T MoE, 1M context. $3 in / $15 out per 1M
+      ($0.30 cached input). Terminal-Bench 2.1 88.3%, but Terminal-Bench
+      3.0 17.4%; DeepSWE 67.5%, GPQA 93.5%. Always reasons at max, so it
+      is slow and token-hungry (about 2x the average output tokens in AA's
+      index run).
+    ratings: {reasoning: 4, precision: 3, code: 3, cost: 2}
+
+# =============================================================================
+# DETERMINISTIC TASK -> WEIGHT-VECTOR CLASSIFICATION
+# =============================================================================
+#
+# Deterministic (no LLM call) task -> weight-vector classification, reused
+# from this harness's existing KeywordTrigger pattern (see skills/). The task
+# text is matched against each profile's `triggers` (case-insensitive
+# substring match) IN THE ORDER PROFILES ARE DECLARED BELOW — the first one
+# that matches wins, so put a more specific profile earlier if its triggers
+# could also appear in a broader one. `default` is the fallback when nothing
+# else matches; its own position doesn't matter for that purpose, but keep it
+# last for readability.
+#
+# Add your own axes/profiles freely — scoring just sums whatever keys a
+# profile's `weights` declares against whatever `ratings` each model
+# provides (see the ratings/weights note at the top of this file for how
+# `cost` in particular is scored).
+
+task_profiles:
+  # High correctness + deep reasoning + coding.
+  debugging:
+    triggers: [fix, bug, crash, "failing test", "race condition", debug, debugging, error, exception, regression]
+    weights: {reasoning: 3, precision: 2, code: 2, cost: 0.5}
+
+  # Cheap generation/scaffolding. Don't waste frontier inference here.
+  scaffolding:
+    triggers: [scaffold, "create a new", "set up", setup, boilerplate, initialize, initialization, "starter project", template, prototype]
+    weights: {cost: 2, code: 1, reasoning: 0.5, precision: 0.5}
+
+  # Code quality matters more than raw generation speed.
+  refactor:
+    triggers: [refactor, "clean up", simplify, restructure, redesign, optimize, modernization]
+    weights: {code: 2, precision: 2, reasoning: 1, cost: 0.5}
+
+  # Architecture needs stronger reasoning and precision.
+  architecture:
+    triggers: [architecture, "system design", "design system", "technical design", "architecture decision", ADR, "distributed system", scalability, "data architecture"]
+    weights: {reasoning: 3, precision: 3, code: 1, cost: 0.5}
+
+  # Research / analysis favors reasoning and precision.
+  research:
+    triggers: [research, analyze, analysis, investigate, compare, evaluate, "deep dive", "trade-off", "tradeoff"]
+    weights: {reasoning: 3, precision: 3, code: 0.5, cost: 0.5}
+
+  # High-volume mechanical work should bias heavily toward cheap models.
+  extraction:
+    triggers: [extract, extraction, classify, classification, categorize, normalize, transform, parse, summarize]
+    weights: {cost: 3, precision: 2, reasoning: 0.5, code: 0}
+
+  # Agentic tasks need reasoning + code, with cost still relevant.
+  agent:
+    triggers: [agent, agentic, "multi-step", "long-running", "tool use", tools, automate, automation, workflow]
+    weights: {reasoning: 3, code: 2, precision: 2, cost: 1}
+
+  # Default balanced profile — used when nothing above matches.
+  default:
+    weights: {reasoning: 1, cost: 1, precision: 1, code: 1}
+
+# =============================================================================
+# ESCALATION (`certo --escalate`): start cheap, climb only when verification fails
+# =============================================================================
+#
+# Optional. With no `escalation:` section at all, `--escalate` builds a
+# "derived" ladder from the active models' ratings: least capable first,
+# most capable last, at most `max_rungs` long (see
+# docs/guides/escalate-between-models.md). An explicit ladder written here
+# always wins over the derived one.
+#
+# Every rung names a model from `models:` above. A rung whose model isn't
+# enabled in models.yaml is skipped, with a notice.
+#
+# With the ratings above, the cheapest model at each capability level is:
+#   qwen3.6-35b-local (6, free) -> gpt-6-luna (9, ~$0.20) ->
+#   claude-haiku-5-5 (10, ~$0.20) -> claude-sonnet-5-5 / gpt-6.1-sol
+#   (13, ~$4) -> claude-opus-5-5 (15, ~$8)
+# (capability = reasoning + precision + code; price = blended per 1M).
+#
+# escalation:
+#   cost_axis: cost       # the rating axis that means cost-effectiveness (default: cost)
+#   max_rungs: 3          # longest derived ladder (default: 3, at least 2)
+#   ladders:
+#     # Used by `--escalate` with no name, when it exists.
+#     default:
+#       - model: qwen3.6-35b-local
+#         retries: 1      # fix attempts on this rung (default: CERTO_MAX_VERIFY_RETRIES)
+#       - model: claude-haiku-5-5
+#       - model: claude-sonnet-5-5
+#     # `--escalate local-only`. Written as a mapping to set an option.
+#     local-only:
+#       escalate_on_acceptance_failed: true   # also climb on acceptance_failed
+#       rungs:
+#         - model: qwen3-coder-local
+#         - model: qwen3.6-35b-local
+#           reasoning_effort: max             # this rung only

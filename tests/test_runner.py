@@ -35,7 +35,9 @@ def _config_available() -> bool:
     return True
 
 
-@pytest.mark.skipif(not _config_available(), reason="No CERTO_LLM_MODEL/CERTO_LLM_API_KEY configured in .env")
+@pytest.mark.skipif(
+    not _config_available(), reason="No CERTO_LLM_MODEL/CERTO_LLM_API_KEY configured in .env"
+)
 def test_run_task_creates_a_file(tmp_path, monkeypatch):
     monkeypatch.setenv("CERTO_WORKSPACE", str(tmp_path))
 
@@ -53,7 +55,9 @@ def test_run_task_creates_a_file(tmp_path, monkeypatch):
     assert messages.outcome.verification_state in runner.VERIFICATION_STATES
 
 
-@pytest.mark.skipif(not _config_available(), reason="No CERTO_LLM_MODEL/CERTO_LLM_API_KEY configured in .env")
+@pytest.mark.skipif(
+    not _config_available(), reason="No CERTO_LLM_MODEL/CERTO_LLM_API_KEY configured in .env"
+)
 def test_run_task_catches_entrypoint_ordering_bug_live(tmp_path, monkeypatch):
     """Closes the "not yet re-verified live" caveat that recurs across
     ROADMAP.md's Known Limitations for the `entrypoint-ordering`/smoke-run
@@ -595,7 +599,9 @@ def test_run_with_confirmation_reports_budget_exhausted_mid_confirm_loop(monkeyp
 
 
 def test_verify_and_report_reports_budget_exhausted_at_entry(monkeypatch):
-    monkeypatch.setattr(runner, "_run_verification", lambda _dir, *_a: _run(_check(summary="3 passed")))
+    monkeypatch.setattr(
+        runner, "_run_verification", lambda _dir, *_a: _run(_check(summary="3 passed"))
+    )
     conversation = _FakeConversation()
 
     outcome = runner._verify_and_report(
@@ -727,7 +733,9 @@ def test_verify_tests_never_mode_skips_entirely(monkeypatch):
 
 
 def test_verify_tests_passes_on_first_check_reports_verified(monkeypatch):
-    monkeypatch.setattr(runner, "_run_verification", lambda _dir, *_a: _run(_check(summary="3 passed")))
+    monkeypatch.setattr(
+        runner, "_run_verification", lambda _dir, *_a: _run(_check(summary="3 passed"))
+    )
 
     conversation = _FakeConversation()
     emitted = []
@@ -1814,10 +1822,12 @@ task_profiles:
 """
 
 
-def _write_catalog(tmp_path) -> str:
-    path = tmp_path / "models.yaml"
-    path.write_text(_MODEL_CATALOG_YAML)
-    return str(path)
+def _catalog_files(tmp_path) -> dict[str, str]:
+    """Config fields naming both model files, written from the catalog."""
+    from model_file_helpers import write_model_files
+
+    list_path, models_path = write_model_files(tmp_path, _MODEL_CATALOG_YAML)
+    return {"models_file": models_path, "models_list_file": list_path}
 
 
 def _stub_stream_task_dependencies(monkeypatch, conversation, tmp_path):
@@ -1870,7 +1880,7 @@ def test_auto_mode_picks_the_best_fit_candidate_for_the_initial_run(monkeypatch,
         cfg=_cfg(
             workspace=str(tmp_path),
             model_selection="auto",
-            models_file=_write_catalog(tmp_path),
+            **_catalog_files(tmp_path),
         ),
     )
 
@@ -1890,9 +1900,7 @@ def test_auto_mode_writes_model_decisions_to_the_workspace(monkeypatch, tmp_path
 
     runner.stream_task(
         "do the thing",
-        cfg=_cfg(
-            workspace=str(tmp_path), model_selection="auto", models_file=_write_catalog(tmp_path)
-        ),
+        cfg=_cfg(workspace=str(tmp_path), model_selection="auto", **_catalog_files(tmp_path)),
     )
 
     content = (tmp_path / "MODEL_DECISIONS.md").read_text()
@@ -1920,7 +1928,7 @@ def test_auto_mode_interactive_prompts_for_the_initial_choice(monkeypatch, tmp_p
         cfg=_cfg(
             workspace=str(tmp_path),
             model_selection="auto",
-            models_file=_write_catalog(tmp_path),
+            **_catalog_files(tmp_path),
             interactive=True,
         ),
         on_model_choice=on_model_choice,
@@ -1941,7 +1949,7 @@ def test_api_failure_triggers_a_switch_to_the_next_candidate(monkeypatch, tmp_pa
         cfg=_cfg(
             workspace=str(tmp_path),
             model_selection="auto",
-            models_file=_write_catalog(tmp_path),
+            **_catalog_files(tmp_path),
             execution="local",
         ),
     )
@@ -1963,7 +1971,7 @@ def test_api_failure_reraises_once_the_chain_is_exhausted(monkeypatch, tmp_path)
             cfg=_cfg(
                 workspace=str(tmp_path),
                 model_selection="auto",
-                models_file=_write_catalog(tmp_path),
+                **_catalog_files(tmp_path),
                 execution="local",
             ),
         )
@@ -1981,12 +1989,14 @@ def test_model_decisions_are_written_even_when_the_chain_is_exhausted_and_raises
     conversation = _SwitchableConversation([_run_error("e1"), _run_error("e2")])
     _stub_stream_task_dependencies(monkeypatch, conversation, tmp_path)
     # Only two candidates, so the chain is fully exhausted after two failures.
-    two_model_catalog = tmp_path / "two_models.yaml"
-    two_model_catalog.write_text(
+    from model_file_helpers import write_model_files
+
+    list_path, models_path = write_model_files(
+        tmp_path,
         "models:\n"
         "  - name: cheap\n    model: openai/gpt-4o-mini\n    ratings: {reasoning: 2}\n"
         "  - name: balanced\n    model: anthropic/claude-sonnet-4-5-20250929\n"
-        "    ratings: {reasoning: 4}\n"
+        "    ratings: {reasoning: 4}\n",
     )
 
     with pytest.raises(Exception, match="e2"):
@@ -1995,7 +2005,8 @@ def test_model_decisions_are_written_even_when_the_chain_is_exhausted_and_raises
             cfg=_cfg(
                 workspace=str(tmp_path),
                 model_selection="auto",
-                models_file=str(two_model_catalog),
+                models_file=models_path,
+                models_list_file=list_path,
                 execution="local",
             ),
         )
@@ -2017,7 +2028,7 @@ def test_api_failure_does_not_switch_under_docker_execution(monkeypatch, tmp_pat
             cfg=_cfg(
                 workspace=str(tmp_path),
                 model_selection="auto",
-                models_file=_write_catalog(tmp_path),
+                **_catalog_files(tmp_path),
                 execution="docker",
             ),
         )
@@ -2035,7 +2046,7 @@ def test_a_non_api_exception_never_triggers_a_model_switch(monkeypatch, tmp_path
             cfg=_cfg(
                 workspace=str(tmp_path),
                 model_selection="auto",
-                models_file=_write_catalog(tmp_path),
+                **_catalog_files(tmp_path),
                 execution="local",
             ),
         )
@@ -2060,7 +2071,7 @@ def test_quality_failure_escalates_during_verify_retry(monkeypatch, tmp_path):
         cfg=_cfg(
             workspace=str(tmp_path),
             model_selection="auto",
-            models_file=_write_catalog(tmp_path),
+            **_catalog_files(tmp_path),
             execution="local",
         ),
     )
@@ -2172,7 +2183,7 @@ def test_artifacts_metrics_include_per_model_breakdown_after_a_switch(monkeypatc
             workspace=str(tmp_path),
             artifacts_dir=str(artifacts_dir),
             model_selection="auto",
-            models_file=_write_catalog(tmp_path),
+            **_catalog_files(tmp_path),
         ),
     )
 

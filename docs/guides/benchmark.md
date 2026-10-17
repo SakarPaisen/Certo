@@ -44,19 +44,18 @@ often go wrong.
 
 `certo bench --list-tasks` lists them. Node tasks need Node 18 or newer.
 
-## How `models.yaml` and `bench.yaml` relate
+## How the model files and `bench.yaml` relate
 
-- **`models.yaml`** is your model catalog, with the API keys. It's the
-  same file `--auto-model` uses, and it stays out of git. See
-  [models.yaml](../reference/models-yaml.md).
+- **`models_list.yaml`** describes the models and **`models.yaml`** holds
+  your keys and the models you use: the same two files `--auto-model`
+  uses. See [models.yaml and models_list.yaml](../reference/models-yaml.md).
 - **`bench.yaml`** says what to compare. Each arm names a strategy and
-  `models.yaml` entries **by their `name`**. It holds no keys, so you can
-  commit it.
+  models **by their `name`**. It holds no keys, so you can commit it.
 
-The benchmark never reads `.env` and never uses `--auto-model` ranking.
-`activated: false` means Certo never uses a model, so an arm that names an
-inactive model is an error: set `activated: true` on it first. (Before
-version 0.1.9 the benchmark ignored the flag.)
+The benchmark never reads `.env` and never uses `--auto-model` ranking. An
+arm can only name a model that `models.yaml` enables: a model missing
+there, or with `activated: false`, is an error. (Before version 0.1.9 the
+benchmark ignored `activated`.)
 
 ```yaml
 # bench.yaml
@@ -65,7 +64,7 @@ repeats: 3
 arms:
   - name: qwen-local
     strategy: single
-    model: qwen3-coder-local      # a name from models.yaml
+    model: qwen3-coder-local      # a model name
   - name: sonnet
     strategy: single
     model: claude-sonnet-5
@@ -81,14 +80,14 @@ like `certo --escalate`: give it `models: [a, b]` for a fixed ladder, or no
 ## Run it
 
 ```bash
-certo bench                     # reads ./bench.yaml and ./models.yaml
+certo bench                     # reads ./bench.yaml and the model files
 ```
 
 Before anything runs, Certo prints the plan: tasks × arms × repeats, and a
 rough cost estimate for paid models where LiteLLM knows the price. Answer
 `y` to start, or pass `--yes` (needed when there is no terminal).
 
-**A local model.** Make one arm with an Ollama entry from `models.yaml`.
+**A local model.** Make one arm with an Ollama model enabled in `models.yaml`.
 Runs go one at a time, because a local server serves one model at a time.
 Give Ollama a large context window first; see
 [Ollama and local models](ollama-and-local-models.md).

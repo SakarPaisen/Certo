@@ -78,7 +78,9 @@ DEFAULT_TASK_STORE_REDIS_DB = 0
 
 # --- Deterministic auto model selection (see model_catalog.py) -------------
 DEFAULT_MODEL_SELECTION = "manual"  # one of MODEL_SELECTION_MODES
-DEFAULT_MODELS_FILE = "./models.yaml"
+# Blank: look for models.yaml / models_list.yaml in the current folder, then
+# the user settings folder (see model_files.py).
+DEFAULT_MODELS_FILE = ""
 
 
 class ConfigError(ValueError):
@@ -194,11 +196,14 @@ class Config:
     # Deterministic auto model selection (see model_catalog.py/
     # model_selection.py). Default ("manual") is byte-for-byte the
     # pre-existing behavior — cfg.model is used exactly as it always has
-    # been; models_file is only ever read when model_selection == "auto".
+    # been. The model files (model_files.py) are read only for "auto" and
+    # "escalate", and by `certo check`: CERTO_MODELS_FILE is the personal
+    # models.yaml, CERTO_MODELS_LIST_FILE the catalog; blank looks them up.
     model_selection: str = DEFAULT_MODEL_SELECTION  # one of MODEL_SELECTION_MODES
     models_file: str = DEFAULT_MODELS_FILE
+    models_list_file: str = ""
     # CERTO_ESCALATION_LADDER: with model_selection "escalate", the ladder
-    # from models.yaml to climb; blank: `default`, else a derived one
+    # from models_list.yaml to climb; blank: `default`, else a derived one
     # (see escalation.py).
     escalation_ladder: str = ""
     # CERTO_MAX_TASK_COST: a USD cap on an escalation run. Before a rung
@@ -612,6 +617,7 @@ def load_config(
         choices=MODEL_SELECTION_MODES,
     )
     models_file = _get(env, "MODELS_FILE") or DEFAULT_MODELS_FILE
+    models_list_file = _get(env, "MODELS_LIST_FILE") or ""
     escalation_ladder = _get(env, "ESCALATION_LADDER") or ""
     max_task_cost = _parse_optional_cost(env, "MAX_TASK_COST")
     artifacts_dir = _get(env, "ARTIFACTS_DIR") or ""
@@ -658,6 +664,7 @@ def load_config(
         interactive=interactive,
         model_selection=model_selection,
         models_file=models_file,
+        models_list_file=models_list_file,
         escalation_ladder=escalation_ladder,
         max_task_cost=max_task_cost,
         artifacts_dir=artifacts_dir,

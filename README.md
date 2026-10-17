@@ -83,12 +83,12 @@ The exit code is nonzero for every failure state, so Certo works in scripts and 
 - **Works across languages.** Detects and verifies Python, Node/JS/TS, Go, Rust and Java (Maven/Gradle) projects. Each Python project gets its own virtual environment, used by both the agent and the checks.
 - **Verify without an agent.** `certo verify [PATH]` runs the same checks on any project, with no model needed.
 - **Any model, one setting.** Ollama, Anthropic, OpenAI, Gemini, DeepSeek or Moonshot. Switching is one environment variable.
-- **Picks the best model per task.** List your models with cost and quality ratings in `models.yaml` and Certo routes each task to the best fit, with fallback when a provider fails. No extra LLM call to decide. Add `--auto-model`.
+- **Picks the best model per task.** Rate your models in `models_list.yaml`, enable the ones you have keys for in `models.yaml`, and Certo routes each task to the best fit, with fallback when a provider fails. No extra LLM call to decide. Add `--auto-model`.
 - **Hard limits.** An iteration cap, a wall-clock budget across all retries, and an optional approve-every-action mode.
 - **Sandboxed runs.** Add `--execution docker` to run the agent in a container.
 - **Server mode.** REST, WebSocket streaming, and an OpenAI-compatible `/v1/chat/completions` endpoint.
 - **Run records.** Full transcript, token counts and cost per run, plus a log of which model was picked and why.
-- **Escalates only when it must.** Give Certo a ladder of models from `models.yaml`, cheapest first. Each task starts on the first; it moves to the next, stronger model only when Certo's verification shows the cheaper one couldn't finish. Per task, not per step. Add `--escalate`. See [Escalate between models](https://github.com/alessioricco/certo/blob/main/docs/guides/escalate-between-models.md).
+- **Escalates only when it must.** Give Certo a ladder of models from `models_list.yaml`, cheapest first. Each task starts on the first; it moves to the next, stronger model only when Certo's verification shows the cheaper one couldn't finish. Per task, not per step. Add `--escalate`. See [Escalate between models](https://github.com/alessioricco/certo/blob/main/docs/guides/escalate-between-models.md).
 - **A benchmark.** `certo bench` compares models on bundled tasks graded by hidden tests the agent never sees, and counts how often Certo itself was fooled. See [Benchmark models and strategies](https://github.com/alessioricco/certo/blob/main/docs/guides/benchmark.md).
 - **Skills and custom tools.** Add project conventions or new tools by dropping files in a folder.
 

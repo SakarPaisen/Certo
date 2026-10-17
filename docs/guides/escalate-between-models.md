@@ -11,7 +11,7 @@ certo "Build a terminal Wordle game in Python, with pytest tests" --escalate
 
 ## What escalation is
 
-You give Certo a **ladder**: a list of models from your `models.yaml`,
+You give Certo a **ladder**: a list of models from your model files,
 cheapest first. Certo runs the task on rung 1, the normal way: the agent
 works, Certo runs the project's checks, sends failures back, and gives a
 verdict. Then:
@@ -39,13 +39,17 @@ exactly as before.
 
 ## Set up a ladder
 
-Escalation uses the models in `models.yaml` (see
-[models.yaml](../reference/models-yaml.md)). Only models with
-`activated: true` (the default) are ever used.
+Escalation uses the two model files (see
+[models.yaml and models_list.yaml](../reference/models-yaml.md)):
+`models_list.yaml` describes the models and holds the ladders;
+`models.yaml` holds your keys and says which models you use. Only models
+enabled in `models.yaml` are ever used; a rung whose model isn't enabled
+there is skipped.
 
 ### An explicit ladder
 
-Write the order yourself, under `escalation.ladders`:
+Write the order yourself, under `escalation.ladders` in
+`models_list.yaml`:
 
 ```yaml
 escalation:
@@ -250,9 +254,8 @@ certo check --models
 ```
 
 `certo check` lists your active and inactive models, each ladder with its
-usable rungs, the derived ladder for the `default` profile, and every
-error and warning in `models.yaml` (for example a rung that names a model
-that doesn't exist). `--models` also sends a real test request to every
+usable rungs, the derived ladder, and every error and warning in the model
+files (for example a rung that names a model that doesn't exist). `--models` also sends a real test request to every
 active model, so a broken key or a model without tool calling shows up
 now, not halfway up a ladder. See [Commands](../reference/commands.md#certo-check).
 
@@ -280,7 +283,7 @@ produced the final result** show where the money went. See
 
 ## Related
 
-- [models.yaml](../reference/models-yaml.md#escalation)
+- [models.yaml and models_list.yaml](../reference/models-yaml.md#escalation)
 - [Pick models automatically](pick-models-automatically.md)
 - [How verification works](../concepts/how-verification-works.md)
-- [Troubleshooting](../troubleshooting.md#escalation-and-modelsyaml)
+- [Troubleshooting](../troubleshooting.md#model-files-and-escalation)

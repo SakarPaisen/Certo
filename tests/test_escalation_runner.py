@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from typing import ClassVar
 
 import pytest
+from model_file_helpers import write_model_files
 from openhands.sdk import ConversationExecutionStatus
 from openhands.sdk.conversation.exceptions import ConversationRunError
 from openhands.sdk.llm.exceptions.types import LLMRateLimitError
@@ -62,9 +63,7 @@ def _cfg(tmp_path, **overrides) -> Config:
 
 
 def _ladder(tmp_path, name=None, models=None):
-    path = tmp_path / "models.yaml"
-    path.write_text(_CATALOG)
-    catalog = load_model_catalog(str(path))
+    catalog = load_model_catalog(*write_model_files(tmp_path, _CATALOG))
     if models is not None:
         return ladder_from_models(catalog, models)
     return resolve_ladder(catalog, name)
@@ -399,13 +398,14 @@ def test_per_rung_results_and_the_combined_summary(tmp_path, fake_run):
 
 
 def test_the_escalate_setting_resolves_the_ladder_itself(tmp_path, fake_run):
-    (tmp_path / "models.yaml").write_text(_CATALOG)
+    list_path, models_path = write_model_files(tmp_path, _CATALOG)
     fake_run.script[:] = [("verified", 0, {})]
     cfg = _cfg(
         tmp_path,
         model_selection="escalate",
         escalation_ladder="careful",
-        models_file=str(tmp_path / "models.yaml"),
+        models_file=models_path,
+        models_list_file=list_path,
     )
     outcome, progress = _run(tmp_path, None, cfg=cfg)
     assert progress[0].startswith("Escalation: explicit ladder 'careful'")
@@ -439,7 +439,7 @@ def test_model_decisions_records_the_ladder_every_climb_and_the_stop(tmp_path, f
         "escalation_stop",
     ]
     text = (tmp_path / "MODEL_DECISIONS.md").read_text()
-    assert "Explicit ladder 'default' from models.yaml." in text
+    assert "Explicit ladder 'default' from models_list.yaml." in text
     assert "Ladder (explicit ladder 'default'):" in text
     assert "- **local** (capability" in text
     assert "local failed at the provider or run level (LLMRateLimitError: slow down)" in text
@@ -459,9 +459,7 @@ def test_model_decisions_explains_a_derived_ladder(tmp_path, fake_run):
 def _derived(tmp_path):
     from certo.escalation import derive_ladder
 
-    path = tmp_path / "models.yaml"
-    path.write_text(_CATALOG)
-    return derive_ladder(load_model_catalog(str(path)))
+    return derive_ladder(load_model_catalog(*write_model_files(tmp_path, _CATALOG)))
 
 
 def test_model_decisions_is_written_even_when_a_rung_raises(tmp_path, fake_run):
@@ -517,13 +515,13 @@ def test_the_per_rung_summary_lines(tmp_path, fake_run):
 def test_auto_model_ranking_ignores_the_escalation_section(tmp_path):
     from certo.model_catalog import classify_task, rank_candidates
 
-    with_section = tmp_path / "with.yaml"
-    with_section.write_text(_CATALOG)
-    without = tmp_path / "without.yaml"
-    without.write_text(_CATALOG[: _CATALOG.index("escalation:")])
     ranked = []
-    for path in (with_section, without):
-        catalog = load_model_catalog(str(path))
+    for folder, text in (
+        ("with", _CATALOG),
+        ("without", _CATALOG[: _CATALOG.index("escalation:")]),
+    ):
+        (tmp_path / folder).mkdir()
+        catalog = load_model_catalog(*write_model_files(tmp_path / folder, text))
         weights = classify_task("Build the thing", catalog).weights
         ranked.append([e.name for e in rank_candidates(catalog, weights)])
     assert ranked[0] == ranked[1]
@@ -533,9 +531,11 @@ def test_auto_model_runs_one_conversation_and_never_escalates(tmp_path, fake_run
     monkeypatch.setattr(
         runner, "_stream_escalation", lambda *a, **k: pytest.fail("escalation in auto mode")
     )
-    (tmp_path / "models.yaml").write_text(_CATALOG)
+    list_path, models_path = write_model_files(tmp_path, _CATALOG)
     fake_run.script[:] = [("no_progress", 0, {})]
-    cfg = _cfg(tmp_path, model_selection="auto", models_file=str(tmp_path / "models.yaml"))
+    cfg = _cfg(
+        tmp_path, model_selection="auto", models_file=models_path, models_list_file=list_path
+    )
 
     outcome = runner.stream_task("Build the thing", cfg=cfg)
 

@@ -16,11 +16,6 @@ import pytest
 # call load_config() at collection time), so no test reads or writes the
 # real ~/.config. Tests that need the file set their own folder.
 os.environ["XDG_CONFIG_HOME"] = tempfile.mkdtemp(prefix="certo-tests-xdg-")
-# Likewise, never read a real models.yaml (it holds keys, and `certo check`
-# reports it): tests that need a catalog write their own.
-os.environ["CERTO_MODELS_FILE"] = os.path.join(
-    tempfile.mkdtemp(prefix="certo-tests-models-"), "models.yaml"
-)
 
 
 def make_project_venv(project_dir) -> str:
@@ -45,6 +40,24 @@ def project_venv():
     return make_project_venv
 
 
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+@pytest.fixture(autouse=True)
+def _never_read_the_real_model_files(monkeypatch):
+    """The repository root may hold the developer's own models.yaml (with
+    keys) and models_list.yaml: never look there. Tests that need model
+    files write their own, or change into a temporary folder."""
+    from certo import model_files
+
+    def folders():
+        cwd = os.getcwd()
+        others = (model_files.user_dir(),)
+        return others if os.path.realpath(cwd) == os.path.realpath(_REPO_ROOT) else (cwd, *others)
+
+    monkeypatch.setattr(model_files, "_search_folders", folders)
+
+
 @pytest.fixture(autouse=True)
 def _restore_environ():
     """Undo whatever a test leaves in os.environ. load_config() copies .env
@@ -53,3 +66,11 @@ def _restore_environ():
     yield
     os.environ.clear()
     os.environ.update(saved)
+
+
+
+@pytest.fixture
+def model_files():
+    from model_file_helpers import write_model_files
+
+    return write_model_files

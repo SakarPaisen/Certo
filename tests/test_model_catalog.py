@@ -6,6 +6,7 @@ no mocking of yaml.safe_load itself.
 from __future__ import annotations
 
 import pytest
+from model_file_helpers import write_model_files
 
 from certo.model_catalog import (
     ModelCatalog,
@@ -53,17 +54,24 @@ task_profiles:
 """
 
 
-def _write(tmp_path, text: str) -> str:
-    path = tmp_path / "models.yaml"
-    path.write_text(text)
-    return str(path)
+def _write(tmp_path, text: str) -> tuple[str, str]:
+    """Both model files, from one combined text (see conftest)."""
+    return write_model_files(tmp_path, text)
+
+
+def _list_only(tmp_path, list_text: str) -> tuple[str, str]:
+    """A hand-written models_list.yaml (for malformed lists), with a
+    minimal models.yaml."""
+    (tmp_path / "models_list.yaml").write_text(list_text)
+    (tmp_path / "models.yaml").write_text("models:\n  - name: foo\n")
+    return str(tmp_path / "models_list.yaml"), str(tmp_path / "models.yaml")
 
 
 # --- load_model_catalog: happy paths -----------------------------------
 
 
 def test_loads_minimal_catalog_with_one_model_and_no_profiles(tmp_path):
-    catalog = load_model_catalog(_write(tmp_path, _MINIMAL_YAML))
+    catalog = load_model_catalog(*_write(tmp_path, _MINIMAL_YAML))
 
     assert len(catalog.models) == 1
     assert catalog.models[0] == ModelCatalogEntry(
@@ -75,7 +83,7 @@ def test_loads_minimal_catalog_with_one_model_and_no_profiles(tmp_path):
 
 
 def test_loads_full_catalog_with_profiles(tmp_path):
-    catalog = load_model_catalog(_write(tmp_path, _FULL_YAML))
+    catalog = load_model_catalog(*_write(tmp_path, _FULL_YAML))
 
     assert [m.name for m in catalog.models] == ["fast-cheap", "balanced", "deep-reasoner"]
     assert catalog.models[0].api_key == "sk-fake"
@@ -88,7 +96,7 @@ def test_loads_full_catalog_with_profiles(tmp_path):
 
 
 def test_activated_defaults_to_true_when_omitted(tmp_path):
-    catalog = load_model_catalog(_write(tmp_path, _MINIMAL_YAML))
+    catalog = load_model_catalog(*_write(tmp_path, _MINIMAL_YAML))
 
     assert catalog.models[0].activated is True
 
@@ -98,7 +106,7 @@ def test_activated_false_is_parsed(tmp_path):
         tmp_path,
         "models:\n  - name: foo\n    model: openai/gpt-4o\n    activated: false\n",
     )
-    catalog = load_model_catalog(path)
+    catalog = load_model_catalog(*path)
 
     assert catalog.models[0].activated is False
 
@@ -108,7 +116,7 @@ def test_activated_true_is_parsed(tmp_path):
         tmp_path,
         "models:\n  - name: foo\n    model: openai/gpt-4o\n    activated: true\n",
     )
-    catalog = load_model_catalog(path)
+    catalog = load_model_catalog(*path)
 
     assert catalog.models[0].activated is True
 
@@ -119,7 +127,7 @@ def test_non_boolean_activated_raises(tmp_path):
         "models:\n  - name: foo\n    model: openai/gpt-4o\n    activated: maybe\n",
     )
     with pytest.raises(ModelCatalogError, match="'activated'"):
-        load_model_catalog(path)
+        load_model_catalog(*path)
 
 
 def test_duplicate_name_still_raises_when_one_is_deactivated(tmp_path):
@@ -130,51 +138,51 @@ def test_duplicate_name_still_raises_when_one_is_deactivated(tmp_path):
         "  - name: dup\n    model: anthropic/claude-sonnet-4-5-20250929\n",
     )
     with pytest.raises(ModelCatalogError, match="duplicate model name"):
-        load_model_catalog(path)
+        load_model_catalog(*path)
 
 
 # --- load_model_catalog: error paths -------------------------------------
 
 
 def test_missing_file_raises_clear_error(tmp_path):
-    with pytest.raises(ModelCatalogError, match="no such file"):
-        load_model_catalog(str(tmp_path / "does_not_exist.yaml"))
+    with pytest.raises(ModelCatalogError, match="doesn't exist"):
+        load_model_catalog(str(tmp_path / "missing.yaml"), str(tmp_path / "models.yaml"))
 
 
 def test_invalid_yaml_raises(tmp_path):
-    path = _write(tmp_path, "models: [this is not: valid: yaml: at all")
+    path = _list_only(tmp_path, "models: [this is not: valid: yaml: at all")
     with pytest.raises(ModelCatalogError, match="not valid YAML"):
-        load_model_catalog(path)
+        load_model_catalog(*path)
 
 
 def test_non_mapping_top_level_raises(tmp_path):
-    path = _write(tmp_path, "- just\n- a\n- list\n")
+    path = _list_only(tmp_path, "- just\n- a\n- list\n")
     with pytest.raises(ModelCatalogError, match="mapping"):
-        load_model_catalog(path)
+        load_model_catalog(*path)
 
 
 def test_missing_models_key_raises(tmp_path):
-    path = _write(tmp_path, "task_profiles: {}\n")
+    path = _list_only(tmp_path, "task_profiles: {}\n")
     with pytest.raises(ModelCatalogError, match="non-empty 'models' list"):
-        load_model_catalog(path)
+        load_model_catalog(*path)
 
 
 def test_empty_models_list_raises(tmp_path):
-    path = _write(tmp_path, "models: []\n")
+    path = _list_only(tmp_path, "models: []\n")
     with pytest.raises(ModelCatalogError, match="non-empty 'models' list"):
-        load_model_catalog(path)
+        load_model_catalog(*path)
 
 
 def test_model_entry_missing_name_raises(tmp_path):
-    path = _write(tmp_path, "models:\n  - model: openai/gpt-4o\n")
+    path = _list_only(tmp_path, "models:\n  - model: openai/gpt-4o\n")
     with pytest.raises(ModelCatalogError, match="'name'"):
-        load_model_catalog(path)
+        load_model_catalog(*path)
 
 
 def test_model_entry_missing_model_id_raises(tmp_path):
-    path = _write(tmp_path, "models:\n  - name: foo\n")
+    path = _list_only(tmp_path, "models:\n  - name: foo\n")
     with pytest.raises(ModelCatalogError, match="'model'"):
-        load_model_catalog(path)
+        load_model_catalog(*path)
 
 
 def test_duplicate_model_names_raise(tmp_path):
@@ -185,33 +193,33 @@ def test_duplicate_model_names_raise(tmp_path):
         "  - name: dup\n    model: anthropic/claude-sonnet-4-5-20250929\n",
     )
     with pytest.raises(ModelCatalogError, match="duplicate model name"):
-        load_model_catalog(path)
+        load_model_catalog(*path)
 
 
 def test_non_numeric_rating_raises(tmp_path):
-    path = _write(
+    path = _list_only(
         tmp_path, "models:\n  - name: foo\n    model: openai/gpt-4o\n    ratings: {cost: high}\n"
     )
     with pytest.raises(ModelCatalogError, match="rating"):
-        load_model_catalog(path)
+        load_model_catalog(*path)
 
 
 def test_ratings_not_a_mapping_raises(tmp_path):
-    path = _write(
+    path = _list_only(
         tmp_path, "models:\n  - name: foo\n    model: openai/gpt-4o\n    ratings: [1, 2, 3]\n"
     )
     with pytest.raises(ModelCatalogError, match="'ratings'"):
-        load_model_catalog(path)
+        load_model_catalog(*path)
 
 
 def test_task_profile_non_numeric_weight_raises(tmp_path):
-    path = _write(
+    path = _list_only(
         tmp_path,
         "models:\n  - name: foo\n    model: openai/gpt-4o\n    ratings: {cost: 5}\n"
         "task_profiles:\n  bogus:\n    weights: {cost: lots}\n",
     )
     with pytest.raises(ModelCatalogError, match="weight"):
-        load_model_catalog(path)
+        load_model_catalog(*path)
 
 
 # --- classify_task ---------------------------------------------------------
@@ -337,7 +345,7 @@ def test_rank_candidates_raises_when_every_model_is_deactivated():
 
 def test_timeout_seconds_defaults_to_300_and_can_be_set(tmp_path):
     catalog = load_model_catalog(
-        _write(
+        *_write(
             tmp_path,
             """
 models:
@@ -360,7 +368,7 @@ models:
 def test_timeout_seconds_must_be_a_whole_number_of_seconds(tmp_path, value):
     text = f"models:\n  - name: m\n    model: openai/gpt-4o\n    timeout_seconds: {value}\n"
     with pytest.raises(ModelCatalogError, match="timeout_seconds"):
-        load_model_catalog(_write(tmp_path, text))
+        load_model_catalog(*_write(tmp_path, text))
 
 
 # --- escalation section ----------------------------------------------------------
@@ -379,7 +387,7 @@ models:
 
 
 def test_no_escalation_section_gives_the_defaults(tmp_path):
-    settings = load_model_catalog(_write(tmp_path, _TWO_MODELS)).escalation
+    settings = load_model_catalog(*_write(tmp_path, _TWO_MODELS)).escalation
 
     assert settings.cost_axis == "cost"
     assert settings.cost_axis_set is False
@@ -407,7 +415,7 @@ escalation:
           reasoning_effort: max
 """
     )
-    settings = load_model_catalog(_write(tmp_path, text)).escalation
+    settings = load_model_catalog(*_write(tmp_path, text)).escalation
 
     assert (settings.cost_axis, settings.cost_axis_set, settings.max_rungs) == ("price", True, 4)
     default = settings.ladders["default"]
@@ -444,13 +452,15 @@ escalation:
 )
 def test_escalation_section_shape_errors(tmp_path, section, message):
     with pytest.raises(ModelCatalogError, match=message):
-        load_model_catalog(_write(tmp_path, _TWO_MODELS + section + "\n"))
+        load_model_catalog(*_write(tmp_path, _TWO_MODELS + section + "\n"))
 
 
 def test_the_commented_example_in_models_yaml_example_parses(tmp_path):
     from pathlib import Path
 
-    text = (Path(__file__).resolve().parent.parent / "models.yaml.example").read_text()
+    text = (
+        Path(__file__).resolve().parent.parent / "src/certo/examples/models_list.yaml.example"
+    ).read_text()
     block = text[text.index("# escalation:") :]
     uncommented = "\n".join(line[2:] for line in block.splitlines() if line.startswith("# "))
     models = text[
@@ -458,6 +468,136 @@ def test_the_commented_example_in_models_yaml_example_parses(tmp_path):
             "# =============================================================================\n# DETERMINISTIC"
         )
     ]
-    catalog = load_model_catalog(_write(tmp_path, models + "\n" + uncommented + "\n"))
+    catalog = load_model_catalog(*_write(tmp_path, models + "\n" + uncommented + "\n"))
 
     assert list(catalog.escalation.ladders) == ["default", "local-only"]
+
+
+# --- the two files: models_list.yaml and models.yaml ------------------------------
+
+_LIST = """
+models:
+  - name: local
+    model: ollama/qwen3-coder:30b
+    timeout_seconds: 900
+    ratings: {reasoning: 1, precision: 2, code: 1, cost: 5}
+  - name: cloud
+    model: openai/gpt-6-luna
+    reasoning_effort: high
+    description: Cheap cloud model.
+    ratings: {reasoning: 3, precision: 3, code: 3, cost: 4}
+  - name: unused
+    model: anthropic/claude-sonnet-5-5
+    ratings: {reasoning: 4, precision: 4, code: 5, cost: 2}
+"""
+
+
+def _files(tmp_path, personal: str, listed: str = _LIST) -> tuple[str, str]:
+    (tmp_path / "models_list.yaml").write_text(listed)
+    (tmp_path / "models.yaml").write_text(personal)
+    return str(tmp_path / "models_list.yaml"), str(tmp_path / "models.yaml")
+
+
+def test_models_yaml_picks_models_from_the_list_and_adds_personal_settings(tmp_path):
+    catalog = load_model_catalog(
+        *_files(
+            tmp_path,
+            "models:\n  - name: local\n    base_url: http://gpu-box:11434\n"
+            "  - name: cloud\n    api_key: sk-mine\n    activated: false\n",
+        )
+    )
+    local, cloud, unused = catalog.models
+    assert (local.model, local.base_url, local.api_key) == (
+        "ollama/qwen3-coder:30b",
+        "http://gpu-box:11434",
+        None,
+    )
+    assert (local.configured, local.activated, local.timeout_seconds) == (True, True, 900)
+    assert (cloud.api_key, cloud.configured, cloud.activated) == ("sk-mine", True, False)
+    # In the list only: known, never used.
+    assert (unused.configured, unused.activated) == (False, False)
+
+
+def test_overrides_replace_the_lists_values(tmp_path):
+    catalog = load_model_catalog(
+        *_files(
+            tmp_path,
+            "models:\n  - name: cloud\n    api_key: k\n    ratings: {code: 4}\n"
+            "    reasoning_effort: max\n    timeout_seconds: 60\n    description: Mine.\n",
+        )
+    )
+    cloud = catalog.models[1]
+    # Ratings are replaced axis by axis.
+    assert cloud.ratings == {"reasoning": 3, "precision": 3, "code": 4, "cost": 4}
+    assert (cloud.reasoning_effort, cloud.timeout_seconds, cloud.description) == (
+        "max",
+        60,
+        "Mine.",
+    )
+
+
+@pytest.mark.parametrize("key", ["api_key", "base_url", "activated"])
+def test_personal_settings_in_the_list_are_an_error(tmp_path, key):
+    listed = _LIST.replace("    timeout_seconds: 900\n", f"    {key}: x\n")
+    with pytest.raises(ModelCatalogError, match=f"has {key}.*belong in models.yaml"):
+        load_model_catalog(*_files(tmp_path, "models:\n  - name: local\n", listed))
+
+
+@pytest.mark.parametrize(
+    "personal",
+    [
+        "models:\n  - name: local\n    model: ollama/qwen3-coder:30b\n",
+        "models:\n  - name: local\ntask_profiles: {}\n",
+        "models:\n  - name: local\nescalation: {}\n",
+    ],
+)
+def test_the_old_single_file_models_yaml_says_what_to_move(tmp_path, personal):
+    with pytest.raises(ModelCatalogError, match="Since version 0.1.10.*models_list.yaml"):
+        load_model_catalog(*_files(tmp_path, personal))
+
+
+def test_a_name_missing_from_the_list(tmp_path):
+    paths = _files(tmp_path, "models:\n  - name: claude\n")
+    with pytest.raises(ModelCatalogError, match="'claude', which isn't in models_list.yaml"):
+        load_model_catalog(*paths)
+    assert load_model_catalog(*paths, strict=False).load_problems == (
+        (
+            "models.yaml names 'claude', which isn't in models_list.yaml. Check the spelling, or "
+            "add the model to models_list.yaml."
+        ),
+    )
+
+
+def test_a_name_listed_twice_in_models_yaml(tmp_path):
+    paths = _files(tmp_path, "models:\n  - name: local\n  - name: local\n")
+    assert (
+        "models.yaml lists 'local' twice." in load_model_catalog(*paths, strict=False).load_problems
+    )
+
+
+@pytest.mark.parametrize(
+    ("personal", "message"),
+    [
+        ("models: []\n", "non-empty 'models' list"),
+        ("models:\n  - api_key: k\n", "'name'"),
+        ("models:\n  - name: local\n    colour: red\n", "unknown key"),
+        ("models:\n  - name: local\n    activated: maybe\n", "'activated'"),
+    ],
+)
+def test_models_yaml_shape_errors(tmp_path, personal, message):
+    with pytest.raises(ModelCatalogError, match=message):
+        load_model_catalog(*_files(tmp_path, personal))
+
+
+def test_the_shipped_examples_load_together():
+    from pathlib import Path
+
+    from certo.catalog_check import check_catalog
+
+    examples = Path(__file__).resolve().parent.parent / "src/certo/examples"
+    catalog = load_model_catalog(
+        str(examples / "models_list.yaml.example"), str(examples / "models.yaml.example")
+    )
+    assert check_catalog(catalog).errors == []
+    assert any(m.activated for m in catalog.models)
+    assert any(not m.configured for m in catalog.models)

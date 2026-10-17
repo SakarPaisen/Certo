@@ -1633,9 +1633,12 @@ escalation:
 
 
 def _escalation_cfg(tmp_path, **overrides):
-    path = tmp_path / "models.yaml"
-    path.write_text(_ESCALATION_CATALOG)
-    return _cfg(workspace=str(tmp_path), models_file=str(path), **overrides)
+    from model_file_helpers import write_model_files
+
+    list_path, models_path = write_model_files(tmp_path, _ESCALATION_CATALOG)
+    return _cfg(
+        workspace=str(tmp_path), models_file=models_path, models_list_file=list_path, **overrides
+    )
 
 
 @pytest.mark.parametrize(
@@ -1670,7 +1673,7 @@ def test_the_escalate_setting_works_without_the_flag(monkeypatch, tmp_path):
         (["do it", "--escalate", "--model", "openai/x"], "can't be combined"),
         (
             ["do it", "--escalate", "fast"],
-            "no escalation ladder named 'fast' in models.yaml. Ladders: cloud-only, default.",
+            "no escalation ladder named 'fast' in models_list.yaml. Ladders: cloud-only, default.",
         ),
         (["--resume", "--escalate"], "--resume can't be combined with escalation"),
     ],
@@ -1694,13 +1697,14 @@ def test_model_flag_with_the_escalate_setting_is_an_error(monkeypatch, tmp_path,
 
 
 def test_escalate_without_a_catalog_says_what_to_do(monkeypatch, tmp_path, capsys):
-    monkeypatch.setattr(
-        cli, "load_config", lambda: _cfg(workspace=str(tmp_path), models_file=str(tmp_path / "no"))
-    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg(workspace=str(tmp_path)))
     monkeypatch.setattr(cli, "run_task", _fail_if_called)
 
     assert cli.main(["do it", "--escalate"]) == 1
-    assert "Escalation needs a model catalog" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "No models_list.yaml found" in err
+    assert "models_list.yaml.example" in err
 
 
 def test_escalate_prints_progress_and_asks_only_when_interactive(monkeypatch, tmp_path):

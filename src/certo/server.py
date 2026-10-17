@@ -92,8 +92,7 @@ def _resolve_cfg(
         raise ValueError("agents_md requires project")
     if escalate is not None and escalate is not False and model is not None:
         raise ValueError(
-            "escalate can't be combined with model: the ladder in models.yaml decides "
-            "which models run"
+            "escalate can't be combined with model: the ladder decides which models run"
         )
 
     cfg = load_config()
@@ -111,8 +110,8 @@ def _resolve_cfg(
         cfg = replace(cfg, model_selection="escalate", escalation_ladder=name)
     elif cfg.model_selection == "escalate" and model is not None:
         raise ValueError(
-            "model can't be used while CERTO_MODEL_SELECTION=escalate: the ladder in "
-            "models.yaml decides which models run"
+            "model can't be used while CERTO_MODEL_SELECTION=escalate: the ladder "
+            "decides which models run"
         )
     if execution is not None:
         cfg = replace(cfg, execution=execution)
@@ -300,7 +299,7 @@ def create_app():
                 else None
             )
             ladder = (
-                load_ladder(cfg.models_file, cfg.escalation_ladder or None)
+                load_ladder(cfg.models_file, cfg.models_list_file, cfg.escalation_ladder or None)
                 if cfg.model_selection == "escalate"
                 else None
             )
@@ -373,7 +372,7 @@ def create_app():
                 else None
             )
             ladder = (
-                load_ladder(cfg.models_file, cfg.escalation_ladder or None)
+                load_ladder(cfg.models_file, cfg.models_list_file, cfg.escalation_ladder or None)
                 if cfg.model_selection == "escalate"
                 else None
             )

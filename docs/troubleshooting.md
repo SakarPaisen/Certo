@@ -35,13 +35,15 @@ setting comes from and makes one small call to the model.
   [`budget_exhausted`](#budget_exhausted),
   [nothing to resume](#nothing-to-resume),
   [Rust fails on `cargo clippy`](#a-rust-project-fails-on-cargo-clippy)
-- Escalation and `models.yaml`: [problems](#modelsyaml-has-problems),
-  [warnings](#warnings-about-modelsyaml),
+- Model files and escalation: [files not found](#no-models_listyaml-or-modelsyaml-found),
+  [old format](#modelsyaml-is-in-the-old-format),
+  [problems](#the-model-files-have-problems),
+  [warnings](#warnings-about-the-model-files),
   [`--escalate` refuses to start](#--escalate-refuses-to-start),
   [stops with inconclusive](#escalation-stops-on-the-first-rung-with-inconclusive),
   [stops before the last rung](#escalation-stops-before-the-last-rung),
   [`--models` failures](#certo-check---models-a-model-fails)
-- Benchmark: [no bench.yaml or models.yaml](#certo-bench-no-benchyaml-or-modelsyaml),
+- Benchmark: [no bench.yaml or model files](#certo-bench-no-benchyaml-or-model-files),
   [unknown model](#certo-bench-unknown-model),
   [`--parallel` refused](#certo-bench---parallel-is-refused),
   [nothing starts](#certo-bench-nothing-starts),
@@ -260,7 +262,7 @@ on the first call.
 thinking mode.
 
 **Fix:** clear `CERTO_LLM_REASONING_EFFORT` (and `--reasoning-effort`, or
-`reasoning_effort` in `models.yaml`), or set it to `none`. When it is
+`reasoning_effort` in the model files), or set it to `none`. When it is
 empty, Certo sends no reasoning setting to Ollama models. Versions up to
 0.1.0 always asked for thinking; upgrade if you are on one.
 
@@ -303,7 +305,7 @@ column shows a CPU share, use a smaller model (for example
 
 If one step takes more than 5 minutes, the call to the model hits its
 timeout and starts over, so the step never finishes. Raise
-`CERTO_LLM_TIMEOUT_SECONDS` (or `timeout_seconds` in `models.yaml`), for
+`CERTO_LLM_TIMEOUT_SECONDS` (or `timeout_seconds` in the model files), for
 example to `900`. See [Ollama and local models](guides/ollama-and-local-models.md#make-sure-the-model-fits-in-memory).
 
 ## Verdicts
@@ -453,48 +455,82 @@ limitation).
 
 **Fix:** install the component: `rustup component add clippy`.
 
-## Escalation and `models.yaml`
+## Model files and escalation
 
-### `models.yaml` has problems
+### No `models_list.yaml` or `models.yaml` found
 
-**You see:** `Configuration error: models.yaml has 2 problem(s):` followed
-by one line per problem, or `Error: ...` lines in `certo check`.
+**You see:** `No models_list.yaml found: Certo looked in the current folder
+and in ~/.config/certo. Certo ships an example to start from; copy it and
+edit it:` followed by a `cp` command (the same for `models.yaml`).
 
-**Cause:** every command that reads `models.yaml` checks it the same way,
-and stops on an error. The errors and their fixes:
+**Cause:** `--auto-model`, `--escalate`, `certo bench` and
+`certo check --models` need both model files, and Certo ships them only as
+examples, which it never reads.
+
+**Fix:** run the `cp` command the message prints, then edit the copy: name
+the models you use in `models.yaml`, with their keys. Put the files in a
+project folder instead to use them for that project only. See
+[models.yaml and models_list.yaml](reference/models-yaml.md).
+
+### `models.yaml` is in the old format
+
+**You see:** `models.yaml gives a model id for '...'` (or `has
+task_profiles` / `has escalation`) `. Since version 0.1.10, models.yaml
+holds only your personal settings: ...`
+
+**Cause:** before 0.1.10, everything was in `models.yaml`. Now model ids,
+descriptions, ratings, task profiles and ladders go in `models_list.yaml`.
+
+**Fix:** copy the shipped `models_list.yaml.example` (or move your own
+models into a `models_list.yaml`), and keep in `models.yaml` only `name`,
+`api_key`, `base_url`, `activated` and any overrides for each model you
+use.
+
+### The model files have problems
+
+**You see:** `Configuration error: .../models_list.yaml and
+.../models.yaml have 2 problem(s):` followed by one line per problem, or
+`Error: ...` lines in `certo check`.
+
+**Cause:** every command that reads the model files checks them the same
+way, and stops on an error. The errors and their fixes:
 
 | Message starts with | Fix |
 |---|---|
-| `Two models are named '...'` | Give each model a unique `name`. |
-| `Every model has 'activated: false'` | Set `activated: true` on the models you filled in. |
+| `model '...' has api_key` (or `base_url`, `activated`) `. Those are personal settings` | Move those fields from `models_list.yaml` to the model's entry in `models.yaml`. |
+| `models.yaml names '...', which isn't in models_list.yaml` | Fix the spelling, or add the model to `models_list.yaml` first. |
+| `models.yaml lists '...' twice` | Keep one entry per model. |
+| `Two models in models_list.yaml are named '...'` | Give each model a unique `name`. |
+| `No model is enabled` | List the models you want in `models.yaml`, by name, without `activated: false`. |
 | `Ladder '...', rung N: there is no model named '...'. Models: ...` | Fix the spelling: the message lists the names that exist. |
 | `Ladder '...' lists ... twice with the same settings` | Remove the repeated rung (the same model with a different `reasoning_effort` is allowed). |
 | `Ladder '...', rung N (...): retries must be 0 or more` | Use 0 or a positive number. |
 | `escalation.cost_axis is '...', but no model has a rating with that name` | Set `cost_axis` to the rating you use for cost-effectiveness, usually `cost`. |
-| `Ladder '...' has no usable rung` | Activate at least one of its models, or fix the names. |
+| `Ladder '...' has no usable rung` | Enable at least one of its models in `models.yaml`, or fix the names. |
 
 **Fix:** run `certo check` after each change: it lists every problem at
 once.
 
-### Warnings about `models.yaml`
+### Warnings about the model files
 
 **You see:** `Warning (models.yaml): ...` (or `Warning: ...` in
 `certo check`). The command still runs.
 
 | Warning | What it means |
 |---|---|
-| `... has 'activated: false', so this rung is skipped` | The ladder names an inactive model. Activate it, or remove the rung. |
-| `... has only one usable rung (...), so it can't escalate` | Only one model in the ladder can be used. Add or activate another. |
+| `... isn't in models.yaml, so this rung is skipped` | The ladder names a model you haven't enabled. Add it to `models.yaml`, or remove the rung. |
+| `... has 'activated: false', so this rung is skipped` | The ladder names a model you turned off. Activate it, or remove the rung. |
+| `... has only one usable rung (...), so it can't escalate` | Only one model in the ladder can be used. Enable another. |
 | `Model '...' has no rating for ..., which task profile(s) ... weigh: it counts as 0` | Add the missing ratings, or the model ranks lower than it should. |
-| `Model '...' has no api_key and no base_url` | It works only if the provider's own key variable (such as `OPENAI_API_KEY`) is set. Add `api_key` otherwise. |
+| `Model '...' has no api_key and no base_url` | It works only if the provider's own key variable (such as `OPENAI_API_KEY`) is set. Add `api_key` in `models.yaml` otherwise. |
 | `... (capability ...) comes after ... but is rated less capable` | Your explicit ladder climbs to a weaker model. Allowed, if that's what you meant. |
 
 ### `--escalate` refuses to start
 
 | You see | Fix |
 |---|---|
-| `Escalation needs a model catalog, and there is none at ./models.yaml` | Copy `models.yaml.example` to `models.yaml` and activate the models to climb through, or set `CERTO_MODELS_FILE`. |
-| `There is no escalation ladder named '...' in models.yaml. Ladders: ...` | Use one of the listed names, or leave the name out for the `default` (or derived) ladder. |
+| `No models_list.yaml found` / `No models.yaml found` | See [No `models_list.yaml` or `models.yaml` found](#no-models_listyaml-or-modelsyaml-found). |
+| `There is no escalation ladder named '...' in models_list.yaml. Ladders: ...` | Use one of the listed names, or leave the name out for the `default` (or derived) ladder. |
 | `--escalate can't be combined with --auto-model or --model` | The ladder decides which models run. Drop the other flag. |
 | `--model can't be used while CERTO_MODEL_SELECTION=escalate` | Drop `--model`, or set `CERTO_MODEL_SELECTION=manual` for this run. |
 | `--resume can't be combined with escalation` | Resume without `--escalate`: it continues the last model's conversation. |
@@ -527,39 +563,45 @@ over sooner. Models with no known price count as 0 toward the cost cap.
 **You see:** a line such as `gpt-luna (openai/gpt-5.6-luna)... OpenAI
 rejected the API key. Check its api_key in models.yaml: ...`.
 
-**Fix:** follow the line: it names the `models.yaml` field to fix. `--models`
-without a `models.yaml` fails with `--models: there is no model catalog`.
+**Fix:** follow the line: it names the field to fix, in `models.yaml` (the
+key or address) or `models_list.yaml` (the model id). `--models` without
+the model files fails with `--models: No models.yaml found` and the command
+to copy the example.
 
 ## Benchmark (`certo bench`)
 
-### `certo bench`: no bench.yaml or models.yaml
+### `certo bench`: no bench.yaml or model files
 
 **You see:**
 
 ```text
-Configuration error: benchmark file not found: bench.yaml. Copy bench.yaml.example to bench.yaml and name the models.yaml entries to compare.
+Configuration error: benchmark file not found: bench.yaml. Copy bench.yaml.example to bench.yaml and name the models to compare.
 ```
 
-or `the models file './models.yaml' doesn't exist. The benchmark takes its
-models, by name, from models.yaml`.
+or `the benchmark takes its models, by name, from models.yaml and
+models_list.yaml. No models.yaml found: ...` with the `cp` command for the
+example.
 
-**Cause:** the benchmark reads its models from `models.yaml`, by name, and
-what to compare from `bench.yaml`. It never uses `.env`.
+**Cause:** the benchmark reads its models from the two model files, by
+name, and what to compare from `bench.yaml`. It never uses `.env`.
 
-**Fix:** copy `bench.yaml.example` to `bench.yaml` and `models.yaml.example`
-to `models.yaml`, then fill in the models to compare. Use `--config` for
-another benchmark file, or `models_file` in it for another models file.
-See [Benchmark models and strategies](guides/benchmark.md).
+**Fix:** copy `bench.yaml.example` to `bench.yaml`, and the model file
+examples as the message says, then enable the models to compare in
+`models.yaml`. Use `--config` for another benchmark file, or
+`models_file` / `models_list_file` in it for other model files. See
+[Benchmark models and strategies](guides/benchmark.md).
 
-### `certo bench`: an inactive model
+### `certo bench`: a model that isn't enabled
 
 **You see:** `arm 'a': model 'x' has 'activated: false' in models.yaml,
-and Certo never uses an inactive model.`
+and Certo never uses an inactive model.` or `model 'x' is in
+models_list.yaml but not in models.yaml.`
 
-**Cause:** since version 0.1.9, `activated: false` means never used, in
-the benchmark too. Before, the benchmark ignored the flag.
+**Cause:** an arm can only use a model that `models.yaml` enables. (Before
+version 0.1.9 the benchmark ignored `activated`.)
 
-**Fix:** set `activated: true` on that model in `models.yaml`.
+**Fix:** list the model in `models.yaml` with its key or address, without
+`activated: false`.
 
 ### `certo bench`: an escalate arm is refused
 

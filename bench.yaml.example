@@ -4,13 +4,16 @@
 # hidden tests the agent never sees. See docs/guides/benchmark.md and
 # docs/reference/bench-yaml.md.
 #
-# Models come from models.yaml (copy models.yaml.example), by their `name`.
+# Models are named from the model files: models_list.yaml (the catalog) and
+# models.yaml (your keys and the models you use), by their `name`.
 # Credentials stay there; this file has none and can be committed. The
 # benchmark never reads .env and never uses --auto-model ranking. A model
 # with `activated: false` can't be used: set it to true first.
 
-# Optional. Default: ./models.yaml, relative to where you run certo bench.
+# Optional. Without them, each file is looked for in the folder where you
+# run certo bench, then in ~/.config/certo/.
 # models_file: ./models.yaml
+# models_list_file: ./models_list.yaml
 
 # `all`, or a list of task names (certo bench --list-tasks shows them).
 tasks: all
@@ -25,7 +28,7 @@ arms:
   # `certo "<task>"` does.
   - name: qwen-local
     strategy: single
-    model: qwen3-coder-local      # a `name` from models.yaml
+    model: qwen3-coder-local      # a model `name`
 
   - name: sonnet
     strategy: single

@@ -45,10 +45,10 @@ current folder, the file is read instead.
 | `--reasoning-effort LEVEL` | `CERTO_LLM_REASONING_EFFORT` | Reasoning effort for this run only: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, or any value the provider accepts. `none` or `off` turns it off. |
 | `--agents-md TEXT` | none | Write `TEXT` as the project's `AGENTS.md` before the task. Needs `--project`. |
 | `--interactive` | off (`CERTO_INTERACTIVE`) | Let the agent stop and ask you questions. See [Interactive and confirm mode](../guides/interactive-mode.md). |
-| `--auto-model` | off (`CERTO_MODEL_SELECTION`) | Pick the model from `models.yaml`. See [Pick models automatically](../guides/pick-models-automatically.md). |
+| `--auto-model` | off (`CERTO_MODEL_SELECTION`) | Pick the model from the model files (`models_list.yaml`, `models.yaml`). See [Pick models automatically](../guides/pick-models-automatically.md). |
 | `--require-verification` | off | Exit 1 for `inconclusive` too. |
 | `--acceptance-checks JSON_OR_FILE` | none | Extra file checks for this task, as inline JSON or a JSON file. See [Acceptance checks](../guides/acceptance-checks.md). |
-| `--escalate [LADDER]` | off (`CERTO_MODEL_SELECTION`) | Start on the first rung of a ladder of models from `models.yaml`, and move to the next, stronger model only when Certo's verdict shows the model couldn't finish. `LADDER` names a ladder; without it, the ladder named `default` is used, else one built from the ratings. Can't be combined with `--auto-model`, `--model` or `--resume`. A missing `models.yaml` or an unknown ladder is a configuration error that lists the ladders found. See [Escalate between models](../guides/escalate-between-models.md). |
+| `--escalate [LADDER]` | off (`CERTO_MODEL_SELECTION`) | Start on the first rung of a ladder of models from `models_list.yaml`, and move to the next, stronger model only when Certo's verdict shows the model couldn't finish. `LADDER` names a ladder; without it, the ladder named `default` is used, else one built from the ratings. Can't be combined with `--auto-model`, `--model` or `--resume`. A missing model file (the error says which example to copy) or an unknown ladder is a configuration error that lists the ladders found. See [Escalate between models](../guides/escalate-between-models.md). |
 | `--resume` | off | Continue the last run in this folder (or in `--project NAME`) from the state in its `.certo/` folder. `TASK` is optional and is sent as an extra instruction. Errors when there is no saved state; does nothing (exit 0) when the last run ended `verified` and no `TASK` is given. See [Resume an interrupted run](../guides/resume-a-run.md). |
 
 **Output.** With `--project`, the first line is
@@ -152,7 +152,7 @@ certo check [--timeout SECONDS] [--models]
 | Flag | Default | Effect |
 |---|---|---|
 | `--timeout SECONDS` | `120` | How long to wait for each answer. A local model may need time to load. |
-| `--models` | off | Also send the same test request to every active model in `models.yaml`, one line per model. |
+| `--models` | off | Also send the same test request to every model enabled in `models.yaml`, one line per model. |
 
 It reads the settings like a run does, prints each LLM setting and where
 it came from (`environment variable`, `./.env (<path>)` or
@@ -161,15 +161,18 @@ one request that offers the model a tool. It passes only if the model
 answers with a tool call. Every message and its fix:
 [Troubleshooting](../troubleshooting.md).
 
-**The model catalog.** When a `models.yaml` exists (`./models.yaml`, or
-`CERTO_MODELS_FILE`), `certo check` also reports it: active and inactive
-models, each ladder with its usable rungs, the ladder Certo would build
-from the ratings, and every error and
-warning (see [models.yaml](models-yaml.md#checks)). Keys are never
-printed. For example:
+**The model files.** When `models_list.yaml` or `models.yaml` exists (see
+[where Certo looks](models-yaml.md#where-certo-looks)), `certo check` also
+reports them: which files it found, the active and inactive models, how
+many listed models aren't used, each ladder with its usable rungs, the
+ladder Certo would build from the ratings, and every error and warning
+(see [Checks](models-yaml.md#checks)). A missing file is an error with the
+command that copies its example. Keys are never printed. For example:
 
 ```text
-Model catalog: models.yaml
+Model files:
+  List: .../models_list.yaml
+  Personal settings: .../models.yaml
   Active models: qwen-local, gpt-luna, claude-sonnet
   Inactive models: gemma-local
   Ladder 'default': qwen-local -> gpt-luna -> claude-sonnet
@@ -185,7 +188,7 @@ A broken key or a model without tool calling shows up here, before a run.
 
 **Exit code.** 0 when the model check passes, the catalog has no error,
 and (with `--models`) every model passes; 1 otherwise. `--models` without
-a `models.yaml` is an error.
+the model files is an error.
 
 ## `certo bench`
 

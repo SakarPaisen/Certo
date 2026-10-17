@@ -20,7 +20,7 @@ This table maps each section of the old manual to its new page.
 | Before the agent edits an existing folder | [Work on an existing project](docs/guides/work-on-an-existing-project.md) |
 | Task source resolution | [Commands: certo](docs/reference/commands.md#certo) |
 | Interactive mode | [Interactive and confirm mode](docs/guides/interactive-mode.md) |
-| Automatic model selection | [Pick models automatically](docs/guides/pick-models-automatically.md), [models.yaml](docs/reference/models-yaml.md) |
+| Automatic model selection | [Pick models automatically](docs/guides/pick-models-automatically.md), [models.yaml and models_list.yaml](docs/reference/models-yaml.md) |
 | Run artifacts | [Run records and costs](docs/guides/run-records-and-costs.md) |
 | Server mode (HTTP/WebSocket) | [Run as a server](docs/guides/run-as-a-server.md), [Server API](docs/reference/server-api.md) |
 | Task registry persistence, `certo-admin` | [Run as a server](docs/guides/run-as-a-server.md#keep-task-records), [Commands: certo-admin](docs/reference/commands.md#certo-admin) |

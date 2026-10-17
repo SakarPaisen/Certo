@@ -24,7 +24,7 @@ toggle individual models on/off without deleting or re-adding entries.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -58,6 +58,9 @@ class ModelCatalogEntry:
     description: str = ""
     ratings: dict[str, float] = field(default_factory=dict)
     activated: bool = True
+    # Whether models.yaml lists this model. A model that is only in
+    # models_list.yaml is never used (and is not `activated`).
+    configured: bool = True
 
 
 @dataclass(frozen=True)
@@ -109,6 +112,9 @@ class ModelCatalog:
     models: list[ModelCatalogEntry]
     task_profiles: list[TaskProfile]
     escalation: EscalationSettings = field(default_factory=EscalationSettings)
+    # Problems between the two files that a non-strict load collects for
+    # catalog_check.py instead of raising (duplicate or unknown names).
+    load_problems: tuple[str, ...] = ()
 
 
 _DEFAULT_PROFILE = TaskProfile(name="default", triggers=(), weights={})
@@ -296,52 +302,174 @@ def _parse_escalation(raw: Any, path: str) -> EscalationSettings:
     )
 
 
-def load_model_catalog(path: str, *, strict: bool = True) -> ModelCatalog:
-    """Parse `models.yaml`. Raises `ModelCatalogError` for a missing file, a
-    file that isn't valid YAML, or one that fails schema validation (a
-    non-empty 'models' list, each with 'name'/'model'; 'activated' defaults
-    to `true` if omitted; profiles are optional). No minimum catalog size is
-    enforced — see `rank_candidates()`'s docstring for why (and for what
-    happens when every model is deactivated).
+LIST_FILE = "models_list.yaml"
+MODELS_FILE = "models.yaml"
+# Personal settings: they live in models.yaml, never in the shared list.
+_PERSONAL_ONLY = ("api_key", "base_url", "activated")
+_PERSONAL_KEYS = {
+    "name",
+    "api_key",
+    "base_url",
+    "activated",
+    "ratings",
+    "reasoning_effort",
+    "timeout_seconds",
+    "description",
+}
 
-    `strict=False` skips the duplicate-name check, so `catalog_check.py`
-    can report it together with every other problem. Commands load the file
-    through `catalog_check.load_checked_catalog`, which checks everything."""
+
+def _read_mapping(path: str) -> dict:
     file_path = Path(path)
     if not file_path.is_file():
-        raise ModelCatalogError(
-            f"CERTO_MODEL_SELECTION=auto requires a model catalog at {path!r}, "
-            "but no such file exists. Copy models.yaml.example to models.yaml "
-            "and fill in your models."
-        )
+        raise ModelCatalogError(f"{path} doesn't exist.")
     try:
         raw = yaml.safe_load(file_path.read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:
         raise ModelCatalogError(f"{path} is not valid YAML: {exc}") from exc
-
     if not isinstance(raw, dict):
         raise ModelCatalogError(f"{path} must contain a mapping at the top level.")
+    return raw
 
+
+def _parse_list(path: str) -> tuple[list[ModelCatalogEntry], list[TaskProfile], EscalationSettings]:
+    """models_list.yaml: the models (ids, descriptions, ratings), task
+    profiles and escalation settings. No personal settings."""
+    raw = _read_mapping(path)
     models_raw = raw.get("models")
     if not isinstance(models_raw, list) or not models_raw:
         raise ModelCatalogError(f"{path} must define a non-empty 'models' list.")
+    for data in models_raw:
+        if isinstance(data, dict):
+            personal = [key for key in _PERSONAL_ONLY if key in data]
+            if personal:
+                raise ModelCatalogError(
+                    f"{path}: model {data.get('name')!r} has {', '.join(personal)}. Those are "
+                    f"personal settings and belong in {MODELS_FILE}, next to the model's name."
+                )
     models = [_parse_model_entry(entry) for entry in models_raw]
-
-    seen_names = set()
-    for entry in models:
-        if strict and entry.name in seen_names:
-            raise ModelCatalogError(f"{path}: duplicate model name {entry.name!r}.")
-        seen_names.add(entry.name)
-
     profiles_raw = raw.get("task_profiles", {}) or {}
     if not isinstance(profiles_raw, dict):
         raise ModelCatalogError(f"{path}: 'task_profiles' must be a mapping of name -> profile.")
-    task_profiles = [_parse_task_profile(name, data) for name, data in profiles_raw.items()]
+    profiles = [_parse_task_profile(name, data) for name, data in profiles_raw.items()]
+    return models, profiles, _parse_escalation(raw.get("escalation"), path)
 
+
+def _old_format_error(path: str, what: str) -> ModelCatalogError:
+    return ModelCatalogError(
+        f"{path} {what}. Since version 0.1.10, {MODELS_FILE} holds only your personal "
+        f"settings: for each model, its `name` from {LIST_FILE} plus api_key, base_url, "
+        f"activated and optional overrides. Model ids, descriptions, task_profiles and "
+        f"escalation go in {LIST_FILE}. See docs/reference/models-yaml.md."
+    )
+
+
+def _parse_personal(path: str) -> list[dict]:
+    """models.yaml: one entry per model the user wants, by name, with keys,
+    addresses and optional overrides."""
+    raw = _read_mapping(path)
+    extra = sorted(set(raw) - {"models"})
+    if extra:
+        raise _old_format_error(path, f"has {', '.join(extra)}")
+    entries = raw.get("models")
+    if not isinstance(entries, list) or not entries:
+        raise ModelCatalogError(
+            f"{path} must define a non-empty 'models' list: the models from {LIST_FILE} "
+            "you want to use, by name."
+        )
+    parsed = []
+    for data in entries:
+        if not isinstance(data, dict):
+            raise ModelCatalogError(f"{path}: each entry under 'models' must be a mapping.")
+        name = _require_str(data, "name", context=f"An entry in {path}")
+        if "model" in data:
+            raise _old_format_error(path, f"gives a model id for {name!r}")
+        unknown = sorted(set(data) - _PERSONAL_KEYS)
+        if unknown:
+            raise ModelCatalogError(
+                f"{path}: {name!r} has unknown key(s) {', '.join(unknown)}. Allowed: "
+                f"{', '.join(sorted(_PERSONAL_KEYS))}."
+            )
+        context = f"{path}: {name!r}"
+        entry: dict[str, Any] = {
+            "name": name.strip(),
+            "api_key": _optional_str(data, "api_key"),
+            "base_url": _optional_str(data, "base_url"),
+            "activated": _parse_activated(data, context=context),
+        }
+        if "ratings" in data:
+            entry["ratings"] = _parse_ratings(data, context=context)
+        if _optional_str(data, "reasoning_effort") is not None:
+            entry["reasoning_effort"] = _optional_str(data, "reasoning_effort")
+        if data.get("timeout_seconds") is not None:
+            entry["timeout_seconds"] = _parse_timeout(data, context=context)
+        if _optional_str(data, "description") is not None:
+            entry["description"] = _optional_str(data, "description")
+        parsed.append(entry)
+    return parsed
+
+
+def _merge(listed: ModelCatalogEntry, personal: dict | None) -> ModelCatalogEntry:
+    if personal is None:
+        return replace(listed, activated=False, configured=False)
+    return replace(
+        listed,
+        api_key=personal["api_key"],
+        base_url=personal["base_url"],
+        activated=personal["activated"],
+        configured=True,
+        ratings={**listed.ratings, **personal.get("ratings", {})},
+        reasoning_effort=personal.get("reasoning_effort", listed.reasoning_effort),
+        timeout_seconds=personal.get("timeout_seconds", listed.timeout_seconds),
+        description=personal.get("description", listed.description),
+    )
+
+
+def load_model_catalog(list_path: str, models_path: str, *, strict: bool = True) -> ModelCatalog:
+    """Build the catalog from `models_list.yaml` (the models, task profiles
+    and escalation settings) and `models.yaml` (which of them to use, with
+    keys, addresses and overrides). Ratings in models.yaml replace the
+    list's axis by axis. A model missing from models.yaml is never used.
+
+    Raises `ModelCatalogError` for a missing or malformed file, personal
+    settings in the list, and the pre-0.1.10 single-file models.yaml. With
+    `strict=False`, duplicate names and names models.yaml gives that the
+    list doesn't have are collected in `load_problems` for
+    `catalog_check.py` to report with everything else; commands load
+    through `catalog_check.load_checked_catalog`. No minimum catalog size
+    is enforced (see `rank_candidates()`)."""
+    listed, profiles, escalation = _parse_list(list_path)
+    personal = _parse_personal(models_path)
+    problems: list[str] = []
+
+    seen: set[str] = set()
+    for entry in listed:
+        # catalog_check reports a duplicate in the list itself.
+        if strict and entry.name in seen:
+            raise ModelCatalogError(f"{list_path}: duplicate model name {entry.name!r}.")
+        seen.add(entry.name)
+    by_name: dict[str, dict] = {}
+    for data in personal:
+        if data["name"] in by_name:
+            problems.append(f"{MODELS_FILE} lists {data['name']!r} twice.")
+        elif data["name"] not in seen:
+            problems.append(
+                f"{MODELS_FILE} names {data['name']!r}, which isn't in {LIST_FILE}. Check the "
+                f"spelling, or add the model to {LIST_FILE}."
+            )
+        by_name.setdefault(data["name"], data)
+    if strict and problems:
+        raise ModelCatalogError(problems[0])
+
+    merged: list[ModelCatalogEntry] = []
+    done: set[str] = set()
+    for entry in listed:
+        merged.append(_merge(entry, by_name.get(entry.name) if entry.name not in done else None))
+        done.add(entry.name)
     return ModelCatalog(
-        models=models,
-        task_profiles=task_profiles,
-        escalation=_parse_escalation(raw.get("escalation"), path),
+        models=merged,
+        task_profiles=profiles,
+        escalation=escalation,
+        load_problems=tuple(problems),
     )
 
 

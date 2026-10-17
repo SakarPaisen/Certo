@@ -1068,14 +1068,19 @@ escalation:
 
 
 def _escalation_app(monkeypatch, tmp_path, calls):
-    path = tmp_path / "models.yaml"
-    path.write_text(_LADDER_CATALOG)
+    from model_file_helpers import write_model_files
+
+    list_path, models_path = write_model_files(tmp_path, _LADDER_CATALOG)
 
     def _fake_stream_task(task, cfg=None, on_message=None, acceptance_checks=None, **kwargs):
         calls.append({"cfg": cfg, **kwargs})
         return _fake_outcome()
 
-    monkeypatch.setattr(server, "load_config", lambda: _cfg(models_file=str(path)))
+    monkeypatch.setattr(
+        server,
+        "load_config",
+        lambda: _cfg(models_file=models_path, models_list_file=list_path),
+    )
     monkeypatch.setattr(server, "stream_task", _fake_stream_task)
     return TestClient(server.create_app())
 
@@ -1129,13 +1134,14 @@ def test_create_task_escalate_errors_are_400(monkeypatch, tmp_path, payload, mes
 
 
 def test_create_task_escalate_without_a_catalog_is_400(monkeypatch, tmp_path):
-    monkeypatch.setattr(server, "load_config", lambda: _cfg(models_file=str(tmp_path / "no.yaml")))
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(server, "load_config", lambda: _cfg())
     client = TestClient(server.create_app())
 
     response = client.post("/tasks", json={"task": "do it", "escalate": True})
 
     assert response.status_code == 400
-    assert "needs a model catalog" in response.json()["detail"]
+    assert "No models_list.yaml found" in response.json()["detail"]
 
 
 def test_websocket_with_escalate(monkeypatch, tmp_path):

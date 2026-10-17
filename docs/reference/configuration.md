@@ -85,9 +85,10 @@ Per-run overrides: `--model`, `--api-key`, `--base-url`,
 | Variable | Default | Meaning |
 |---|---|---|
 | `CERTO_MODEL_SELECTION` | `manual` | `manual`, `auto` or `escalate`. `auto` is the same as `--auto-model`, `escalate` the same as `--escalate`. |
-| `CERTO_MODELS_FILE` | `./models.yaml` | The model list. Read when selection is `auto` or `escalate`, and by `certo check`. See [models.yaml](models-yaml.md). |
+| `CERTO_MODELS_FILE` | empty | Your personal `models.yaml` (keys, addresses, which models you use). Empty: `./models.yaml`, else `~/.config/certo/models.yaml`. Read when selection is `auto` or `escalate`, and by `certo check`. See [models.yaml and models_list.yaml](models-yaml.md). |
+| `CERTO_MODELS_LIST_FILE` | empty | The model catalog, `models_list.yaml` (models, ratings, task profiles, ladders). Empty: `./models_list.yaml`, else `~/.config/certo/models_list.yaml`. |
 | `CERTO_MAX_TASK_COST` | empty | A cap, in US dollars, on an escalation run. Before each rung starts, Certo stops climbing if the cost recorded so far has reached it, and keeps the verdict it has. Models with no known price count as 0, and the note says so. Empty means no cap. Used only by escalation. |
-| `CERTO_ESCALATION_LADDER` | empty | With `escalate`: the ladder in `models.yaml` to climb. Empty uses the ladder named `default`, or one built from the ratings. |
+| `CERTO_ESCALATION_LADDER` | empty | With `escalate`: the ladder in `models_list.yaml` to climb. Empty uses the ladder named `default`, or one built from the ratings. |
 
 ## Skills
 

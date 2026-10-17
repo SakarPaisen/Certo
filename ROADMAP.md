@@ -171,6 +171,16 @@ decisions log below for *why* a given design was chosen.
   prompt is passed to `stream_task`, not copied into the workspace, so an
   empty-starter Python task keeps the normal "empty folder + task names
   Python → environment up front" behaviour.
+- **`model_files.py`** — where `models_list.yaml` and `models.yaml` are
+  found (0.1.10): an explicit setting (`CERTO_MODELS_LIST_FILE` /
+  `CERTO_MODELS_FILE`, or `models_list_file` / `models_file` in a bench
+  file), else the current folder, else the user settings folder; first
+  found wins, per file. `missing_message()` prints the `cp` command for
+  the shipped example in `certo/examples/`. `model_catalog.load_model_catalog
+  (list_path, models_path)` merges the two into the same `ModelCatalog`
+  as before (entries gain `configured`), so ranking, ladders and checks
+  are unchanged; a model only in the list is `configured=False,
+  activated=False`.
 - **`catalog_check.py` / `escalation.py` / `catalog_report.py` /
   `model_pricing.py`** — escalation (0.1.9). `model_catalog.py` parses
   the optional `escalation:` section (`EscalationSettings`, `Ladder`,
@@ -1044,6 +1054,23 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   floor(j(n-1)/(k-1)+0.5), which keeps the least and most capable model
   and spreads the rest. Deterministic, printed, written to
   MODEL_DECISIONS.md.
+- **The model catalog is split from personal settings (0.1.10, user's
+  design):** `models_list.yaml` (model ids, descriptions, ratings,
+  `reasoning_effort`, `timeout_seconds`, task profiles, escalation
+  ladders) and `models.yaml` (by name: `api_key`, `base_url`,
+  `activated`, overrides of ratings per axis, `reasoning_effort`,
+  `timeout_seconds`, `description`). So the catalog can be shared and
+  updated without touching keys. Both ship only as `.example` files in
+  the package and are never read from there: a release must never
+  overwrite a user's customised list, and using the example silently
+  would hide that the user has no keys configured. `models.yaml` may only
+  name models the list has; new models go into the list. Personal fields
+  in the list and the old single-file `models.yaml` are errors that say
+  what to move (no compatibility reader: the user migrates by hand).
+  Lookup mirrors `.env` (project folder before user folder) but takes the
+  first file found whole rather than merging entries, so what runs is one
+  file you can open. Tests never look in the repository root
+  (`conftest.py`), where a developer's real `models.yaml` lives.
 - **Capability ignores task profiles** (changed before release, user's
   call, with `models.yaml.example`'s rating comments as the source of
   truth). The brief first had the matched profile's weighted sum; the

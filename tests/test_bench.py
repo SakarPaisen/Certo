@@ -33,11 +33,13 @@ models:
 
 
 def _bench_file(tmp_path: Path, arms: str, tasks: str = "[temperature-table]", repeats: int = 1):
-    (tmp_path / "models.yaml").write_text(MODELS)
+    from model_file_helpers import write_model_files
+
+    list_path, models_path = write_model_files(tmp_path, MODELS)
     path = tmp_path / "bench.yaml"
     path.write_text(
-        f"models_file: {tmp_path / 'models.yaml'}\ntasks: {tasks}\nrepeats: {repeats}\n"
-        f"arms:\n{arms}"
+        f"models_file: {models_path}\nmodels_list_file: {list_path}\n"
+        f"tasks: {tasks}\nrepeats: {repeats}\narms:\n{arms}"
     )
     return str(path)
 

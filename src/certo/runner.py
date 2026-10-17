@@ -1161,7 +1161,7 @@ def stream_task(
     optional extra message from the user. A resume always saves state.
 
     `ladder` (or `cfg.model_selection == "escalate"`, which resolves one from
-    `cfg.models_file`) runs the task as an escalation: see
+    the model files) runs the task as an escalation: see
     `_stream_escalation`. `on_escalate` is asked before each climb when
     `cfg.interactive` is set; `on_progress` receives the escalation lines
     (the ladder, each climb) for a terminal.
@@ -1186,6 +1186,7 @@ def stream_task(
     if ladder is None and cfg.model_selection == "escalate":
         ladder = load_ladder(
             cfg.models_file,
+            cfg.models_list_file,
             cfg.escalation_ladder or None,
             on_warning=lambda w: _emit_notice(emit, f"Certo: models.yaml: {w}"),
         )
@@ -1222,7 +1223,9 @@ def stream_task(
     agent_usage_id = "certo"
     if cfg.model_selection == "auto":
         catalog = load_checked_catalog(
-            cfg.models_file, on_warning=lambda w: _emit_notice(emit, f"Certo: models.yaml: {w}")
+            cfg.models_file,
+            cfg.models_list_file,
+            on_warning=lambda w: _emit_notice(emit, f"Certo: models.yaml: {w}"),
         )
         profile = classify_task(task, catalog)
         ranked = rank_candidates(catalog, profile.weights)
@@ -1665,7 +1668,7 @@ def _ladder_reason(ladder: ResolvedLadder) -> str:
             "longest ladder is escalation.max_rungs."
         )
     else:
-        reason = f"Explicit ladder '{ladder.name}' from models.yaml."
+        reason = f"Explicit ladder '{ladder.name}' from models_list.yaml."
     if ladder.skipped:
         reason += f" Skipped: {', '.join(ladder.skipped)}."
     return reason

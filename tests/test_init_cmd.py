@@ -1028,9 +1028,10 @@ def _check_with_catalog(tmp_path, monkeypatch, catalog, argv=()):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("CERTO_LLM_MODEL", "openai/main")
     monkeypatch.setenv("CERTO_LLM_API_KEY", "k")
-    path = tmp_path / "models.yaml"
-    path.write_text(catalog)
-    monkeypatch.setenv("CERTO_MODELS_FILE", str(path))
+    from model_file_helpers import write_model_files
+
+    # In the project folder: the lookup finds both files there.
+    write_model_files(tmp_path, catalog)
     out = io.StringIO()
     code = init_cmd.check_main(list(argv), out=out)
     return code, out.getvalue()
@@ -1089,9 +1090,7 @@ def test_certo_check_models_tests_every_active_model(tmp_path, monkeypatch):
     # Each entry's own settings, never .env's.
     assert seen[1].api_key is None and seen[1].base_url == "http://localhost:11434"
     assert "qwen-local (ollama/qwen3-coder:30b)... ok: reachable, tool calling works." in text
-    assert (
-        "claude-sonnet (anthropic/claude-sonnet-5-5)... Anthropic rejected the API key." in text
-    )
+    assert "claude-sonnet (anthropic/claude-sonnet-5-5)... Anthropic rejected the API key." in text
     assert "Check its api_key in models.yaml" in text
     assert "sk-CATALOG-SECRET" not in text
 
@@ -1100,11 +1099,12 @@ def test_certo_check_models_without_a_catalog_is_an_error(tmp_path, monkeypatch,
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("CERTO_LLM_MODEL", "openai/main")
     monkeypatch.setenv("CERTO_LLM_API_KEY", "k")
-    monkeypatch.setenv("CERTO_MODELS_FILE", str(tmp_path / "missing.yaml"))
     out = io.StringIO()
 
     assert init_cmd.check_main(["--models"], out=out) == 1
-    assert "--models: there is no model catalog" in out.getvalue()
+    text = out.getvalue()
+    assert "--models: No models.yaml found" in text
+    assert "models.yaml.example" in text
 
 
 def test_certo_check_without_a_catalog_prints_no_report(tmp_path, monkeypatch, checks):
@@ -1115,3 +1115,44 @@ def test_certo_check_without_a_catalog_prints_no_report(tmp_path, monkeypatch, c
 
     assert init_cmd.check_main([], out=out) == 0
     assert "Model catalog" not in out.getvalue()
+
+
+def test_certo_check_names_both_files_and_counts_unused_list_models(tmp_path, monkeypatch, checks):
+    from pathlib import Path
+
+    from model_file_helpers import write_model_files
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CERTO_LLM_MODEL", "openai/main")
+    monkeypatch.setenv("CERTO_LLM_API_KEY", "k")
+    _, models_path = write_model_files(tmp_path, _CATALOG)
+    personal = Path(models_path)
+    personal.write_text(
+        "models:\n  - name: qwen-local\n  - name: gpt-luna\n    api_key: sk-x\n"
+        "  - name: claude-sonnet\n    api_key: sk-x\n"
+    )
+    out = io.StringIO()
+
+    assert init_cmd.check_main([], out=out) == 0
+    text = out.getvalue()
+    assert f"List: {tmp_path / 'models_list.yaml'}" in text
+    assert f"Personal settings: {tmp_path / 'models.yaml'}" in text
+    assert "Active models: qwen-local, gpt-luna, claude-sonnet" in text
+    assert "1 other model(s) in models_list.yaml, not used (not in models.yaml)" in text
+    assert "gemma-local isn't in models.yaml, so this rung is skipped" in text
+
+
+def test_certo_check_with_only_the_list_says_to_create_models_yaml(tmp_path, monkeypatch, checks):
+    from pathlib import Path
+
+    from model_file_helpers import write_model_files
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CERTO_LLM_MODEL", "openai/main")
+    monkeypatch.setenv("CERTO_LLM_API_KEY", "k")
+    _, models_path = write_model_files(tmp_path, _CATALOG)
+    Path(models_path).unlink()
+    out = io.StringIO()
+
+    assert init_cmd.check_main([], out=out) == 1
+    assert "Error: No models.yaml found" in out.getvalue()

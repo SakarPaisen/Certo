@@ -227,6 +227,8 @@ private/
 .env.local
 secrets/
 models.yaml
+# A personal copy of the model list (Certo ships only the .example).
+models_list.yaml
 # certo bench results (default output folder)
 bench-results/
 

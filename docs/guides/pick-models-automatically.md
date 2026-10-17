@@ -8,27 +8,39 @@ and strong models on hard ones.
 The choice uses simple keyword rules and scores you write. It makes no
 extra model call.
 
-## 1. Write `models.yaml`
+## 1. Create `models_list.yaml` and `models.yaml`
 
-Start from the example in the repository,
-[models.yaml.example](../../models.yaml.example), and save it as
-`models.yaml` in the folder where you run `certo`. A small one:
+Certo uses two files, and ships both only as examples:
+
+- **`models_list.yaml`**, the catalog: the models, their ratings and the
+  task profiles. No keys.
+- **`models.yaml`**, your personal settings: the models you use, by name,
+  each with its key or server address. It holds keys: keep it out of git,
+  like `.env`.
+
+Copy both examples into your user settings folder (or into a project
+folder, which then overrides them). `certo check` prints the exact
+commands for your installation when a file is missing:
+
+```bash
+cp <examples>/models_list.yaml.example ~/.config/certo/models_list.yaml
+cp <examples>/models.yaml.example ~/.config/certo/models.yaml
+```
+
+The list describes the models. A short one:
 
 ```yaml
+# models_list.yaml
 models:
   - name: claude-sonnet
     model: anthropic/claude-sonnet-5-5
-    api_key: "sk-ant-..."
     description: "Strong, well-rounded coding model."
-    ratings: {reasoning: 4, cost: 3, precision: 4, code: 5}
-    activated: true
+    ratings: {reasoning: 4, precision: 4, code: 5, cost: 2}
 
   - name: local-coder
     model: ollama/qwen3-coder:30b
-    base_url: "http://localhost:11434"
     description: "Free, local, weaker on hard tasks."
-    ratings: {reasoning: 3, cost: 5, precision: 3, code: 4}
-    activated: true
+    ratings: {reasoning: 1, precision: 2, code: 1, cost: 5}
 
 task_profiles:
   debugging:
@@ -38,17 +50,29 @@ task_profiles:
     weights: {reasoning: 1, cost: 1, precision: 1, code: 1}
 ```
 
-- `models.yaml` holds real API keys. Keep it out of git, like `.env`.
-- Every model in the example file starts with `activated: false`. Turn on
-  only the ones whose keys you filled in. `activated: false` means Certo
-  never uses that model, in any command.
-- Run `certo check` to see what Certo makes of the file: the active models
-  and every error or warning. `certo check --models` also tests each
-  active model with a real request.
+`models.yaml` picks the ones you use and adds what's personal:
+
+```yaml
+# models.yaml
+models:
+  - name: claude-sonnet
+    api_key: "sk-ant-..."
+  - name: local-coder
+    base_url: "http://localhost:11434"
+```
+
+- Only the models listed in `models.yaml` are used. `activated: false`
+  keeps an entry there without using it.
+- To add a model, add it to `models_list.yaml` first, then name it in
+  `models.yaml`. To change a rating for yourself only, override it in
+  `models.yaml` (`ratings: {code: 4}`).
+- Run `certo check` to see what Certo makes of the files: the active
+  models and every error or warning. `certo check --models` also tests
+  each active model with a real request.
 - On every rating, **higher is better, including `cost`**: `cost: 5` means
   cheap.
 
-Every field is in the [models.yaml reference](../reference/models-yaml.md).
+Every field is in the [reference](../reference/models-yaml.md).
 
 ## 2. Run with `--auto-model`
 
@@ -56,13 +80,13 @@ Every field is in the [models.yaml reference](../reference/models-yaml.md).
 certo "Fix the failing test in payments.py" --auto-model
 ```
 
-Or set `CERTO_MODEL_SELECTION=auto` in your settings. Certo reads
-`./models.yaml`, or the file named by `CERTO_MODELS_FILE`.
+Or set `CERTO_MODEL_SELECTION=auto` in your settings. Where Certo finds
+the two files is in the [reference](../reference/models-yaml.md#where-certo-looks).
 
 `CERTO_LLM_MODEL` must still be set: Certo checks the normal settings
-before it reads the model list. Problems in `models.yaml` are reported the
-same way for every command: errors stop the run, warnings are printed (see
-[models.yaml](../reference/models-yaml.md#checks)).
+before it reads the model files. Problems in them are reported the same
+way for every command: errors stop the run, warnings are printed (see
+[Checks](../reference/models-yaml.md#checks)).
 
 ## How a model is chosen
 
@@ -131,6 +155,6 @@ verification, use [escalation](escalate-between-models.md) instead:
 
 ## Related
 
-- [models.yaml reference](../reference/models-yaml.md)
+- [models.yaml and models_list.yaml](../reference/models-yaml.md)
 - [Escalate between models](escalate-between-models.md)
 - [Run records and costs](run-records-and-costs.md): tokens and cost per model

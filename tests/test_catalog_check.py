@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from model_file_helpers import write_model_files
 
 from certo.catalog_check import check_catalog, load_checked_catalog, usable_rungs
 from certo.model_catalog import ModelCatalogError, load_model_catalog
@@ -33,9 +34,9 @@ task_profiles:
 
 
 def _report(tmp_path, extra: str = "", models: str = _MODELS):
-    path = tmp_path / "models.yaml"
-    path.write_text(models + extra)
-    return check_catalog(load_model_catalog(str(path), strict=False))
+    return check_catalog(
+        load_model_catalog(*write_model_files(tmp_path, models + extra), strict=False)
+    )
 
 
 def test_a_consistent_catalog_has_no_problems(tmp_path):
@@ -53,7 +54,10 @@ def test_a_consistent_catalog_has_no_problems(tmp_path):
 
 def test_duplicate_model_names(tmp_path):
     report = _report(tmp_path, models=_MODELS.replace("name: mid", "name: local"))
-    assert "Two models are named 'local'. Model names must be unique." in report.errors
+    assert (
+        "Two models in models_list.yaml are named 'local'. Model names must be unique."
+        in report.errors
+    )
 
 
 def test_a_rung_naming_a_missing_model_lists_the_known_names(tmp_path):
@@ -104,7 +108,7 @@ def test_the_default_cost_axis_is_not_required(tmp_path):
 def test_a_ladder_with_only_inactive_models(tmp_path):
     report = _report(tmp_path, "escalation:\n  ladders:\n    x:\n      - model: parked\n")
     assert (
-        "Ladder 'x' has no usable rung: every model in it is missing or has 'activated: false'."
+        "Ladder 'x' has no usable rung: none of its models is enabled in models.yaml."
         in report.errors
     )
 
@@ -116,20 +120,21 @@ def test_no_active_model_at_all(tmp_path):
             "    ratings: {reason", "    activated: false\n    ratings: {reason"
         ),
     )
-    assert any(e.startswith("Every model has 'activated: false'") for e in report.errors)
+    assert any(e.startswith("No model is enabled") for e in report.errors)
 
 
 def test_load_checked_catalog_lists_every_error(tmp_path):
-    path = tmp_path / "models.yaml"
-    path.write_text(
+    list_path, models_path = write_model_files(
+        tmp_path,
         _MODELS.replace("name: mid", "name: local")
-        + "escalation:\n  ladders:\n    x:\n      - model: nope\n"
+        + "escalation:\n  ladders:\n    x:\n      - model: nope\n",
     )
     with pytest.raises(ModelCatalogError) as caught:
-        load_checked_catalog(str(path))
+        load_checked_catalog(models_path, list_path)
     message = str(caught.value)
-    assert "has 3 problem(s)" in message
-    assert "Two models are named 'local'" in message
+    assert "have 4 problem(s)" in message
+    assert "models.yaml lists 'local' twice." in message
+    assert "Two models in models_list.yaml are named 'local'" in message
     assert "no model named 'nope'" in message
 
 
@@ -201,14 +206,33 @@ def test_a_ladder_whose_capability_goes_down(tmp_path):
 
 
 def test_warnings_reach_the_callback(tmp_path):
-    path = tmp_path / "models.yaml"
-    path.write_text(
-        _MODELS + "escalation:\n  ladders:\n    x:\n      - model: strong\n      - model: local\n"
+    list_path, models_path = write_model_files(
+        tmp_path,
+        _MODELS + "escalation:\n  ladders:\n    x:\n      - model: strong\n      - model: local\n",
     )
     seen: list[str] = []
-    catalog = load_checked_catalog(str(path), on_warning=seen.append)
+    catalog = load_checked_catalog(models_path, list_path, on_warning=seen.append)
     assert len(seen) == 1
     assert [r.model for r in usable_rungs(catalog.escalation.ladders["x"], catalog)] == [
         "strong",
         "local",
     ]
+
+
+def test_a_rung_on_a_model_not_in_models_yaml_is_skipped(tmp_path):
+    from certo.model_catalog import load_model_catalog as load
+
+    list_path, models_path = write_model_files(
+        tmp_path,
+        _MODELS + "escalation:\n  ladders:\n    x:\n      - model: local\n      - model: strong\n"
+        "      - model: mid\n",
+    )
+    # Drop 'mid' from models.yaml: it stays in the list only.
+    from pathlib import Path
+
+    personal = Path(models_path)
+    personal.write_text(personal.read_text().replace("- name: mid\n  api_key: sk-fake\n", ""))
+    report = check_catalog(load(list_path, models_path, strict=False))
+    assert "Ladder 'x', rung 3: mid isn't in models.yaml, so this rung is skipped." in (
+        report.warnings
+    )

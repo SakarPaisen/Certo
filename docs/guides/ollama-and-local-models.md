@@ -85,7 +85,8 @@ but you want to use it anyway, raise the limit:
 CERTO_LLM_TIMEOUT_SECONDS=900
 ```
 
-In `models.yaml`, set it per model with `timeout_seconds: 900`. A longer
+For one model, set `timeout_seconds: 900` on it in `models_list.yaml`, or
+as an override in your `models.yaml`. A longer
 call timeout also makes the whole task longer, so you may need to raise
 `CERTO_MAX_TASK_SECONDS` too.
 

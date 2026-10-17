@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from model_file_helpers import write_model_files
 
 from certo import bench_strategies
 from certo.bench_config import BenchConfigError, load_bench_config
@@ -32,9 +33,9 @@ models:
 
 
 def _write(tmp_path: Path, bench: str, models: str = MODELS) -> str:
-    (tmp_path / "models.yaml").write_text(models)
+    list_path, models_path = write_model_files(tmp_path, models)
     path = tmp_path / "bench.yaml"
-    path.write_text(f"models_file: {tmp_path / 'models.yaml'}\n" + bench)
+    path.write_text(f"models_file: {models_path}\nmodels_list_file: {list_path}\n" + bench)
     return str(path)
 
 
@@ -75,7 +76,7 @@ def test_models_yaml_warnings_are_kept_for_the_plan(tmp_path):
 
 def test_a_models_yaml_error_stops_the_benchmark(tmp_path):
     models = MODELS + "  - name: cloud\n    model: openai/gpt-4o\n"
-    with pytest.raises(BenchConfigError, match="Two models are named 'cloud'"):
+    with pytest.raises(BenchConfigError, match="Two models in models_list.yaml are named 'cloud'"):
         load_bench_config(_write(tmp_path, VALID, models))
 
 
@@ -131,22 +132,52 @@ def test_missing_bench_file_says_what_to_do(tmp_path):
         load_bench_config(str(tmp_path / "bench.yaml"))
 
 
-def test_missing_models_file_says_what_to_do(tmp_path):
+def test_a_missing_named_models_file(tmp_path):
     path = tmp_path / "bench.yaml"
     path.write_text(f"models_file: {tmp_path / 'nope.yaml'}\narms: []\n")
+    with pytest.raises(BenchConfigError, match="'models_file' names .*nope.yaml"):
+        load_bench_config(str(path))
+
+
+def test_no_model_files_says_what_to_copy(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    path = tmp_path / "bench.yaml"
+    path.write_text("arms: []\n")
     with pytest.raises(BenchConfigError, match="models.yaml.example"):
         load_bench_config(str(path))
 
 
-def test_the_shipped_example_is_valid_against_the_shipped_models_example(tmp_path):
-    # Every model in the template ships inactive; activate them in a copy.
-    text = (_REPO / "bench.yaml.example").read_text()
-    models = (_REPO / "models.yaml.example").read_text().replace(
-        "activated: false", "activated: true"
-    )
-    (tmp_path / "models.yaml").write_text(models)
+def test_the_model_files_are_found_in_the_project_folder(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    write_model_files(tmp_path, MODELS)
+    (tmp_path / "bench.yaml").write_text("arms:\n  - {name: a, strategy: single, model: cloud}\n")
+    cfg = load_bench_config("bench.yaml")
+    assert cfg.models_list_file == str((tmp_path / "models_list.yaml").resolve())
+
+
+def test_an_arm_naming_a_model_missing_from_models_yaml(tmp_path):
+    list_path, models_path = write_model_files(tmp_path, MODELS)
+    Path(models_path).write_text("models:\n  - name: cloud\n    api_key: k\n")
     path = tmp_path / "bench.yaml"
-    path.write_text(f"models_file: {tmp_path / 'models.yaml'}\n" + text)
+    path.write_text(
+        f"models_file: {models_path}\nmodels_list_file: {list_path}\n"
+        "arms:\n  - {name: a, strategy: single, model: local-coder}\n"
+    )
+    with pytest.raises(BenchConfigError, match="in models_list.yaml but not in models.yaml"):
+        load_bench_config(str(path))
+
+
+def test_the_shipped_example_is_valid_against_the_shipped_models_example(tmp_path):
+    # The shipped list, and a models.yaml enabling the models the example names.
+    text = (_REPO / "bench.yaml.example").read_text()
+    list_path = _REPO / "src/certo/examples/models_list.yaml.example"
+    (tmp_path / "models.yaml").write_text(
+        "models:\n  - name: qwen3-coder-local\n  - name: claude-sonnet-5\n    api_key: k\n"
+    )
+    path = tmp_path / "bench.yaml"
+    path.write_text(
+        f"models_file: {tmp_path / 'models.yaml'}\nmodels_list_file: {list_path}\n" + text
+    )
     cfg = load_bench_config(str(path))
     assert [a.strategy for a in cfg.arms] == ["single", "single", "escalate"]
 
@@ -261,7 +292,9 @@ def _escalation_outcome(final_rung, names):
     from certo.escalation import RungResult
 
     rungs = tuple(
-        RungResult(n, name, f"x/{name}", "verified" if n == final_rung else "no_progress", 1, 1.0, None)
+        RungResult(
+            n, name, f"x/{name}", "verified" if n == final_rung else "no_progress", 1, 1.0, None
+        )
         for n, name in enumerate(names, start=1)
     )
     return SimpleNamespace(

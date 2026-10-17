@@ -290,7 +290,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="LADDER",
         help=(
-            "Start on the first, cheapest model of a ladder from models.yaml and move "
+            "Start on the first, cheapest model of a ladder from models_list.yaml and move "
             "to the next, stronger one only when Certo's verification shows the model "
             "couldn't finish. LADDER names a ladder under escalation.ladders; without "
             "it, the ladder named 'default' is used, else one built from the ratings. "
@@ -460,7 +460,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.auto_model or args.model is not None:
             print(
                 "Error: --escalate can't be combined with --auto-model or --model: the "
-                "ladder in models.yaml decides which models run.",
+                "ladder decides which models run.",
                 file=sys.stderr,
             )
             return 1
@@ -470,7 +470,7 @@ def main(argv: list[str] | None = None) -> int:
     elif cfg.model_selection == "escalate" and args.model is not None:
         print(
             "Error: --model can't be used while CERTO_MODEL_SELECTION=escalate: the "
-            "ladder in models.yaml decides which models run.",
+            "ladder decides which models run.",
             file=sys.stderr,
         )
         return 1
@@ -526,6 +526,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             ladder = load_ladder(
                 cfg.models_file,
+                cfg.models_list_file,
                 cfg.escalation_ladder or None,
                 on_warning=lambda w: print(f"Warning (models.yaml): {w}", file=sys.stderr),
             )

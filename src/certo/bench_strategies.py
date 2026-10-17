@@ -116,6 +116,11 @@ def model_name(
     if value not in catalog:
         names = ", ".join(sorted(catalog)) or "(none)"
         raise BenchConfigError(f"{where}: unknown model {value!r}. The models file has: {names}.")
+    if not catalog[value].configured:
+        raise BenchConfigError(
+            f"{where}: model {value!r} is in models_list.yaml but not in models.yaml. List it "
+            "in models.yaml, with its key or address, to benchmark it."
+        )
     if not catalog[value].activated:
         raise BenchConfigError(
             f"{where}: model {value!r} has 'activated: false' in models.yaml, and Certo never "

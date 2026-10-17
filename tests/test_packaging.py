@@ -107,7 +107,6 @@ def test_sdist_ships_only_the_allowlisted_paths(built):
         "MANUAL.md",
         "LICENSE",
         ".env.example",
-        "models.yaml.example",
         "bench.yaml.example",
         "docker/agent-server.Dockerfile",
     }
@@ -131,6 +130,14 @@ def test_wheel_ships_the_builtin_skill_catalog(built):
     assert repo, "no built-in skills found in the source tree"
     assert repo <= shipped
     assert any(n.startswith("lifecycle/") for n in shipped)
+
+
+def test_wheel_ships_the_model_file_examples(built):
+    # Certo ships the two model files only as examples, inside the package,
+    # so an installed Certo can tell users what to copy.
+    names = set(_wheel_names(built["wheel"]))
+    assert "certo/examples/models_list.yaml.example" in names
+    assert "certo/examples/models.yaml.example" in names
 
 
 def test_wheel_ships_the_benchmark_task_set(built):

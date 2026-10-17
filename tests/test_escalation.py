@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from model_file_helpers import write_model_files
 
 from certo.escalation import (
     EscalationError,
@@ -54,9 +55,7 @@ task_profiles:
 
 
 def _catalog(tmp_path, extra: str = "", text: str = _CATALOG):
-    path = tmp_path / "models.yaml"
-    path.write_text(text + extra)
-    return load_model_catalog(str(path))
+    return load_model_catalog(*write_model_files(tmp_path, text + extra))
 
 
 def _names(ladder):

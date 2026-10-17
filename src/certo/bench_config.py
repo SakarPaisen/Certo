@@ -20,11 +20,17 @@ import yaml
 from .bench_strategies import STRATEGIES, BenchConfigError
 from .bench_tasks import BUILTIN_TASKS_DIR, BenchTask, BenchTaskError, load_tasks
 from .catalog_check import load_checked_catalog
-from .config import DEFAULT_MODELS_FILE
-from .model_catalog import ModelCatalog, ModelCatalogEntry, ModelCatalogError
+from .model_catalog import (
+    LIST_FILE,
+    MODELS_FILE,
+    ModelCatalog,
+    ModelCatalogEntry,
+    ModelCatalogError,
+)
+from .model_files import find, missing_message
 
 DEFAULT_BENCH_FILE = "bench.yaml"
-_TOP_LEVEL_KEYS = {"tasks", "repeats", "arms", "models_file", "tasks_dir"}
+_TOP_LEVEL_KEYS = {"tasks", "repeats", "arms", "models_file", "models_list_file", "tasks_dir"}
 # Arm names become file names in the results folder.
 _ARM_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
@@ -51,6 +57,7 @@ class BenchConfig:
     arms: list[Arm]
     models_file: str
     catalog: dict[str, ModelCatalogEntry]
+    models_list_file: str = ""
     # models.yaml warnings (catalog_check.py), printed with the plan.
     catalog_warnings: list[str] = field(default_factory=list)
     # The whole catalog (task profiles, escalation settings), for ladders.
@@ -71,7 +78,7 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     if not path.is_file():
         raise BenchConfigError(
             f"benchmark file not found: {path}. Copy bench.yaml.example to bench.yaml "
-            "and name the models.yaml entries to compare."
+            "and name the models to compare."
         )
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -147,21 +154,28 @@ def load_bench_config(path: str = DEFAULT_BENCH_FILE) -> BenchConfig:
     raw = _load_yaml(bench_path)
     where = str(bench_path)
 
-    models_file = raw.get("models_file") or DEFAULT_MODELS_FILE
-    if not isinstance(models_file, str):
-        raise BenchConfigError(f"{where}: 'models_file' must be a path.")
-    if not Path(models_file).is_file():
-        raise BenchConfigError(
-            f"{where}: the models file {models_file!r} doesn't exist. The benchmark takes "
-            "its models, by name, from models.yaml: copy models.yaml.example to "
-            "models.yaml and fill in the models to compare, or set 'models_file'."
-        )
+    files = {}
+    for key, name in (("models_file", MODELS_FILE), ("models_list_file", LIST_FILE)):
+        value = raw.get(key) or ""
+        if not isinstance(value, str):
+            raise BenchConfigError(f"{where}: '{key}' must be a path.")
+        if value and not Path(value).is_file():
+            raise BenchConfigError(f"{where}: '{key}' names {value!r}, which doesn't exist.")
+        found = find(name, value)
+        if found is None:
+            raise BenchConfigError(
+                f"{where}: the benchmark takes its models, by name, from {MODELS_FILE} and "
+                f"{LIST_FILE}. {missing_message(name, repr(key) + ' in the benchmark file')}"
+            )
+        files[key] = found
     catalog_warnings: list[str] = []
     try:
-        loaded = load_checked_catalog(models_file, on_warning=catalog_warnings.append)
+        loaded = load_checked_catalog(
+            files["models_file"], files["models_list_file"], on_warning=catalog_warnings.append
+        )
         catalog = {e.name: e for e in loaded.models}
     except ModelCatalogError as exc:
-        raise BenchConfigError(f"models file for {where}: {exc}") from exc
+        raise BenchConfigError(f"model files for {where}: {exc}") from exc
 
     tasks_dir = raw.get("tasks_dir") or str(BUILTIN_TASKS_DIR)
     if not isinstance(tasks_dir, str):
@@ -179,7 +193,8 @@ def load_bench_config(path: str = DEFAULT_BENCH_FILE) -> BenchConfig:
         tasks=_tasks(raw.get("tasks"), available, where),
         repeats=_repeats(raw.get("repeats"), where),
         arms=_arms(raw.get("arms"), catalog, where),
-        models_file=str(Path(models_file).resolve()),
+        models_file=str(Path(files["models_file"]).resolve()),
+        models_list_file=str(Path(files["models_list_file"]).resolve()),
         catalog=catalog,
         catalog_warnings=catalog_warnings,
         model_catalog=loaded,

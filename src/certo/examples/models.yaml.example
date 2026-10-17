@@ -1,0 +1,47 @@
+# models.yaml: your personal model settings. It holds API keys: keep it
+# out of git, like .env.
+#
+# Certo ships this file only as an example and never reads the example.
+# Copy it to models.yaml (in your project folder, or in ~/.config/certo/)
+# and edit it. It works together with models_list.yaml, the catalog of
+# models (ids, descriptions, ratings, task profiles, escalation ladders),
+# which Certo also ships as an example to copy.
+#
+# List here the models you want Certo to use, each by the `name` it has in
+# models_list.yaml. A model that isn't listed here is never used: not by
+# --auto-model, not in an escalation ladder, not in certo bench. A name
+# that isn't in models_list.yaml is an error; add new models there first.
+#
+# Per model:
+#   name              required: the model's name in models_list.yaml
+#   api_key           the provider key (blank for a local model)
+#   base_url          the server address (for Ollama and other local or
+#                     self-hosted servers; blank = the provider's default)
+#   activated         true (default) or false, to keep an entry but not
+#                     use it for now
+# Optional overrides of the list's values, for this computer only:
+#   ratings           replace single axes, e.g. {code: 3}; the other axes
+#                     keep the list's values
+#   reasoning_effort  e.g. high, max
+#   timeout_seconds   seconds one call may take (0 = no limit)
+#   description
+
+models:
+  # A local model served by Ollama on this machine. Start Ollama with a
+  # large enough context window: OLLAMA_CONTEXT_LENGTH=32768 ollama serve
+  - name: qwen3.6-35b-local
+    base_url: "http://localhost:11434"
+
+  # A local model on another machine of your network.
+  - name: gemma4-31b-local
+    base_url: "http://192.168.1.50:11434"
+    timeout_seconds: 1200
+
+  # A cloud model: its key.
+  - name: gpt-6-luna
+    api_key: ""
+
+  # Kept, but not used for now.
+  - name: claude-sonnet-5-5
+    api_key: ""
+    activated: false

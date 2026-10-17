@@ -22,6 +22,7 @@ from .model_catalog import (
     capability,
     load_model_catalog,
 )
+from .model_files import resolve
 
 
 @dataclass
@@ -48,15 +49,19 @@ def check_catalog(catalog: ModelCatalog) -> CatalogReport:
     report = CatalogReport()
     errors, warnings = report.errors, report.warnings
     by_name: dict[str, ModelCatalogEntry] = {}
+    errors.extend(catalog.load_problems)
     for entry in catalog.models:
         if entry.name in by_name:
-            errors.append(f"Two models are named {entry.name!r}. Model names must be unique.")
+            errors.append(
+                f"Two models in models_list.yaml are named {entry.name!r}. Model names must be "
+                "unique."
+            )
         by_name.setdefault(entry.name, entry)
     active = [m for m in catalog.models if m.activated]
     if not active:
         errors.append(
-            "Every model has 'activated: false', so there is nothing Certo can use. "
-            "Set 'activated: true' on at least one model."
+            "No model is enabled, so there is nothing Certo can use. List the models you "
+            "want in models.yaml, by name, without 'activated: false'."
         )
 
     settings = catalog.escalation
@@ -76,6 +81,11 @@ def check_catalog(catalog: ModelCatalog) -> CatalogReport:
                     f"{where}, rung {i}: there is no model named {rung.model!r}. "
                     f"Models: {_names(catalog.models)}."
                 )
+            elif not by_name[rung.model].configured:
+                warnings.append(
+                    f"{where}, rung {i}: {rung.model} isn't in models.yaml, so this rung is "
+                    "skipped."
+                )
             elif not by_name[rung.model].activated:
                 warnings.append(
                     f"{where}, rung {i}: {rung.model} has 'activated: false', so this rung "
@@ -93,17 +103,13 @@ def check_catalog(catalog: ModelCatalog) -> CatalogReport:
         usable = usable_rungs(ladder, catalog)
         if not usable:
             errors.append(
-                f"{where} has no usable rung: every model in it is missing or has "
-                "'activated: false'."
+                f"{where} has no usable rung: none of its models is enabled in models.yaml."
             )
         elif len(usable) == 1:
             warnings.append(
                 f"{where} has only one usable rung ({usable[0].model}), so it can't escalate."
             )
-        scores = [
-            (r.model, capability(by_name[r.model], settings.cost_axis))
-            for r in usable
-        ]
+        scores = [(r.model, capability(by_name[r.model], settings.cost_axis)) for r in usable]
         for (low_name, low), (high_name, high) in pairwise(scores):
             if high < low:
                 warnings.append(
@@ -134,15 +140,20 @@ def check_catalog(catalog: ModelCatalog) -> CatalogReport:
 
 
 def load_checked_catalog(
-    path: str, *, on_warning: Callable[[str], None] | None = None
+    models_file: str = "",
+    models_list_file: str = "",
+    *,
+    on_warning: Callable[[str], None] | None = None,
 ) -> ModelCatalog:
-    """Load `models.yaml` and check it. Raises `ModelCatalogError` listing
-    every error; passes each warning to `on_warning`."""
-    catalog = load_model_catalog(path, strict=False)
+    """Find, load and check `models_list.yaml` and `models.yaml` (see
+    model_files.py; "" means look them up). Raises `ModelCatalogError`
+    listing every error; passes each warning to `on_warning`."""
+    list_path, models_path = resolve(models_file, models_list_file)
+    catalog = load_model_catalog(list_path, models_path, strict=False)
     report = check_catalog(catalog)
     if report.errors:
         raise ModelCatalogError(
-            f"{path} has {len(report.errors)} problem(s):\n"
+            f"{list_path} and {models_path} have {len(report.errors)} problem(s):\n"
             + "\n".join(f"  - {e}" for e in report.errors)
         )
     if on_warning is not None:

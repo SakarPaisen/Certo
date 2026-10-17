@@ -1,6 +1,6 @@
 [project]
 name = "certo"
-version = "0.1.9"
+version = "0.1.10"
 description = "Model-agnostic coding agent that verifies its own work. Picks the best model per task and re-runs your tests before it says done."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -94,6 +94,7 @@ exclude = [
     "**/.env.local",
     "**/.envrc",
     "**/models.yaml",
+    "**/models_list.yaml",
     "**/*.db",
     "**/*.sqlite",
     "**/*.sqlite3",
@@ -109,7 +110,6 @@ include = [
     "/LICENSE",
     "/pyproject.toml",
     "/.env.example",
-    "/models.yaml.example",
     "/bench.yaml.example",
 ]
 exclude = [
@@ -122,6 +122,7 @@ exclude = [
     "**/.env.local",
     "**/.envrc",
     "**/models.yaml",
+    "**/models_list.yaml",
     "**/*.db",
     "**/*.sqlite",
     "**/*.sqlite3",
@@ -135,5 +136,5 @@ target-version = "py311"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "tests"]
 addopts = "--import-mode=importlib"

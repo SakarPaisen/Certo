@@ -105,7 +105,7 @@ def derive_ladder(catalog: ModelCatalog) -> ResolvedLadder:
     settings = catalog.escalation
     active = [m for m in catalog.models if m.activated]
     if not active:
-        raise EscalationError("Every model has 'activated: false', so there is nothing to climb.")
+        raise EscalationError("No model is enabled in models.yaml, so there is nothing to climb.")
     scored = [_rung(m, settings.cost_axis) for m in active]
     scored.sort(key=lambda r: (r.capability, -(r.cost_rating or 0.0), r.name))
     chosen = tuple(scored[i] for i in spread_indices(len(scored), settings.max_rungs))
@@ -122,18 +122,17 @@ def explicit_ladder(catalog: ModelCatalog, ladder: Ladder) -> ResolvedLadder:
     by_name = {m.name: m for m in catalog.models}
     usable = usable_rungs(ladder, catalog)
     skipped = tuple(
-        f"{r.model} (activated: false)"
+        f"{r.model} ({'activated: false' if by_name[r.model].configured else 'not in models.yaml'})"
         for r in ladder.rungs
         if r.model in by_name and not by_name[r.model].activated
     )
     if not usable:
         raise EscalationError(
-            f"Ladder '{ladder.name}' has no usable rung: every model in it is missing or "
-            "has 'activated: false'."
+            f"Ladder '{ladder.name}' has no usable rung: none of its models is enabled in "
+            "models.yaml."
         )
     rungs = tuple(
-        _rung(by_name[r.model], settings.cost_axis, r.retries, r.reasoning_effort)
-        for r in usable
+        _rung(by_name[r.model], settings.cost_axis, r.retries, r.reasoning_effort) for r in usable
     )
     return ResolvedLadder(
         kind="explicit",
@@ -161,7 +160,8 @@ def resolve_ladder(catalog: ModelCatalog, name: str | None) -> ResolvedLadder:
         if name not in ladders:
             known = ", ".join(sorted(ladders)) or "none (only a derived ladder is available)"
             raise EscalationError(
-                f"There is no escalation ladder named '{name}' in models.yaml. Ladders: {known}."
+                f"There is no escalation ladder named '{name}' in models_list.yaml. "
+                f"Ladders: {known}."
             )
         return explicit_ladder(catalog, ladders[name])
     if "default" in ladders:
@@ -171,20 +171,16 @@ def resolve_ladder(catalog: ModelCatalog, name: str | None) -> ResolvedLadder:
 
 def load_ladder(
     models_file: str,
+    models_list_file: str,
     name: str | None,
     *,
     on_warning: Callable[[str], None] | None = None,
 ) -> ResolvedLadder:
-    """Load and check `models.yaml`, then resolve the ladder.
-    Raises `EscalationError` or `ModelCatalogError` (both `ValueError`s)
-    with a message for the user."""
-    if not os.path.isfile(models_file):
-        raise EscalationError(
-            f"Escalation needs a model catalog, and there is none at {models_file}. Copy "
-            "models.yaml.example to models.yaml and activate the models to climb through, "
-            "or set CERTO_MODELS_FILE."
-        )
-    catalog = load_checked_catalog(models_file, on_warning=on_warning)
+    """Find, load and check `models_list.yaml` and `models.yaml` ("" looks
+    them up, see model_files.py), then resolve the ladder. Raises
+    `EscalationError` or `ModelCatalogError` (both `ValueError`s) with a
+    message for the user, including how to create a missing file."""
+    catalog = load_checked_catalog(models_file, models_list_file, on_warning=on_warning)
     return resolve_ladder(catalog, name)
 
 

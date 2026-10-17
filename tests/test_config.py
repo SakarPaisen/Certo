@@ -560,7 +560,7 @@ def test_invalid_interactive_raises():
 def test_model_selection_defaults_to_manual():
     cfg = load_config(_base_env())
     assert cfg.model_selection == "manual"
-    assert cfg.models_file == "./models.yaml"
+    assert (cfg.models_file, cfg.models_list_file) == ("", "")  # "": look them up
 
 
 def test_model_selection_accepts_auto():

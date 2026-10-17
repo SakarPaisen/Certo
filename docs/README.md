@@ -78,8 +78,9 @@ takes you from install to your first verified project.
   code.
 - [Verification by language](reference/verification-by-language.md): what
   Certo runs for each kind of project.
-- [models.yaml](reference/models-yaml.md): the model list for automatic
-  model selection and the benchmark.
+- [models.yaml and models_list.yaml](reference/models-yaml.md): the model
+  list and your personal model settings, for automatic model selection,
+  escalation and the benchmark.
 - [bench.yaml](reference/bench-yaml.md): the benchmark file.
 - [Server API](reference/server-api.md): every HTTP and WebSocket endpoint.
 
