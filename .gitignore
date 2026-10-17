@@ -230,6 +230,9 @@ models.yaml
 # A personal copy of the model list (Certo ships only the .example).
 models_list.yaml
 bench.yaml
+bench-local.yaml
+bench-cloud.yaml
+bench-ladder.yaml
 # certo bench results (default output folder)
 bench-results/
 
