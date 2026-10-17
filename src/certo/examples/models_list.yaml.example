@@ -123,6 +123,18 @@ models:
       rated as an estimate. Superseded locally by qwen3.6 below.
     ratings: {reasoning: 1, precision: 1, code: 1, cost: 5}
 
+  - name: gpt-oss-20b-local
+    model: ollama/gpt-oss:20b
+    reasoning_effort: ""             # always reasons; supports low / medium / high
+    timeout_seconds: 600
+    description: >
+      OpenAI gpt-oss-20b (21B total / 3.6B active MoE, MXFP4, 13-14GB, 128K
+      context, tool calling; August 2025). Fast and light, fits in 16GB.
+      SWE-bench Verified 60.7%, Aider Polyglot 34.2%, GPQA Diamond 71.5%,
+      tau-bench retail 54.8% at high effort (OpenAI model card). Good for
+      quick, small edits; below the 2026 local coders on multi-step work.
+    ratings: {reasoning: 1, precision: 2, code: 1, cost: 5}
+
   - name: glm-4.7-flash-local
     model: ollama/glm-4.7-flash
     reasoning_effort: ""
@@ -161,19 +173,47 @@ models:
       card comparison). Thinking traces eat a 32K window quickly.
     ratings: {reasoning: 2, precision: 2, code: 1, cost: 5}
 
+  - name: devstral-small-2-local
+    model: ollama/devstral-small-2:24b
+    reasoning_effort: ""             # no thinking mode: leave empty
+    timeout_seconds: 900
+    description: >
+      Mistral Devstral Small 2 (24B dense, 15GB, 384K context, tools and
+      vision, Apache 2.0; late 2025; needs Ollama 0.13.3+). Built as a coding
+      agent: SWE-bench Verified 65.8%, Terminal-Bench 32.0% (Mistral, as
+      listed by Ollama); an independent leaderboard measured 56.4%. No
+      reasoning benchmark published. The non-Qwen local option to compare
+      against qwen3.6 and qwen3.8 in `certo bench`.
+    ratings: {reasoning: 1, precision: 2, code: 2, cost: 5}
+
   - name: qwen3.6-35b-local
     model: ollama/qwen3.6:35b-a3b
     reasoning_effort: ""
     timeout_seconds: 900
     description: >
       Alibaba Qwen3.6-35B-A3B (35B total / 3B active MoE, ~23-24GB at
-      4-bit, hybrid thinking, April 2026). Best local coding agent in this
-      file: SWE-bench Verified 73.4%, SWE-Bench Pro 49.5%, Terminal-Bench
+      4-bit, hybrid thinking, April 2026). Best fast (3B-active) local coding
+      agent in this file: SWE-bench Verified 73.4%, SWE-Bench Pro 49.5%, Terminal-Bench
       2.0 51.5%, LiveCodeBench v6 80.4% (official model card). OpenHands
       recommends it as the first local model to try and an Ollama context
       of at least ~22K. Some community GGUFs don't load in Ollama — use the
       official `qwen3.6:35b-a3b` tag.
     ratings: {reasoning: 2, precision: 2, code: 2, cost: 5}
+
+  - name: qwen3.8-27b-local
+    model: ollama/qwen3.8:27b
+    reasoning_effort: ""             # thinks by default (model default: xhigh); set low/medium to save context
+    timeout_seconds: 1200            # dense 27B that thinks at length: slower per answer than the 3B-active MoEs
+    description: >
+      Alibaba Qwen3.8-27B dense (18GB, 256K context, text and image, thinking
+      on by default; August 2026). Strongest local model in this file on
+      paper: SWE-Bench Pro 61.7%, Terminal-Bench 2.1 73.0%, DeepSWE v1.1
+      42.2%, GPQA Diamond 89.2%, IFBench 79.5%, LiveCodeBench v6 90.3%
+      (official model card, full precision). Those numbers would earn code
+      3; it is rated 2 because at 4-bit with a 32K window its long thinking
+      traces leave little room for the task. Give it a bigger window if your
+      machine allows, and measure with `certo bench`.
+    ratings: {reasoning: 3, precision: 3, code: 2, cost: 5}
 
   # ===========================================================================
   # OPENAI — CURRENT (GPT-6 family)
@@ -577,9 +617,9 @@ task_profiles:
 # enabled in models.yaml is skipped, with a notice.
 #
 # With the ratings above, the cheapest model at each capability level is:
-#   qwen3.6-35b-local (6, free) -> gpt-6-luna / claude-haiku-5-5
-#   (10, ~$0.20) -> claude-sonnet-5-5 / gpt-6.1-sol (13, ~$4) ->
-#   claude-opus-5-5 (15, ~$8)
+#   qwen3.6-35b-local (6, free) -> qwen3.8-27b-local (8, free) ->
+#   gpt-6-luna / claude-haiku-5-5 (10, ~$0.20) ->
+#   claude-sonnet-5-5 / gpt-6.1-sol (13, ~$4) -> claude-opus-5-5 (15, ~$8)
 # (capability = reasoning + precision + code; price = blended per 1M).
 # At 10, claude-haiku-5-5 is the better coder (code 4 against 3): the
 # capability sum doesn't see that, so the example ladder names it.
@@ -590,7 +630,7 @@ task_profiles:
 #   ladders:
 #     # Used by `--escalate` with no name, when it exists.
 #     default:
-#       - model: qwen3.6-35b-local
+#       - model: qwen3.8-27b-local
 #         retries: 1      # fix attempts on this rung (default: CERTO_MAX_VERIFY_RETRIES)
 #       - model: claude-haiku-5-5
 #       - model: claude-sonnet-5-5
@@ -598,6 +638,6 @@ task_profiles:
 #     local-only:
 #       escalate_on_acceptance_failed: true   # also climb on acceptance_failed
 #       rungs:
-#         - model: qwen3-coder-local
 #         - model: qwen3.6-35b-local
-#           reasoning_effort: max             # this rung only
+#         - model: qwen3.8-27b-local
+#           reasoning_effort: xhigh           # this rung only
