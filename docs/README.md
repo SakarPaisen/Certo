@@ -58,6 +58,7 @@ takes you from install to your first verified project.
 | Know what to do after a verdict | [What to do after each verdict](guides/after-the-verdict.md) |
 | Use OpenAI, Claude or Gemini | [OpenAI, Claude and Gemini](guides/openai-claude-gemini.md) |
 | Use a model on my own machine | [Ollama and local models](guides/ollama-and-local-models.md) |
+| Pick which local model to use | [Choose a local model](guides/choose-a-local-model.md) |
 | Let the agent work on a project I already have | [Work on an existing project](guides/work-on-an-existing-project.md) |
 | Answer the agent's questions, or approve each action | [Interactive and confirm mode](guides/interactive-mode.md) |
 | Let Certo choose the model for each task | [Pick models automatically](guides/pick-models-automatically.md) |

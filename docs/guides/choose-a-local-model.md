@@ -1,0 +1,109 @@
+# Choose a local model
+
+This guide helps you pick a model to run Certo on your own machine, from
+Certo's own benchmark results and with a quick test of your own setup.
+How to install Ollama, give a model enough memory and reach it on another
+machine is in [Ollama and local models](ollama-and-local-models.md).
+
+## What makes a local model work with Certo
+
+Three things matter, in this order:
+
+1. **It makes real tool calls.** The agent works by calling tools: run
+   a command, edit a file. A model that writes the call as text instead
+   ends the run before any work is done. This depends on the model *and*
+   on how Ollama serves it, so a model that works for someone else can
+   fail on your setup.
+2. **It gets the details right.** Certo checks the work with the
+   project's tests, but the agent writes those tests. A model that
+   misreads a rule writes tests that miss it, and the result is
+   `verified` but wrong (see
+   [Write a task Certo can check](write-a-good-task.md#3-give-the-expected-answers-yourself)).
+3. **It is fast enough.** A task has a 30-minute budget by default
+   (`CERTO_MAX_TASK_SECONDS`). A model that is right but slow ends
+   `budget_exhausted`.
+
+## What Certo's benchmark found
+
+Certo's [four-model benchmark](../benchmark/local-models-0.1.15.md) ran
+each model 27 times on 9 small tasks, graded by hidden tests the agent
+never saw. All four ran on the same Ollama server.
+
+| Model | Correct | Median time per task | In short |
+|---|---|---|---|
+| `gemma4:31b-it-qat` | 26/27 | 12m 40s | The most accurate, but slow. |
+| `qwen3.8:27b` | 24/27 | 4m 37s | Almost as accurate, nearly three times faster. |
+| `devstral-small-2:24b` | 5/27 | 51s | Mostly wrote its tool calls as text. |
+| `qwen3.6:35b-a3b` | 0/27 | 19s | Wrote its tool calls as text in every run. |
+
+How to read it:
+
+- **Start with `qwen3.8:27b`** if your machine can hold it: the best
+  balance of accuracy and speed in this run.
+- **Try `gemma4:31b-it-qat`** when correctness matters more than time, and
+  raise `CERTO_MAX_TASK_SECONDS` for bigger tasks.
+- **Don't rule out `qwen3.6` or `devstral` from this table alone.** Their
+  failures were tool calls written as text, which can come from the
+  Ollama setup rather than the model. Check your own setup with the steps
+  below.
+- **`qwen3-coder:30b`**, the default in `certo init`, wasn't in this
+  benchmark.
+- The tasks are small, single-file ones. On bigger work, differences
+  between models are likely to grow.
+
+## Test a model on your setup
+
+### 1. Check that it makes real tool calls
+
+Pull the model, point Certo at it, and run `certo check`:
+
+```bash
+ollama pull qwen3.8:27b
+export CERTO_LLM_MODEL=ollama/qwen3.8:27b
+export CERTO_LLM_BASE_URL=http://localhost:11434
+certo check
+```
+
+`certo check` makes one real call, and fails when the answer doesn't come
+back as a tool call. A model that fails here will fail every task.
+
+### 2. Run one small task
+
+```bash
+certo "Write a Python function that converts Celsius to Fahrenheit, with pytest tests" --project try-model
+```
+
+Watch for a run that ends within a minute with `inconclusive` or
+`unchanged`. If the agent's last message is a tool call written as text,
+such as `{"command": "view", ...}`, the model has the problem from step
+1 even though `certo check` passed: see
+[The run ends at once, with a tool call as the agent's last message](../troubleshooting.md#the-run-ends-at-once-with-a-tool-call-as-the-agents-last-message).
+
+### 3. Compare models with the benchmark
+
+To compare two or more models on your own machine, run `certo bench` with
+one arm per model. It grades every run with hidden tests and shows how
+often each model was right, how long it took, and how often Certo was
+fooled. See [Write a benchmark file](write-a-benchmark-file.md) ("Which
+of my local models is best?").
+
+Running all 9 tasks takes hours on a local model. To get a first answer
+sooner, list only a few tasks and use one repeat.
+
+## When a local model isn't enough
+
+- Split the task into smaller steps (see
+  [one step per task](write-a-good-task.md#7-one-step-per-task)).
+- Resume a failed run with a stronger model:
+  `certo --resume --model MODEL` (see [After the verdict](after-the-verdict.md)).
+- Let Certo do that by itself: start every task on the local model and
+  move to a cloud model only when verification fails. See
+  [Escalate between models](escalate-between-models.md).
+
+## Related
+
+- [Ollama and local models](ollama-and-local-models.md): install, memory,
+  context window
+- [Four local models (0.1.15)](../benchmark/local-models-0.1.15.md): the
+  full results
+- [Benchmark models and strategies](benchmark.md)

@@ -196,8 +196,7 @@ first item is the suggested next one.
   pace.
 - **GitHub Action**: an issue labelled `certo` becomes a pull request with
   the verdict and checks in its description.
-- **Docs articles still to write** (ideas from 2026-10-18): choose a local
-  model for your machine (needs the local benchmark's numbers); build an
+- **Docs articles still to write** (ideas from 2026-10-18): build an
   app in several tasks (needs real runs); review the agent's work safely;
   share your benchmark results; keep costs down; use `certo verify`
   without the agent (pre-commit, any AI tool).

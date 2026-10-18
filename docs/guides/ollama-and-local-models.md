@@ -21,7 +21,9 @@ ollama pull qwen3-coder:30b
 ```
 
 Small local models often struggle with long, multi-step tasks. Expect
-weaker results than a large cloud model.
+weaker results than a large cloud model. Which models did best in Certo's
+own benchmark, and how to test one on your setup:
+[Choose a local model](choose-a-local-model.md).
 
 ## Set up
 
@@ -138,3 +140,4 @@ them. Set `CERTO_LLM_MODEL` to the LiteLLM id for that server and
 
 - Every Ollama problem with its fix: [Troubleshooting](../troubleshooting.md)
 - Every setting: [Configuration](../reference/configuration.md)
+- [Choose a local model](choose-a-local-model.md): benchmark results and how to test a model
