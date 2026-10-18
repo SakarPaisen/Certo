@@ -354,6 +354,13 @@ decisions log below for *why* a given design was chosen.
   attempts, the verifier picks) is the planned next entry in
   `bench_strategies.STRATEGIES`. Each must be benchmarked on a local and a
   cloud model before release (CLAUDE.md working agreements).
+- **`bench.yaml.example` isn't in the wheel** — it is in the sdist
+  allowlist only (repo root), while the model examples moved into
+  `src/certo/examples/` in 0.1.10. A pip user has to download it
+  (`docs/guides/write-a-benchmark-file.md` gives the URL). Fix: ship it in
+  `certo/examples/` and name the `cp` command when `bench.yaml` is
+  missing, as `model_files.missing_message()` does. Not done on
+  2026-10-18 because a benchmark was running from the checkout.
 - **Bench estimates from recorded cost, not a token guess** — the plan
   prices every run at a fixed ~500k input / ~20k output tokens. Since
   0.1.13 each results folder's `cost.json` holds each model's real average

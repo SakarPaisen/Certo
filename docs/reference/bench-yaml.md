@@ -1,7 +1,8 @@
 # bench.yaml
 
 The format of the benchmark file read by `certo bench`. It is for looking
-things up; the guide is [Benchmark models and strategies](../guides/benchmark.md).
+things up; the guides are [Benchmark models and strategies](../guides/benchmark.md)
+and [Write a benchmark file](../guides/write-a-benchmark-file.md).
 
 The default file is `./bench.yaml`; `certo bench --config FILE` reads
 another. It holds no keys: models are named from the model files. A commented

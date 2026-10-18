@@ -1,8 +1,11 @@
 # Copy to bench.yaml and edit. Run with: certo bench
 #
 # A benchmark compares "arms" on Certo's bundled tasks, each graded by
-# hidden tests the agent never sees. See docs/guides/benchmark.md and
-# docs/reference/bench-yaml.md.
+# hidden tests the agent never sees. See docs/guides/write-a-benchmark-file.md,
+# docs/guides/benchmark.md and docs/reference/bench-yaml.md.
+#
+# The model names below are the two the example models.yaml enables.
+# Change them to the models you enabled (certo check --models tests them).
 #
 # Models are named from the model files: models_list.yaml (the catalog) and
 # models.yaml (your keys and the models you use), by their `name`.
@@ -26,20 +29,20 @@ repeats: 3
 arms:
   # strategy: single = one model, the normal Certo run, exactly what
   # `certo "<task>"` does.
-  - name: qwen-local
+  - name: local
     strategy: single
-    model: qwen3-coder-local      # a model `name`
+    model: qwen3.6-35b-local      # a model `name`
 
-  - name: sonnet
+  - name: cloud
     strategy: single
-    model: claude-sonnet-5
+    model: gpt-6-luna
 
   # strategy: escalate = start on the first model, move to the next only
   # when Certo's verdict shows it couldn't finish (like certo --escalate).
   # Leave out `models` for the ladder Certo builds from the ratings.
   - name: local-then-cloud
     strategy: escalate
-    models: [qwen3-coder-local, claude-sonnet-5]
+    models: [qwen3.6-35b-local, gpt-6-luna]
 
 # Optional: a folder of your own tasks instead of the bundled set, in the
 # same shape (task.md, starter/, hidden_tests/, reference/).

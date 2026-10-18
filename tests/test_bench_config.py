@@ -168,16 +168,13 @@ def test_an_arm_naming_a_model_missing_from_models_yaml(tmp_path):
 
 
 def test_the_shipped_example_is_valid_against_the_shipped_models_example(tmp_path):
-    # The shipped list, and a models.yaml enabling the models the example names.
+    # Both shipped model examples as they are: copying the three examples
+    # must give a benchmark file that loads.
     text = (_REPO / "bench.yaml.example").read_text()
     list_path = _REPO / "src/certo/examples/models_list.yaml.example"
-    (tmp_path / "models.yaml").write_text(
-        "models:\n  - name: qwen3-coder-local\n  - name: claude-sonnet-5\n    api_key: k\n"
-    )
+    models_path = _REPO / "src/certo/examples/models.yaml.example"
     path = tmp_path / "bench.yaml"
-    path.write_text(
-        f"models_file: {tmp_path / 'models.yaml'}\nmodels_list_file: {list_path}\n" + text
-    )
+    path.write_text(f"models_file: {models_path}\nmodels_list_file: {list_path}\n" + text)
     cfg = load_bench_config(str(path))
     assert [a.strategy for a in cfg.arms] == ["single", "single", "escalate"]
 

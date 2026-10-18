@@ -62,20 +62,21 @@ benchmark ignored `activated`.)
 tasks: all
 repeats: 3
 arms:
-  - name: qwen-local
+  - name: local
     strategy: single
-    model: qwen3-coder-local      # a model name
-  - name: sonnet
+    model: qwen3.6-35b-local      # a model name
+  - name: cloud
     strategy: single
-    model: claude-sonnet-5
+    model: gpt-6-luna
 ```
 
 `strategy: single` means one model and the normal Certo run, exactly what
 `certo "<task>"` does. `strategy: escalate` climbs a ladder of models,
 like `certo --escalate`: give it `models: [a, b]` for a fixed ladder, or no
 `models` for the ladder Certo derives from the ratings. Start from
-[bench.yaml.example](../../bench.yaml.example); every field is in the
-[bench.yaml reference](../reference/bench-yaml.md).
+[bench.yaml.example](../../bench.yaml.example); how to choose the arms for
+your question is in [Write a benchmark file](write-a-benchmark-file.md),
+and every field is in the [bench.yaml reference](../reference/bench-yaml.md).
 
 ## Run it
 
@@ -253,6 +254,7 @@ run the test suite, which checks every task the same way.
 
 ## Related
 
+- [Write a benchmark file](write-a-benchmark-file.md)
 - [bench.yaml reference](../reference/bench-yaml.md)
 - [Baseline 0.1.13](../benchmark/baseline-0.1.13.md): the first complete
   results
