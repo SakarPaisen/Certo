@@ -54,6 +54,8 @@ takes you from install to your first verified project.
 
 | I want to... | Guide |
 |---|---|
+| Write a task the agent gets right, and Certo can check | [Write a task Certo can check](guides/write-a-good-task.md) |
+| Know what to do after a verdict | [What to do after each verdict](guides/after-the-verdict.md) |
 | Use OpenAI, Claude or Gemini | [OpenAI, Claude and Gemini](guides/openai-claude-gemini.md) |
 | Use a model on my own machine | [Ollama and local models](guides/ollama-and-local-models.md) |
 | Let the agent work on a project I already have | [Work on an existing project](guides/work-on-an-existing-project.md) |

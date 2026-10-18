@@ -1,8 +1,11 @@
 # Verdicts
 
 Every verdict (verification state) Certo can report, what it means, and
-its exit code. It is for looking things up and for scripts. Why Certo works
-this way is in [How verification works](../concepts/how-verification-works.md).
+its exit code. It is for looking things up and for scripts. What to do
+next after each one is in
+[What to do after each verdict](../guides/after-the-verdict.md). Why Certo
+works this way is in
+[How verification works](../concepts/how-verification-works.md).
 
 ## Where you see the verdict
 

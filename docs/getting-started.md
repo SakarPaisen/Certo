@@ -244,6 +244,8 @@ export CERTO_LLM_API_KEY=sk-...
 
 ## Next steps
 
+- Write tasks Certo can check: [Write a task Certo can check](guides/write-a-good-task.md).
+- What to do after each verdict: [What to do after each verdict](guides/after-the-verdict.md).
 - Use a different provider: [OpenAI, Claude and Gemini](guides/openai-claude-gemini.md)
   or [Ollama and local models](guides/ollama-and-local-models.md).
 - Every flag: [Commands](reference/commands.md).

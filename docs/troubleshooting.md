@@ -313,6 +313,10 @@ example to `900`. See [Ollama and local models](guides/ollama-and-local-models.m
 
 ## Verdicts
 
+What to do after any verdict, step by step, is in
+[What to do after each verdict](guides/after-the-verdict.md). This section
+covers the messages.
+
 ### `inconclusive`: the project has no tests
 
 **You see:** `Verification: inconclusive`, with no explanation, or the
