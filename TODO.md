@@ -26,6 +26,11 @@ first item is the suggested next one.
   agreement 2). `unchanged` and bench transcripts are unit-tested only.
   The 0.1.11 derived-ladder order is not benchmarked either. Done when a
   results folder from this version has both kinds of arm.
+- **Point code comments at the new planning files.** About 41 comments in
+  `src/` and `tests/` say "see ROADMAP.md (decisions log / known
+  limitations)"; those sections are now `DECISIONS.md` and
+  `ARCHITECTURE.md`. Comments only. Deferred on 2026-10-18 while a
+  benchmark ran from the checkout.
 - **Run `scripts/release_check.sh`** against the built wheel.
 - **Publish** (the Author does it): `main` is ahead of origin; PyPI has
   0.1.10.
