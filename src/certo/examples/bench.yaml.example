@@ -1,4 +1,5 @@
-# Copy to bench.yaml and edit. Run with: certo bench
+# Copy to bench.yaml and edit (when bench.yaml is missing, certo bench
+# prints the cp command). Run with: certo bench
 #
 # A benchmark compares "arms" on Certo's bundled tasks, each graded by
 # hidden tests the agent never sees. See docs/guides/write-a-benchmark-file.md,
@@ -31,7 +32,7 @@ arms:
   # `certo "<task>"` does.
   - name: local
     strategy: single
-    model: qwen3.6-35b-local      # a model `name`
+    model: qwen3.8-27b-local      # a model `name`
 
   - name: cloud
     strategy: single
@@ -42,7 +43,7 @@ arms:
   # Leave out `models` for the ladder Certo builds from the ratings.
   - name: local-then-cloud
     strategy: escalate
-    models: [qwen3.6-35b-local, gpt-6-luna]
+    models: [qwen3.8-27b-local, gpt-6-luna]
 
 # Optional: a folder of your own tasks instead of the bundled set, in the
 # same shape (task.md, starter/, hidden_tests/, reference/).

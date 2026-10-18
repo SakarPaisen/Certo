@@ -6,7 +6,8 @@ and [Write a benchmark file](../guides/write-a-benchmark-file.md).
 
 The default file is `./bench.yaml`; `certo bench --config FILE` reads
 another. It holds no keys: models are named from the model files. A commented
-example ships as [bench.yaml.example](../../bench.yaml.example).
+example ships as [bench.yaml.example](../../src/certo/examples/bench.yaml.example), inside the
+package (`certo/examples/`).
 
 ## Layout
 

@@ -64,7 +64,7 @@ repeats: 3
 arms:
   - name: local
     strategy: single
-    model: qwen3.6-35b-local      # a model name
+    model: qwen3.8-27b-local      # a model name
   - name: cloud
     strategy: single
     model: gpt-6-luna
@@ -74,7 +74,8 @@ arms:
 `certo "<task>"` does. `strategy: escalate` climbs a ladder of models,
 like `certo --escalate`: give it `models: [a, b]` for a fixed ladder, or no
 `models` for the ladder Certo derives from the ratings. Start from
-[bench.yaml.example](../../bench.yaml.example); how to choose the arms for
+[bench.yaml.example](../../src/certo/examples/bench.yaml.example) (when
+`bench.yaml` is missing, `certo bench` prints the command that copies it); how to choose the arms for
 your question is in [Write a benchmark file](write-a-benchmark-file.md),
 and every field is in the [bench.yaml reference](../reference/bench-yaml.md).
 

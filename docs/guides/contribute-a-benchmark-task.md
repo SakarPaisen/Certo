@@ -131,7 +131,7 @@ tasks_dir: ./my-tasks
 tasks: all
 repeats: 1
 arms:
-  - {name: local, strategy: single, model: qwen3.6-35b-local}
+  - {name: local, strategy: single, model: qwen3.8-27b-local}
 ```
 
 ```bash

@@ -107,7 +107,6 @@ def test_sdist_ships_only_the_allowlisted_paths(built):
         "MANUAL.md",
         "LICENSE",
         ".env.example",
-        "bench.yaml.example",
         "docker/agent-server.Dockerfile",
     }
     names = _sdist_names(built["sdist"])
@@ -138,6 +137,7 @@ def test_wheel_ships_the_model_file_examples(built):
     names = set(_wheel_names(built["wheel"]))
     assert "certo/examples/models_list.yaml.example" in names
     assert "certo/examples/models.yaml.example" in names
+    assert "certo/examples/bench.yaml.example" in names
 
 
 def test_wheel_ships_the_benchmark_task_set(built):

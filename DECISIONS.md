@@ -722,3 +722,11 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   whatever their verdicts. The facts come from the rung's own before/after
   listing, never from the model. The handoff tells the next model that no
   file was written.
+- **`bench.yaml.example` ships in the wheel, in `certo/examples/`**
+  (0.1.17; supersedes the sdist-only copy at the repo root). After a pip
+  install the docs had to send users to a download URL. Now a missing
+  `bench.yaml` prints the `cp` command for the installed example, as the
+  model files do since 0.1.10, and the sdist allowlist no longer lists
+  it. The examples (and the example `models.yaml`) name
+  `qwen3.8-27b-local` instead of `qwen3.6-35b-local`, which scored 0/27 in
+  the 0.1.15 local benchmark.

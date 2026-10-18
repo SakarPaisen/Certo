@@ -12,6 +12,7 @@ from certo import bench_strategies
 from certo.bench_config import BenchConfigError, load_bench_config
 from certo.bench_strategies import STRATEGIES, AttemptResult, RunContext, run_config
 from certo.bench_tasks import load_tasks
+from certo.model_files import example_path
 
 _REPO = Path(__file__).resolve().parent.parent
 
@@ -127,9 +128,15 @@ def test_invalid_files_name_the_problem(tmp_path, bench, message):
         load_bench_config(_write(tmp_path, bench))
 
 
-def test_missing_bench_file_says_what_to_do(tmp_path):
-    with pytest.raises(BenchConfigError, match="bench.yaml.example"):
-        load_bench_config(str(tmp_path / "bench.yaml"))
+def test_missing_bench_file_prints_the_cp_command_for_the_shipped_example(tmp_path):
+    # The example ships inside the package (certo/examples/), so the command
+    # works after a pip install too.
+    target = tmp_path / "bench.yaml"
+    with pytest.raises(BenchConfigError) as info:
+        load_bench_config(str(target))
+    example = example_path("bench.yaml")
+    assert Path(example).is_file()
+    assert f"cp {example} {target}" in str(info.value)
 
 
 def test_a_missing_named_models_file(tmp_path):
@@ -170,7 +177,7 @@ def test_an_arm_naming_a_model_missing_from_models_yaml(tmp_path):
 def test_the_shipped_example_is_valid_against_the_shipped_models_example(tmp_path):
     # Both shipped model examples as they are: copying the three examples
     # must give a benchmark file that loads.
-    text = (_REPO / "bench.yaml.example").read_text()
+    text = (_REPO / "src/certo/examples/bench.yaml.example").read_text()
     list_path = _REPO / "src/certo/examples/models_list.yaml.example"
     models_path = _REPO / "src/certo/examples/models.yaml.example"
     path = tmp_path / "bench.yaml"

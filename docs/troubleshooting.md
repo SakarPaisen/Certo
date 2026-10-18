@@ -616,8 +616,11 @@ to copy the example.
 **You see:**
 
 ```text
-Configuration error: benchmark file not found: bench.yaml. Copy bench.yaml.example to bench.yaml and name the models to compare.
+Configuration error: benchmark file not found: bench.yaml. Certo ships an example to start from; copy it and name the models to compare:
+  cp /path/to/certo/examples/bench.yaml.example bench.yaml
 ```
+
+The path in the `cp` line is where Certo is installed on your machine.
 
 or `the benchmark takes its models, by name, from models.yaml and
 models_list.yaml. No models.yaml found: ...` with the `cp` command for the
@@ -626,8 +629,8 @@ example.
 **Cause:** the benchmark reads its models from the two model files, by
 name, and what to compare from `bench.yaml`. It never uses `.env`.
 
-**Fix:** copy `bench.yaml.example` to `bench.yaml`, and the model file
-examples as the message says, then enable the models to compare in
+**Fix:** run the `cp` command the message prints, and the ones for the
+model file examples, then enable the models to compare in
 `models.yaml`. Use `--config` for another benchmark file, or
 `models_file` / `models_list_file` in it for other model files. See
 [Benchmark models and strategies](guides/benchmark.md).

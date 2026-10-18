@@ -160,7 +160,8 @@ given design was chosen.
   `CERTO_MODELS_FILE`, or `models_list_file` / `models_file` in a bench
   file), else the current folder, else the user settings folder; first
   found wins, per file. `missing_message()` prints the `cp` command for
-  the shipped example in `certo/examples/`. `model_catalog.load_model_catalog
+  the shipped example in `certo/examples/`; `bench_config` does the same
+  for a missing `bench.yaml` with `example_path("bench.yaml")` (0.1.17). `model_catalog.load_model_catalog
   (list_path, models_path)` merges the two into the same `ModelCatalog`
   as before (entries gain `configured`), so ranking, ladders and checks
   are unchanged; a model only in the list is `configured=False,

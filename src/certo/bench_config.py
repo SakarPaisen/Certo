@@ -27,7 +27,7 @@ from .model_catalog import (
     ModelCatalogEntry,
     ModelCatalogError,
 )
-from .model_files import find, missing_message
+from .model_files import example_path, find, missing_message
 
 DEFAULT_BENCH_FILE = "bench.yaml"
 _TOP_LEVEL_KEYS = {"tasks", "repeats", "arms", "models_file", "models_list_file", "tasks_dir"}
@@ -77,8 +77,8 @@ class BenchConfig:
 def _load_yaml(path: Path) -> dict[str, Any]:
     if not path.is_file():
         raise BenchConfigError(
-            f"benchmark file not found: {path}. Copy bench.yaml.example to bench.yaml "
-            "and name the models to compare."
+            f"benchmark file not found: {path}. Certo ships an example to start from; "
+            f"copy it and name the models to compare:\n  cp {example_path('bench.yaml')} {path}"
         )
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))

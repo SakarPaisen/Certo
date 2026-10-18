@@ -35,21 +35,19 @@ here fails every benchmark run too.
 
 ## 2. Start from the example
 
-From a source checkout, copy the example:
+Certo ships a commented example inside the package. Run `certo bench` in
+the folder where you want the file: when there is no `bench.yaml`, it
+prints the command that copies the example there, with the right path for
+your installation:
 
-```bash
-cp bench.yaml.example bench.yaml
+```text
+Configuration error: benchmark file not found: bench.yaml. Certo ships an example to start from; copy it and name the models to compare:
+  cp /path/to/certo/examples/bench.yaml.example bench.yaml
 ```
 
-After `pip install` or `uv tool install` the example isn't on your
-machine; download it:
-
-```bash
-curl -o bench.yaml https://raw.githubusercontent.com/alessioricco/certo/main/bench.yaml.example
-```
-
-The example names `qwen3.6-35b-local` and `gpt-6-luna`, the two models the
-example `models.yaml` enables. Change them to models you enabled.
+Run the `cp` line it printed. The example names `qwen3.8-27b-local` and
+`gpt-6-luna`, the two models the example `models.yaml` enables. Change
+them to models you enabled.
 
 ## 3. One question per file
 
@@ -64,7 +62,7 @@ like with like. Some common questions:
 tasks: all
 repeats: 3
 arms:
-  - {name: qwen3.6,  strategy: single, model: qwen3.6-35b-local}
+  - {name: qwen3.8,  strategy: single, model: qwen3.8-27b-local}
   - {name: gemma4,   strategy: single, model: gemma4-31b-local}
 ```
 
@@ -76,7 +74,7 @@ and one cloud arm:
 tasks: all
 repeats: 3
 arms:
-  - {name: local, strategy: single, model: qwen3.6-35b-local}
+  - {name: local, strategy: single, model: qwen3.8-27b-local}
   - {name: cloud, strategy: single, model: gpt-6-luna}
 ```
 
@@ -89,9 +87,9 @@ the ratings:
 tasks: all
 repeats: 1
 arms:
-  - {name: local,  strategy: single, model: qwen3.6-35b-local}
+  - {name: local,  strategy: single, model: qwen3.8-27b-local}
   - {name: cloud,  strategy: single, model: gpt-6-luna}
-  - {name: ladder, strategy: escalate, models: [qwen3.6-35b-local, gpt-6-luna]}
+  - {name: ladder, strategy: escalate, models: [qwen3.8-27b-local, gpt-6-luna]}
   - {name: derived, strategy: escalate}
 ```
 
@@ -107,7 +105,7 @@ one repeat.
 tasks: [temperature-table, slugify]
 repeats: 1
 arms:
-  - {name: local, strategy: single, model: qwen3.6-35b-local}
+  - {name: local, strategy: single, model: qwen3.8-27b-local}
 ```
 
 `certo bench --list-tasks` lists the task names.

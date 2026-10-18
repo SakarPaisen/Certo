@@ -14,17 +14,6 @@ first item is the suggested next one.
 
 ## Before the next release
 
-- **Ship `bench.yaml.example` in the wheel.** It is only in the sdist
-  (repo root); the model examples moved to `src/certo/examples/` in
-  0.1.10. Ship it there, make a missing `bench.yaml` print the `cp`
-  command (as `model_files.missing_message()` does), replace the `curl`
-  download step in `docs/guides/write-a-benchmark-file.md` with that `cp`
-  command, and update the sdist allowlist and `tests/test_packaging.py`.
-  Feature: bump the version. Deferred on 2026-10-18 while a benchmark ran
-  from the checkout. While there: the example (and the example
-  `models.yaml`) enables `qwen3.6-35b-local`, which scored 0/27 in the
-  0.1.15 local benchmark (tool calls written as text); consider
-  `qwen3.8-27b-local` instead.
 - **Point code comments at the new planning files.** About 41 comments in
   `src/` and `tests/` say "see ROADMAP.md (decisions log / known
   limitations)"; those sections are now `DECISIONS.md` and

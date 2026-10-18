@@ -29,7 +29,7 @@
 models:
   # A local model served by Ollama on this machine. Start Ollama with a
   # large enough context window: OLLAMA_CONTEXT_LENGTH=32768 ollama serve
-  - name: qwen3.6-35b-local
+  - name: qwen3.8-27b-local
     base_url: "http://localhost:11434"
 
   # A local model on another machine of your network.
