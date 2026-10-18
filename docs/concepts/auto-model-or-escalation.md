@@ -120,7 +120,8 @@ claude-sonnet.
   use case.
 - The project has tests or a build that Certo can run. Escalation climbs
   on Certo's verdict, so it needs something to verify. A project with
-  nothing to check ends `inconclusive` and never climbs.
+  nothing to check ends `inconclusive` and doesn't climb (unless the model
+  wrote no file at all).
 - You run many tasks unattended (a batch, a benchmark, CI) and want the
   total cost low without picking a model per task.
 

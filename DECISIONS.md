@@ -711,3 +711,14 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   finished, not `verified`); `unconfirmed_pass` is recorded beside it
   because a correct project with no tests also lands there. Runs are
   repeat-major so a stopped benchmark has some of every arm and task.
+- **An `inconclusive` rung that changed no file climbs** (0.1.16; refines
+  "`inconclusive` never climbs", 0.1.9). In the 0.1.15 local benchmark,
+  models that wrote their tool calls as text ended with an empty folder
+  (qwen3.8 once, qwen3.6 14 of 27 times), and a ladder stopped on rung 1.
+  "A stronger model would face the same blank" holds only when files were
+  written and none can be checked. `RungResult.did_no_work` (`unchanged`,
+  or `inconclusive` with an empty `FileChanges`) both climbs and drives
+  the stop rule, which is now "two rungs in a row that did no work",
+  whatever their verdicts. The facts come from the rung's own before/after
+  listing, never from the model. The handoff tells the next model that no
+  file was written.

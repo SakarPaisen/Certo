@@ -1810,7 +1810,9 @@ def _stream_escalation(
     """Run `task` up `ladder`: each rung is the normal run (verification,
     retries, to-do enforcement) in a fresh conversation with its own model,
     in the same workspace. Stops at the first verdict that doesn't escalate
-    (see `ResolvedLadder.escalates_on`), at the last rung, when the shared
+    (see `ResolvedLadder.escalates_on`; an `inconclusive` rung that changed no
+    file does, see `RungResult.did_no_work`), after two rungs in a row that
+    did no work, at the last rung, when the shared
     time budget or `CERTO_MAX_TASK_COST` is spent, or when the user declines
     a climb. The final verdict is the last rung's.
 
@@ -1980,22 +1982,23 @@ def _stream_escalation(
                     final_outcome, final_rung = outcome, number
 
                 previous = rungs[-2] if len(rungs) > 1 else None
-                if (
-                    result.verdict == "unchanged"
-                    and previous is not None
-                    and previous.verdict == "unchanged"
-                ):
+                if result.did_no_work and previous is not None and previous.did_no_work:
                     io.notify(
                         f"Certo: {rung.name} changed no file either, after {previous.name}: two "
-                        "models found nothing to change, so escalation stops."
+                        "models in a row did no work on this task, so escalation stops."
                     )
                     decide(
                         "escalation_stop",
                         rung.name,
-                        f"{rung.name} and {previous.name} both ended unchanged.",
+                        f"{rung.name} ({result.ended}) and {previous.name} ({previous.ended}) "
+                        "both changed no file.",
                     )
                     break
-                if outcome is not None and not ladder.escalates_on(outcome.verification_state):
+                if (
+                    outcome is not None
+                    and not result.did_no_work
+                    and not ladder.escalates_on(outcome.verification_state)
+                ):
                     if outcome.verification_state == "inconclusive":
                         io.notify(
                             f"Certo: {rung.name} ended inconclusive: nothing in the project "

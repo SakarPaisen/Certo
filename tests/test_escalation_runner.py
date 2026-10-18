@@ -211,7 +211,8 @@ def test_these_verdicts_climb_to_the_next_rung(tmp_path, fake_run, verdict):
     "verdict", ["inconclusive", "budget_exhausted", "confirmation_required", "acceptance_failed"]
 )
 def test_these_verdicts_stop_the_climb(tmp_path, fake_run, verdict):
-    fake_run.script[:] = [(verdict, 0.0, {})]
+    # The rung wrote a file: an `inconclusive` rung that wrote none climbs.
+    fake_run.script[:] = [(verdict, 0.0, {"app.py": "x"})]
     outcome, _ = _run(tmp_path, _ladder(tmp_path))
 
     assert outcome.verification_state == verdict
@@ -219,7 +220,7 @@ def test_these_verdicts_stop_the_climb(tmp_path, fake_run, verdict):
 
 
 def test_inconclusive_says_escalation_needs_something_to_check(tmp_path, fake_run):
-    fake_run.script[:] = [("inconclusive", 0.0, {})]
+    fake_run.script[:] = [("inconclusive", 0.0, {"app.py": "x"})]
     _, progress = _run(tmp_path, _ladder(tmp_path))
     assert any("Escalation needs a project with something to check" in p for p in progress)
 
@@ -582,7 +583,7 @@ def test_two_rungs_in_a_row_unchanged_stop_the_climb(tmp_path, fake_run):
 
     assert outcome.verification_state == "unchanged"
     assert len(outcome.rungs) == 2
-    assert any("two models found nothing to change" in p for p in progress)
+    assert any("two models in a row did no work" in p for p in progress)
     assert outcome.model_decisions[-1].kind == "escalation_stop"
 
 
@@ -591,3 +592,33 @@ def test_unchanged_after_another_verdict_still_climbs(tmp_path, fake_run):
     outcome, _ = _run(tmp_path, _ladder(tmp_path))
 
     assert [r.verdict for r in outcome.rungs] == ["no_progress", "unchanged", "verified"]
+
+
+# --- inconclusive with no file changed -------------------------------------------
+
+
+def test_inconclusive_with_no_file_changed_climbs(tmp_path, fake_run):
+    """The 0.1.15 benchmark: a model that writes its tool calls as text ends
+    the run with an empty folder. A stronger model may do the task."""
+    fake_run.script[:] = [("inconclusive", 0, {}), ("verified", 0, {"app.py": "x"})]
+    outcome, progress = _run(tmp_path, _ladder(tmp_path))
+
+    assert [r.verdict for r in outcome.rungs] == ["inconclusive", "verified"]
+    assert outcome.verification_state == "verified"
+    assert (
+        "Certo: local ended inconclusive without changing a file; escalating to mid "
+        "(rung 2 of 3)." in progress
+    )
+    handoff = fake_run.calls[1]["first_message"]
+    assert "created or changed no file, so there was nothing for Certo to check" in handoff
+    assert "couldn't finish it" not in handoff
+
+
+def test_no_work_twice_in_a_row_stops_the_climb_whatever_the_verdicts(tmp_path, fake_run):
+    fake_run.script[:] = [("inconclusive", 0, {}), ("unchanged", 0, {}), ("verified", 0, {})]
+    outcome, progress = _run(tmp_path, _ladder(tmp_path))
+
+    assert outcome.verification_state == "unchanged"
+    assert len(outcome.rungs) == 2
+    assert any("two models in a row did no work" in p for p in progress)
+    assert outcome.model_decisions[-1].kind == "escalation_stop"

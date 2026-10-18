@@ -85,8 +85,9 @@ may come from the earlier session.
 
 With [escalation](../guides/escalate-between-models.md#what-makes-certo-climb),
 `unchanged` moves the task to the next model, unless the model before it
-also ended `unchanged`: two models agreeing there is nothing to change
-stops the climb.
+also changed no file: two models agreeing there is nothing to change
+stops the climb. The same goes for `inconclusive` when the model changed
+no file.
 
 ## The order of the checks
 

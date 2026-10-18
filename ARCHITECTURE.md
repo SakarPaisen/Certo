@@ -173,8 +173,10 @@ given design was chosen.
   warnings as plain sentences); `load_checked_catalog` is how
   `--auto-model`, `--escalate` and `certo bench` load the file.
   `escalation.py` (pure) resolves a `ResolvedLadder` (explicit, or derived
-  from the ratings), defines `ESCALATING_VERDICTS`, `RungResult`, the
-  before/after `workspace_listing`/`FileChanges` and `handoff_message`.
+  from the ratings), defines `ESCALATING_VERDICTS`, `RungResult` (with
+  `did_no_work`: `unchanged`, or `inconclusive` with no file changed, which
+  also climbs, 0.1.16), the before/after `workspace_listing`/`FileChanges`
+  and `handoff_message`.
   `runner._stream_escalation` is the loop: one fresh `Conversation` per
   rung in the same workspace, reusing `_run_stream_task_phases` and
   `_apply_acceptance_checks`; `TaskOutcome.rungs`/`final_rung`.

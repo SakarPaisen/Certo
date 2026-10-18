@@ -567,8 +567,10 @@ once.
 **You see:** `Certo: ... ended inconclusive: nothing in the project could
 be checked, so there is no signal to escalate on.`
 
-**Cause:** the project has no tests or build to run, so Certo can't tell
-whether the model succeeded. A stronger model would face the same blank.
+**Cause:** the model wrote files, but the project has no tests or build to
+run, so Certo can't tell whether the model succeeded. A stronger model
+would face the same blank. (When the model wrote no file at all, Certo
+climbs to the next model instead.)
 
 **Fix:** ask for tests in the task ("... with pytest tests"), or add them
 first. See [`inconclusive`: the project has no tests](#inconclusive-the-project-has-no-tests).
@@ -584,6 +586,18 @@ reached CERTO_MAX_TASK_COST=...` or `... the task's time budget
 **Fix:** raise `CERTO_MAX_TASK_COST` or `CERTO_MAX_TASK_SECONDS`, or give
 the cheaper rungs fewer fix attempts (`retries` in the ladder) so they hand
 over sooner. Models with no known price count as 0 toward the cost cap.
+
+**You see:** `Certo: ... changed no file either, after ...: two models in
+a row did no work on this task, so escalation stops.`
+
+**Cause:** two models in a row changed no file (each ended `unchanged`, or
+`inconclusive` with no file written). Certo takes that as a sign the task
+needs no change, rather than sending it to the most expensive model.
+
+**Fix:** if the task does need a change, say exactly what in the task, or
+resume with a stronger model: `certo --resume --model MODEL`. If both
+models ended within a minute, check for
+[tool calls written as text](#the-run-ends-at-once-with-a-tool-call-as-the-agents-last-message).
 
 ### `certo check --models`: a model fails
 

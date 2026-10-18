@@ -121,17 +121,6 @@ first item is the suggested next one.
 
 ## 4. Models and strategies
 
-- **An empty folder ends escalation.** `inconclusive` never climbs ("a
-  stronger model would face the same blank"), but that holds only when
-  the project has no tests, not when the model produced no file at all.
-  In the 0.1.15 local benchmark, `qwen3.8` `page-ranges` r3 and 14 of
-  `qwen3.6`'s 27 failures ended `inconclusive` with an empty folder (tool
-  calls written as text), so a ladder would stop on rung 1 instead of
-  trying the next model. Make "the agent produced no file" climb, like
-  `unchanged` (once in a row). Update the climb table in
-  `docs/guides/escalate-between-models.md` and the verdicts reference.
-  Done when a unit test covers it and a benchmark escalate arm shows the
-  climb.
 - **Tool calls written as text.** In the 0.1.15 local benchmark, every
   failed `qwen3.6` and `qwen3.8` run and 18 of 22 failed `devstral` runs
   ended because the model wrote its tool call as JSON in a text answer;

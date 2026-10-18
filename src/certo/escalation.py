@@ -43,11 +43,13 @@ from .model_catalog import (
 from .run_summary import RunSummary, format_duration
 
 # Final verdicts that mean "this model couldn't finish the job": the next
-# rung gets the task. Never `inconclusive` (nothing to act on), and never
-# `budget_exhausted` or `confirmation_required` (the user's own limits).
-# `acceptance_failed` only when the ladder opts in. `unchanged` climbs, but
-# two rungs in a row ending `unchanged` stop the climb (runner.py): two
-# models agreeing there is nothing to change is evidence, not laziness.
+# rung gets the task. Never `budget_exhausted` or `confirmation_required`
+# (the user's own limits). `acceptance_failed` only when the ladder opts in.
+# `inconclusive` climbs only when the rung changed no file
+# (`RungResult.did_no_work`): with files written and nothing to check, a
+# stronger model would face the same blank. Two rungs in a row that did no
+# work stop the climb (runner.py): two models agreeing there is nothing to
+# change is evidence, not laziness.
 ESCALATING_VERDICTS = (
     "retry_exhausted",
     "no_progress",
@@ -319,6 +321,18 @@ class RungResult:
     def ended(self) -> str:
         return self.verdict or "provider or run failure"
 
+    @property
+    def did_no_work(self) -> bool:
+        """It ended `unchanged`, or `inconclusive` without creating, changing
+        or deleting a file (in the 0.1.15 benchmark: a model that wrote its
+        tool calls as text). Either way a stronger model may do the task."""
+        if self.verdict == "unchanged":
+            return True
+        changes = self.changes
+        return self.verdict == "inconclusive" and not (
+            changes.created or changes.modified or changes.deleted
+        )
+
     def to_dict(self) -> dict[str, Any]:
         summary = self.summary
         return {
@@ -362,7 +376,13 @@ def handoff_message(task: str, previous: Sequence[RungResult], failing_output: s
     note Certo writes from recorded facts, and the real output of the checks
     that were failing. The files stay in the folder as they were left."""
     last = previous[-1]
-    if last.verdict == "unchanged":
+    if last.verdict == "inconclusive":
+        intro = (
+            "Another model already worked on this task in this folder and created or "
+            "changed no file, so there was nothing for Certo to check. Do what the task "
+            "asks. This summary was written by Certo from what it recorded, not by a model."
+        )
+    elif last.verdict == "unchanged":
         intro = (
             "Another model already worked on this task in this folder and changed no "
             "file, even when Certo asked it to. The project's checks pass, but they "
@@ -400,6 +420,8 @@ def handoff_message(task: str, previous: Sequence[RungResult], failing_output: s
 def climb_line(previous: RungResult, nxt: Rung, number: int, total: int) -> str:
     if previous.verdict is None:
         why = f"failed at the provider or run level ({previous.failure})"
+    elif previous.verdict == "inconclusive":
+        why = "ended inconclusive without changing a file"
     else:
         why = f"ended {previous.verdict} after {_attempts(previous.retries_used)}"
     return f"Certo: {previous.name} {why}; escalating to {nxt.name} (rung {number} of {total})."
