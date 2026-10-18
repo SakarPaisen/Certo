@@ -25,12 +25,6 @@ first item is the suggested next one.
   `models.yaml`) enables `qwen3.6-35b-local`, which scored 0/27 in the
   0.1.15 local benchmark (tool calls written as text); consider
   `qwen3.8-27b-local` instead.
-- **Benchmark 0.1.14–0.1.15 on a local and a cloud model** (working
-  agreement 2). `unchanged` and bench transcripts are unit-tested only.
-  The 0.1.11 derived-ladder order is not benchmarked either. Done when a
-  results folder from this version has both kinds of arm. Local half done
-  (`docs/benchmark/local-models-0.1.15.md`); the cloud arms were started
-  2026-10-18.
 - **Point code comments at the new planning files.** About 41 comments in
   `src/` and `tests/` say "see ROADMAP.md (decisions log / known
   limitations)"; those sections are now `DECISIONS.md` and
@@ -44,7 +38,7 @@ first item is the suggested next one.
 
 - **A baseline per release.** `docs/benchmark/baseline-<version>.md` for
   every release (local vs cloud, fooled rate, cost per solved task), and
-  a README badge. Only `baseline-0.1.13.md` exists.
+  a README badge. 0.1.13 and 0.1.15 exist; no badge yet.
 - **Bench task set v2: app-scale tasks.** Multi-file, multi-language: Go
   REST API with a database, React frontend + API, Rust CLI with
   subcommands, a fix inside an existing mid-size repo. Grading supports

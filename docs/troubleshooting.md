@@ -305,7 +305,7 @@ call written as text, such as
 a real tool call, so the agent framework took it as the final answer.
 This usually comes from the model's chat template in Ollama, or from a
 context window too small for the tool definitions. In Certo's
-[four-model benchmark](benchmark/local-models-0.1.15.md), `qwen3.6:35b-a3b`
+[0.1.15 benchmark](benchmark/baseline-0.1.15.md), `qwen3.6:35b-a3b`
 did this in every run and `devstral-small-2:24b` in most.
 
 **Fix:** raise the context window first (see

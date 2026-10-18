@@ -25,7 +25,7 @@ Three things matter, in this order:
 
 ## What Certo's benchmark found
 
-Certo's [four-model benchmark](../benchmark/local-models-0.1.15.md) ran
+Certo's [0.1.15 benchmark](../benchmark/baseline-0.1.15.md) ran
 each model 27 times on 9 small tasks, graded by hidden tests the agent
 never saw. All four ran on the same Ollama server.
 
@@ -98,12 +98,13 @@ sooner, list only a few tasks and use one repeat.
   `certo --resume --model MODEL` (see [After the verdict](after-the-verdict.md)).
 - Let Certo do that by itself: start every task on the local model and
   move to a cloud model only when verification fails. See
-  [Escalate between models](escalate-between-models.md).
+  [Escalate between models](escalate-between-models.md). In the same
+  benchmark, `claude-haiku-5-5` solved all 9 tasks for under a cent each.
 
 ## Related
 
 - [Ollama and local models](ollama-and-local-models.md): install, memory,
   context window
-- [Four local models (0.1.15)](../benchmark/local-models-0.1.15.md): the
-  full results
+- [Baseline 0.1.15](../benchmark/baseline-0.1.15.md): the full results,
+  with three cloud models for comparison
 - [Benchmark models and strategies](benchmark.md)

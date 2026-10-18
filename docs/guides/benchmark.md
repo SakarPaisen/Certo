@@ -238,7 +238,7 @@ bundled set: [Write or contribute a benchmark task](contribute-a-benchmark-task.
 - [bench.yaml reference](../reference/bench-yaml.md)
 - [Baseline 0.1.13](../benchmark/baseline-0.1.13.md): the first complete
   results
-- [Four local models (0.1.15)](../benchmark/local-models-0.1.15.md):
-  qwen3.8, qwen3.6, devstral and gemma4 compared
+- [Baseline 0.1.15](../benchmark/baseline-0.1.15.md): four local and
+  three cloud models compared
 - [Commands: certo bench](../reference/commands.md#certo-bench)
 - [How verification works](../concepts/how-verification-works.md)
