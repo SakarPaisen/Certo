@@ -4,7 +4,9 @@ For each task × arm × repeat: a fresh temporary workspace with only the
 task's starter files; the arm's strategy runs the normal Certo pipeline on
 `task.md`; then the hidden tests are copied in and run in the project's own
 environment. One JSON file per run lands in `<out>/runs/`, so an
-interrupted benchmark keeps what it has and `--resume` continues it.
+interrupted benchmark keeps what it has and `--resume` continues it, and
+the run's conversation in `<out>/runs/transcripts/`, so every result can
+be explained.
 
 Runs are one at a time by default (a local GPU serves one model at a
 time); `--parallel N` is allowed only when every arm uses cloud models.
@@ -133,6 +135,11 @@ def execute_run(
     """One isolated run: prepare, run the strategy, grade, record."""
     workspace = tempfile.mkdtemp(prefix="certo-bench-")
     isolation = tempfile.mkdtemp(prefix="certo-bench-iso-")
+    messages: list[Any] = []
+
+    def recording_stream(task: str, **kwargs: Any) -> Any:
+        return stream(task, on_message=messages.append, **kwargs)
+
     try:
         prepare_workspace(planned.task, workspace)
         strategy = STRATEGIES[planned.arm.strategy]
@@ -146,7 +153,7 @@ def execute_run(
                     workspace,
                     cfg.catalog,
                     isolation,
-                    stream,
+                    recording_stream,
                     model_catalog=cfg.model_catalog,
                 ),
                 planned.arm.params,
@@ -154,6 +161,7 @@ def execute_run(
         except Exception as exc:  # noqa: BLE001 - recorded; the benchmark goes on
             error = f"{type(exc).__name__}: {exc}"
         wall = time.monotonic() - start
+        write_transcript(out_dir, planned.run_id, messages)
         graded = grade(planned.task, workspace)
         snapshot = out_dir / "workspaces" / planned.run_id
         if snapshot.exists():
@@ -205,6 +213,28 @@ def execute_run(
     }
     _write_json(out_dir / "runs" / f"{planned.run_id}.json", record)
     return record
+
+
+def _message_dict(message: Any) -> Any:
+    dump = getattr(message, "model_dump", None)
+    if not callable(dump):
+        return {"text": str(message)}
+    try:
+        return dump(mode="json")
+    except Exception:  # noqa: BLE001 - a transcript must never fail the run
+        return {"text": str(message)}
+
+
+def write_transcript(out_dir: Path, run_id: str, messages: list[Any]) -> None:
+    """Every message of one run (the agent's, the tools', and Certo's own
+    notices), as the artifacts transcript stores them. Beside the run
+    records, not among them: `load_records` reads only `runs/*.json`."""
+    folder = out_dir / "runs" / "transcripts"
+    folder.mkdir(parents=True, exist_ok=True)
+    _write_json(
+        folder / f"{run_id}.json",
+        {"run_id": run_id, "messages": [_message_dict(m) for m in messages]},
+    )
 
 
 def load_records(out_dir: Path) -> list[dict[str, Any]]:
@@ -442,10 +472,10 @@ def _init_out_dir(cfg: BenchConfig, out_dir: Path, estimate: dict[str, Any]) -> 
         _write_json(out_dir / "meta.json", {**_meta(cfg), "estimate": estimate})
 
 
-def _default_stream(task: str, *, cfg, ladder=None) -> Any:
+def _default_stream(task: str, *, cfg, ladder=None, on_message=None) -> Any:
     from .runner import stream_task
 
-    return stream_task(task, cfg=cfg, ladder=ladder)
+    return stream_task(task, cfg=cfg, ladder=ladder, on_message=on_message)
 
 
 def run_benchmark(
@@ -689,4 +719,4 @@ def finish_report(cfg: BenchConfig, out_dir: Path, records: list[dict[str, Any]]
             f"cost {row['Cost']}"
         )
     print(cost_line(cost_summary(meta, records)))
-    print(f"Results: {markdown} (and results.csv, cost.json)")
+    print(f"Results: {markdown} (and results.csv, cost.json; conversations in runs/transcripts/)")

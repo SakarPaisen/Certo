@@ -67,8 +67,10 @@ class FakeModel:
         self.raise_on = raise_on
         self.calls: list[SimpleNamespace] = []
 
-    def __call__(self, task_text, *, cfg):
+    def __call__(self, task_text, *, cfg, on_message=None):
         self.calls.append(SimpleNamespace(task=task_text, cfg=cfg))
+        if on_message is not None:
+            on_message(f"working on: {task_text[:20]}")
         call = len(self.calls)
         if call in self.raise_on:
             raise self.raise_on[call]
@@ -93,6 +95,29 @@ def _run(path, out, model, *extra):
 
 def _records(out: Path) -> list[dict]:
     return [json.loads(p.read_text()) for p in sorted((out / "runs").glob("*.json"))]
+
+
+def test_each_run_keeps_its_conversation_beside_the_records(tmp_path, project_venv):
+    model = FakeModel(project_venv)
+    out = tmp_path / "out"
+    assert _run(_bench_file(tmp_path, ONE_ARM), out, model) == 0
+
+    transcript = json.loads(
+        (out / "runs" / "transcripts" / "a__temperature-table__r1.json").read_text()
+    )
+    assert transcript["run_id"] == "a__temperature-table__r1"
+    assert transcript["messages"][0]["text"].startswith("working on: ")
+    assert len(_records(out)) == 1  # the transcript is not read as a run record
+
+
+def test_a_transcript_uses_the_messages_own_json_form(tmp_path):
+    from openhands.sdk import Message, TextContent
+
+    message = Message(role="assistant", content=[TextContent(text="done")])
+    bench.write_transcript(tmp_path, "r1", [message])
+
+    saved = json.loads((tmp_path / "runs" / "transcripts" / "r1.json").read_text())
+    assert saved["messages"] == [message.model_dump(mode="json")]
 
 
 def test_a_run_is_isolated_graded_and_recorded(tmp_path, project_venv, capsys):
@@ -308,10 +333,10 @@ class FakeLadderModel(FakeModel):
     """Stands in for stream_task with a ladder: the first rung fails, the
     second solves the task."""
 
-    def __call__(self, task_text, *, cfg, ladder=None):
+    def __call__(self, task_text, *, cfg, ladder=None, on_message=None):
         from certo.escalation import RungResult
 
-        outcome = super().__call__(task_text, cfg=cfg)
+        outcome = super().__call__(task_text, cfg=cfg, on_message=on_message)
         self.ladders = [*getattr(self, "ladders", []), ladder]
         rungs = (
             RungResult(1, ladder.rungs[0].name, "x", "no_progress", 1, 1.0, _summary(0.0)),

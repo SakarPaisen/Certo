@@ -154,7 +154,8 @@ models.
    built-in skills load, so your own skills can't change the result.
 3. The hidden tests are copied in and run in the project's own
    environment. Only they decide the score.
-4. The result is saved at once, with a copy of the final folder.
+4. The result is saved at once, with a copy of the final folder and the
+   run's conversation.
 
 ## Read the results
 
@@ -166,6 +167,7 @@ Each benchmark writes a folder, by default `bench-results/<date-time>/`:
 | `results.csv` | One row per run, for a spreadsheet. |
 | `cost.json` | The real total cost, the cost per model, and the plan's estimate. |
 | `runs/*.json` | Every detail of each run. |
+| `runs/transcripts/<run>.json` | The run's whole conversation: the agent's messages, the tools' output and Certo's notes. Read it to see why a run ended as it did. |
 | `workspaces/<run>/` | The code each run left behind (without `.venv` and `node_modules`). |
 | `meta.json` | Certo version, date, hardware, task set, the benchmark itself, and the plan's cost estimate. |
 

@@ -166,7 +166,8 @@ decisions log below for *why* a given design was chosen.
   catalog entry (`run_config`, Certo defaults, isolated skill dirs, no
   `.env`). `bench.py` runs repeat-major, one JSON per run (atomic write),
   workspace snapshots, `--max-cost`, `--parallel` (cloud-only),
-  `--resume` (fingerprint + task-set hash must match). `bench_report.py`
+  `--resume` (fingerprint + task-set hash must match), each run's
+  conversation in `runs/transcripts/<run_id>.json` (0.1.15). `bench_report.py`
   renders `results.md`/`results.csv` from the folder alone. The task
   prompt is passed to `stream_task`, not copied into the workspace, so an
   empty-starter Python task keeps the normal "empty folder + task names
@@ -1300,6 +1301,14 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   `meta.json` (`estimate`) when the folder is created, outside
   `config`, so the `--resume` fingerprint is unaffected; older folders
   simply have none.
+- **Bench keeps each run's conversation** (0.1.15, user request): the
+  fooled run behind `unchanged` couldn't be explained, since bench passed
+  no `on_message` and set no `CERTO_ARTIFACTS_DIR`. `execute_run` wraps the
+  stream to collect messages (strategies unchanged) and writes
+  `runs/transcripts/<run_id>.json` before grading, also when the strategy
+  raises. A subfolder, not `runs/<id>.transcript.json`, because
+  `load_records` globs `runs/*.json`. Not artifacts (`write_run_artifacts`):
+  that adds per-rung folders and metadata the run record already holds.
 - **A `verified` run that changed no file becomes `unchanged`, after one
   follow-up** (0.1.14, user's choice among: always `inconclusive`, always
   a failure, follow-up only). The checks then only prove the starting
