@@ -294,6 +294,26 @@ start of the task any more.
 `OLLAMA_CONTEXT_LENGTH=32768 ollama serve`, or raise it in the Ollama
 app's settings. `ollama ps` shows the context a loaded model got.
 
+### The run ends at once, with a tool call as the agent's last message
+
+**You see:** with a local model, a run ends within a minute with
+`inconclusive` or `unchanged`, and the agent's last message is a tool
+call written as text, such as
+`{"command": "view", "path": "..."}`.
+
+**Cause:** the model wrote its tool call as plain text instead of making
+a real tool call, so the agent framework took it as the final answer.
+This usually comes from the model's chat template in Ollama, or from a
+context window too small for the tool definitions. In Certo's
+[four-model benchmark](benchmark/local-models-0.1.15.md), `qwen3.6:35b-a3b`
+did this in every run and `devstral-small-2:24b` in most.
+
+**Fix:** raise the context window first (see
+[The agent behaves erratically with Ollama](#the-agent-behaves-erratically-with-ollama)),
+update Ollama, and run `certo check`, which fails when the answer isn't a
+real tool call. If it keeps happening, use another model: in the same benchmark,
+`qwen3.8:27b` did it in 3 runs of 27, and `gemma4:31b-it-qat` never.
+
 ### Every step is very slow
 
 **You see:** each step of the agent takes minutes, and tasks end with
@@ -693,6 +713,19 @@ finds no test files, so Certo counts "no tests" as a pass. See
 **Fix:** nothing to fix in the benchmark: counting these runs is what
 "fooled" is for. In your own projects, check that `npm test` really runs
 tests.
+
+### `certo bench`: a traceback after the results
+
+**You see:** after the `Results:` line, a red traceback that ends with
+`OSError: [Errno 9] Bad file descriptor`, from
+`subprocess_terminal.py` (`PTY reader thread error`).
+
+**Cause:** a terminal used by the agent was closed while the agent
+framework was still reading from it, as the benchmark shut down.
+
+**Fix:** none needed. The benchmark finished: the results are complete,
+and the `runs recorded` count at the top of `results.md` says how many
+runs were saved.
 
 ## Other problems
 

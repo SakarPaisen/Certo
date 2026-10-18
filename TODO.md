@@ -25,7 +25,9 @@ first item is the suggested next one.
 - **Benchmark 0.1.14–0.1.15 on a local and a cloud model** (working
   agreement 2). `unchanged` and bench transcripts are unit-tested only.
   The 0.1.11 derived-ladder order is not benchmarked either. Done when a
-  results folder from this version has both kinds of arm.
+  results folder from this version has both kinds of arm. Local half done
+  (`docs/benchmark/local-models-0.1.15.md`); the cloud arms were started
+  2026-10-18.
 - **Point code comments at the new planning files.** About 41 comments in
   `src/` and `tests/` say "see ROADMAP.md (decisions log / known
   limitations)"; those sections are now `DECISIONS.md` and
@@ -40,9 +42,6 @@ first item is the suggested next one.
 - **A baseline per release.** `docs/benchmark/baseline-<version>.md` for
   every release (local vs cloud, fooled rate, cost per solved task), and
   a README badge. Only `baseline-0.1.13.md` exists.
-- **Analyse the four-model local benchmark** (`bench-local.yaml`, started
-  2026-10-18): compare the models, read the transcripts, and use the
-  numbers for the "choose a local model" guide (see Adoption).
 - **Bench task set v2: app-scale tasks.** Multi-file, multi-language: Go
   REST API with a database, React frontend + API, Rust CLI with
   subcommands, a fix inside an existing mid-size repo. Grading supports
@@ -121,6 +120,22 @@ first item is the suggested next one.
 
 ## 4. Models and strategies
 
+- **Tool calls written as text.** In the 0.1.15 local benchmark, every
+  failed `qwen3.6` and `qwen3.8` run and 18 of 22 failed `devstral` runs
+  ended because the model wrote its tool call as JSON in a text answer;
+  the SDK took it as the final message. First find the cause (Ollama chat
+  template, or context too small for the tool definitions): rerun one
+  task with a known `OLLAMA_CONTEXT_LENGTH`. Then consider a harness fix:
+  when the final message parses as a tool call, send it back once as a
+  correction. Gated by tier or opt-in, and benchmarked local and cloud.
+- **Record the Ollama setup in bench results.** `meta.json` has no Ollama
+  version or context length, so a local result can't be traced to the
+  setup (`/api/version`, `/api/ps`). Done when the report shows both.
+- **Slow local models lose correct work to the time budget.** Three runs
+  in the 0.1.15 local benchmark passed the hidden tests but ended
+  `budget_exhausted`. Consider a per-arm budget in `bench.yaml`. Also: a
+  `devstral` run (`token-bucket` r3) ran 57 minutes under the 30-minute
+  budget; find why the budget overran (a single long model call?).
 - **Bench estimates from recorded cost.** The plan prices every run at a
   fixed ~500k input / ~20k output tokens (far too high: a cloud run used
   ~124k in the baseline). Use the per-model average from earlier
@@ -275,6 +290,11 @@ database).
 
 ## Smaller bugs
 
+- **Traceback when a benchmark ends.** After the results are written,
+  the SDK's terminal reader thread logs `PTY reader thread error: [Errno
+  9] Bad file descriptor` (`subprocess_terminal.py`): it reads a terminal
+  that was already closed. Harmless but alarming; users read it as a
+  crash. Close the conversations' terminals before exit, or silence it.
 - **`llm_check.explain()` always says "in .env"** ("Check
   CERTO_LLM_API_KEY in .env"), although since 0.1.5 the value usually
   comes from the user settings file or the environment.
