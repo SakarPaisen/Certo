@@ -218,43 +218,23 @@ only when the task set version and hash in the header match.
 
 ## Add a task
 
-A task is a folder:
-
-```text
-my-task/
-  task.md        the prompt the agent sees
-  starter/       optional starting files the agent sees
-  hidden_tests/  the tests that decide the score; never shown to the agent
-  reference/     a reference solution; never shown to the agent
-```
-
-- Python hidden tests are pytest files (`test_*.py`) that import the
-  solution's modules by name. Node hidden tests are `*.test.js` files for
-  `node --test` that `require('../module.js')`.
-- `task.md` must state everything the hidden tests check: file names,
-  function names, errors, edge cases. A test that checks something the
-  prompt doesn't ask for measures luck, not skill.
-- Ask for the agent's own tests in `task.md`, so Certo has something to
-  verify.
-
-Put your tasks in a folder of their own and point `tasks_dir` in
-`bench.yaml` at it. Then check them, with no model:
+You can benchmark your own tasks: a task is a folder with a prompt
+(`task.md`), optional starter files, hidden tests and a reference
+solution. Point `tasks_dir` in `bench.yaml` at a folder of them, and
+check them with no model:
 
 ```bash
 certo bench --check-tasks
 ```
 
 Every reference solution must pass its hidden tests, and every starter
-alone must fail them.
-
-To add a task to the bundled set, work from a checkout (see
-[CONTRIBUTING.md](../../CONTRIBUTING.md)): add the folder under
-`src/certo/benchmark_tasks/`, raise the number in its `VERSION` file, and
-run the test suite, which checks every task the same way.
+alone must fail them. How to write a fair task, try it, and send it to the
+bundled set: [Write or contribute a benchmark task](contribute-a-benchmark-task.md).
 
 ## Related
 
 - [Write a benchmark file](write-a-benchmark-file.md)
+- [Write or contribute a benchmark task](contribute-a-benchmark-task.md)
 - [bench.yaml reference](../reference/bench-yaml.md)
 - [Baseline 0.1.13](../benchmark/baseline-0.1.13.md): the first complete
   results

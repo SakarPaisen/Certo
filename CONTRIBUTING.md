@@ -12,7 +12,8 @@ uv run pytest -q     # no API key needed
 See [`CLAUDE.md`](CLAUDE.md) for the project's working rules,
 [`docs/`](docs/README.md) for how Certo behaves, and
 [`ROADMAP.md`](ROADMAP.md) for status and the reasons behind design
-decisions.
+decisions. To add a benchmark task, see
+[Write or contribute a benchmark task](docs/guides/contribute-a-benchmark-task.md).
 
 Only needed for Docker mode or server mode:
 
