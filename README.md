@@ -49,17 +49,18 @@ Eight cases, and how each one changed Certo: [Why agents lie](https://github.com
 
 ## Numbers, not promises
 
-How often would Certo have been fooled? `certo bench` measures it: each run is graded by **hidden tests the agent never sees**, and Certo counts every time it said `verified` while the hidden tests failed. From the first complete benchmark (Certo 0.1.13, 9 tasks, 36 runs):
+How often would Certo have been fooled? `certo bench` measures it: each run is graded by **hidden tests the agent never sees**, and Certo counts every time it said `verified` while the hidden tests failed. From the Certo 0.1.15 benchmark (9 tasks, 7 models, 135 runs):
 
-| | Local: `qwen3.8:27b` on Ollama | Cloud: `claude-sonnet-5-5` |
-| --- | --- | --- |
-| Hidden tests passed | 9/9 | 9/9 |
-| Median time per task | 6m 13s | 37s |
-| Cost | $0.00 | $1.12 ($0.12 per task) |
+| Model | Hidden tests passed | Median time per task | Cost per solved task |
+| --- | --- | --- | --- |
+| `claude-sonnet-5-5` (cloud) | 9/9 | 31s | $0.12 |
+| `claude-haiku-5-5` (cloud) | 9/9 | 45s | $0.0094 |
+| `gemma4:31b-it-qat` (local, Ollama) | 26/27 | 12m 40s | $0.00 |
+| `qwen3.8:27b` (local, Ollama) | 24/27 | 4m 37s | $0.00 |
 
-Certo was fooled **once in 36 runs**: an agent changed no file, the old tests still passed, and Certo said `verified`. Certo 0.1.14 closed that gap with the `unchanged` verdict. That's what the number is for: each fooled run shows a gap to close.
+Certo was fooled **3 times in 135 runs**: each time the code broke a rule the task stated, and the agent's own tests never tried it. When a model broke down (two local models often wrote their tool calls as text and did no work), Certo caught it: of 54 runs that failed the hidden tests, it said `verified` for only those 3. That's what the number is for: each fooled run shows a gap to close.
 
-These tasks are small, too small to tell the two models apart; harder ones are planned. The full results, and their limits: [Benchmark baseline 0.1.13](https://github.com/alessioricco/certo/blob/main/docs/benchmark/baseline-0.1.13.md).
+These tasks are small; harder ones are planned. All seven models, and the limits of this run: [Benchmark baseline 0.1.15](https://github.com/alessioricco/certo/blob/main/docs/benchmark/baseline-0.1.15.md).
 
 ## Quickstart
 
