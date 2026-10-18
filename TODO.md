@@ -21,7 +21,10 @@ first item is the suggested next one.
   download step in `docs/guides/write-a-benchmark-file.md` with that `cp`
   command, and update the sdist allowlist and `tests/test_packaging.py`.
   Feature: bump the version. Deferred on 2026-10-18 while a benchmark ran
-  from the checkout.
+  from the checkout. While there: the example (and the example
+  `models.yaml`) enables `qwen3.6-35b-local`, which scored 0/27 in the
+  0.1.15 local benchmark (tool calls written as text); consider
+  `qwen3.8-27b-local` instead.
 - **Benchmark 0.1.14–0.1.15 on a local and a cloud model** (working
   agreement 2). `unchanged` and bench transcripts are unit-tested only.
   The 0.1.11 derived-ladder order is not benchmarked either. Done when a
