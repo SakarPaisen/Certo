@@ -138,8 +138,8 @@ _VERIFY_BEFORE_FINISH_SUFFIX = (
 # documentation-and-operational-readiness, completion-and-release-readiness
 # — see MANUAL.md "Skills") are legacy-format `.md` files with `triggers:`
 # frontmatter (KeywordTrigger), not AgentSkills `SKILL.md` — a deliberate
-# switch from this harness's earlier 5-skill set (see ROADMAP.md's decisions
-# log): a KeywordTrigger skill auto-injects its full content the moment a
+# switch from this harness's earlier 5-skill set (see DECISIONS.md): a
+# KeywordTrigger skill auto-injects its full content the moment a
 # matching word appears in the task, with no model action required, instead
 # of depending on the model choosing to call `invoke_skill` — real,
 # code-enforced triggering rather than a hope. That makes most of what the

@@ -11,7 +11,7 @@ skipped cleanly otherwise.
 
 `mysql`/`postgres` specifically were verified live during development
 against real `mysql:8`/`postgres:16-alpine` Docker containers (see
-ROADMAP.md's decisions log) but are not run as part of the automated
+DECISIONS.md) but are not run as part of the automated
 suite, since that would require Docker (or a live server) in every
 environment `uv run pytest -q` runs in — they exercise the exact same
 `SQLTaskStore` code path the sqlite tests already cover in full.

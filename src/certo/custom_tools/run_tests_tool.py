@@ -24,7 +24,7 @@ site "set up successfully" and pytest-only verification silently reported
 exact same project — a false pass on code that didn't even compile.
 Generalized to Go/Rust/Java(Maven+Gradle) plus Python/Node lint+typecheck
 and Node lint/typecheck scripts per explicit follow-up request — see
-ROADMAP.md's decisions log for what's genuinely verified vs. only detected.
+DECISIONS.md for what's genuinely verified vs. only detected.
 """
 
 from __future__ import annotations
@@ -663,7 +663,7 @@ def _is_main_guard(node: ast.stmt) -> bool:
 # Directories entry-point discovery skips beyond the usual _SKIP_DIRS
 # (vendored/build output): a project's own tests directory. Recursing at
 # all was deliberately deferred until there was a real reason to (see
-# ROADMAP.md's decisions log) specifically because an unfiltered walk
+# DECISIONS.md) specifically because an unfiltered walk
 # risks two kinds of false positive — a vendored dependency's own
 # `__main__` guard (already covered by _SKIP_DIRS) and a test *script*
 # that happens to define one too (e.g. `if __name__ == "__main__":

@@ -8,7 +8,7 @@ when no `--project` was given), not a hidden folder nested inside each
 generated project — this is harness-internal telemetry, not part of the
 project a user might `git init` and commit. `MODEL_DECISIONS.md` stays
 where it already is (inside the project workspace) — this module never
-touches it. See MANUAL.md "Run artifacts" and ROADMAP.md's decisions log.
+touches it. See MANUAL.md "Run artifacts" and DECISIONS.md.
 
 Pure file-writing, no SDK/`Conversation` dependency — `runner.py` extracts
 `conversation.conversation_stats`-derived data into plain dicts before

@@ -14,7 +14,7 @@ the same small interface.
 dependency, no persistence across restarts, unbounded unless a TTL is set.
 The three SQL backends (`sqlite`/`mysql`/`postgres`) share one
 implementation via SQLAlchemy Core, parameterized by dialect — see
-`SQLTaskStore` and ROADMAP.md's decisions log for why a shared
+`SQLTaskStore` and DECISIONS.md for why a shared
 implementation was chosen over three hand-written ones. `redis` uses
 native per-key expiration for its TTL instead of a purge sweep — see
 `RedisTaskStore`.
@@ -193,7 +193,7 @@ class MemoryTaskStore(TaskStore):
 class SQLTaskStore(TaskStore):
     """Shared implementation for `sqlite`/`mysql`/`postgres`, parameterized
     by a SQLAlchemy engine — one `tasks` table, one set of queries, no
-    dialect-specific SQL. See ROADMAP.md's decisions log for why one
+    dialect-specific SQL. See DECISIONS.md for why one
     implementation was chosen over three.
 
     `messages`/`completion_contract`/`acceptance_results` are stored as

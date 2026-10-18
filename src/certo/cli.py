@@ -604,7 +604,7 @@ def main(argv: list[str] | None = None) -> int:
     # for a confirmed pass — unless --require-verification opted into
     # treating "nothing was checked" as a failure too (off by default: this
     # is a real behavior change a caller must ask for, not a silent default
-    # flip — see ROADMAP.md).
+    # flip — see DECISIONS.md).
     outcome = messages.outcome
     if outcome.model_decisions:
         final = outcome.model_decisions[-1]

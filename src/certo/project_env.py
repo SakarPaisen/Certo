@@ -3,7 +3,7 @@
 Certo used to run a project's checks with its own interpreter
 (`sys.executable`). That works in the dev virtualenv, where pytest is a dev
 dependency, and fails after `uv tool install certo`, whose environment has
-no pytest and no pip (see ROADMAP.md's "confident but wrong" log). Both the
+no pytest and no pip (see ARCHITECTURE.md's "confident but wrong" list). Both the
 agent's terminal and the harness's verification now use one environment
 that belongs to the project:
 

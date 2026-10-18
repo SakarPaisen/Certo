@@ -27,7 +27,7 @@ def build_tools(terminal_env: Mapping[str, str] | None = None) -> list[Tool]:
     default whenever tmux is installed) the session gets VIRTUAL_ENV but a
     new window takes PATH from the tmux client — Certo's own process — so
     `python` still resolved to Certo's interpreter. Confirmed live with SDK
-    1.47.0 and tmux on macOS (see ROADMAP.md's SDK gotchas).
+    1.47.0 and tmux on macOS (see ARCHITECTURE.md's SDK gotchas).
     """
     tools = list(get_default_tools(enable_browser=False))
     if terminal_env:

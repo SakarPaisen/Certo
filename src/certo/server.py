@@ -29,7 +29,7 @@ from .task_store import TaskRecord, TaskStore, build_task_store
 # itself configurable (unlike CERTO_TASK_TTL_SECONDS): a fixed interval
 # is a reasonable default for a sweep that only matters when a TTL is set
 # at all, and this project's config-surface philosophy is to add a knob
-# only for what a user actually asked to control (see ROADMAP.md).
+# only for what a user actually asked to control (see DECISIONS.md).
 _PURGE_INTERVAL_SECONDS = 60
 
 _SENTINEL = object()
@@ -164,7 +164,7 @@ def create_app():
         # software works) and "unchanged" (the agent changed no file) are
         # not treated as a failure unless the caller
         # explicitly opts in — same rationale and same default as the CLI's
-        # --require-verification (see cli.py/ROADMAP.md).
+        # --require-verification (see cli.py/DECISIONS.md).
         require_verification: bool = False
         # Optional, opt-in machine-checkable acceptance criteria — same
         # meaning and same JSON shape as CLI's --acceptance-checks (see
@@ -205,7 +205,7 @@ def create_app():
     # This does mean `certo-server` now requires a valid CERTO_LLM_MODEL/
     # CERTO_LLM_API_KEY at startup rather than only on the first request — a
     # deliberate, minor behavior change (fail fast beats silently starting
-    # a broken server); see ROADMAP.md's decisions log.
+    # a broken server); see DECISIONS.md.
     startup_cfg = load_config()
     store: TaskStore = build_task_store(startup_cfg)
 

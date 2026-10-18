@@ -5,7 +5,7 @@ reading the one file, fully unit-testable without a `Conversation`.
 `models.yaml` is git-ignored (see `.gitignore`) because real API keys live
 directly in it — same treatment as `.env`. `models.yaml.example` is the
 checked-in template. See MANUAL.md "Automatic model selection" for the
-user-facing writeup and ROADMAP.md's decisions log for the design history
+user-facing writeup and DECISIONS.md for the design history
 (deterministic weighted scoring was chosen over an LLM-based router; one
 static ranked list per task, not re-scored mid-task; no hard minimum catalog
 size — see `rank_candidates`).

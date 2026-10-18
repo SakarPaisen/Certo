@@ -108,7 +108,7 @@ logger = logging.getLogger(__name__)
 # across the initial run and every retry phase combined — distinct from a
 # single `conversation.run()` call hitting its own `max_iteration_per_run`
 # (which resets on every call and so cannot bound a whole task on its own,
-# see ROADMAP.md's decisions log); a caller-supplied, machine-checkable
+# see DECISIONS.md); a caller-supplied, machine-checkable
 # acceptance criterion (see `acceptance.py`) that was marked `required` and
 # failed, downgrading what would otherwise have been `verified` — the only
 # state a caller opts into by supplying `acceptance_checks` at all; and a
@@ -118,7 +118,7 @@ logger = logging.getLogger(__name__)
 # (see `_verify_and_report`); it's listed because `VerificationRun.state`
 # (run_tests_tool.py) uses the same vocabulary and a caller may inspect a
 # `TaskOutcome.checks` mid-analysis. See MANUAL.md "Test verification" and
-# ROADMAP.md's decisions log.
+# DECISIONS.md.
 VERIFICATION_STATES = (
     "verified",
     "failed",
@@ -161,7 +161,7 @@ _DURATION_NOISE_RE = re.compile(
 class CompletionContract:
     """A structured, harness-computed statement of what a task run was
     actually judged against — deliberately not another LLM call or a bigger
-    prompt (see ROADMAP.md's decisions log): the goal is a record attached to
+    prompt (see DECISIONS.md): the goal is a record attached to
     the result, not more instructions fed back into the agent.
     """
 
@@ -244,7 +244,7 @@ def _command_runner(cfg: Config, workspace: Any) -> CommandRunner:
     """Where project commands run. Under `--execution docker` that's inside
     the container, next to the agent's own terminal: a venv only works on
     the OS that created it, so the agent and verification must share the
-    container's (see ROADMAP.md's decisions log)."""
+    container's (see DECISIONS.md)."""
     if cfg.execution == "docker":
         return WorkspaceRunner(
             workspace,
@@ -316,8 +316,8 @@ def _failure_signature(run: VerificationRun) -> tuple:
     after both edits except for its own run-duration footer. Two identical
     fix-then-still-broken cycles in a row is a much stronger, cheaper, and
     more reliable signal to stop on than trying to judge whether the
-    agent's own prose explanation still makes sense (see ROADMAP.md's
-    decisions log for why a text-coherence heuristic was rejected in favor
+    agent's own prose explanation still makes sense (see DECISIONS.md
+    for why a text-coherence heuristic was rejected in favor
     of this one).
     """
     problems = run.failing + run.timed_out_checks
@@ -596,7 +596,7 @@ def _run_conversation_once(
     A no-op fallback (behaves exactly like a bare `conversation.run()` call)
     when `model_chain` is `None` (auto mode off) or `cfg.execution !=
     "local"` (`conversation.switch_llm` doesn't exist on `RemoteConversation`
-    — see ROADMAP.md's decisions log).
+    — see DECISIONS.md).
     """
     while True:
         try:
@@ -642,7 +642,7 @@ def _run_with_confirmation(
     `AlwaysConfirm` pause along the way instead of leaving it unhandled —
     the actual wiring `CERTO_CONFIRM_MODE=always` previously lacked (it
     was parsed/validated in `config.py` but never attached to a real
-    `ConfirmationPolicyBase`; see ROADMAP.md) — and enforcing the shared,
+    `ConfirmationPolicyBase`; see DECISIONS.md) — and enforcing the shared,
     task-level `CERTO_MAX_TASK_SECONDS` wall-clock budget before every
     single `.run()` call it makes, not just the first. A drop-in
     replacement for a bare `conversation.run()` call: when
@@ -669,7 +669,7 @@ def _run_with_confirmation(
     to `0` at the top of every `run()` call, not persisted across calls —
     so `CERTO_MAX_ITERATIONS` alone cannot bound how long one task runs
     in total across the initial run and every retry phase combined (see
-    ROADMAP.md's decisions log for the exact multiplication and why a
+    DECISIONS.md for the exact multiplication and why a
     wall-clock budget was chosen over reverse-engineering the SDK's
     internal per-call iteration count). Checking it before *every* `.run()`
     call this function makes — including each confirm/reject round-trip —
@@ -727,8 +727,8 @@ def _verify_and_report(
     the project's own checks ourselves instead of trusting the agent's
     self-report, and never report a failed or unverified run as success.
 
-    Confirmed live this matters, not just in theory — see ROADMAP.md's
-    decisions log for two independent, concrete false-pass reproductions
+    Confirmed live this matters, not just in theory — see DECISIONS.md
+    for two independent, concrete false-pass reproductions
     (a Python `IndentationError` the agent's own summary misdiagnosed, and a
     JSX parse error a pytest-only check couldn't even see). Bounded by
     `cfg.max_verify_retries` so a project whose checks are simply wrong, or a
@@ -954,7 +954,7 @@ def _enforce_task_tracker_completion(
     task_tracker list incomplete" instruction: inspect the agent's own
     task_tracker state directly instead of trusting its finish message —
     the same "verify, don't trust the self-report" principle
-    `_verify_and_report` already applies to test results (see ROADMAP.md).
+    `_verify_and_report` already applies to test results (see DECISIONS.md).
 
     Returns `None` when there's nothing to enforce (the tool was never
     used, or its last known state already has no pending items) so
@@ -1145,8 +1145,8 @@ def stream_task(
     implementation, `server.py` leaves it unset. `acceptance_checks` is
     entirely optional — see `_apply_acceptance_checks`. `on_awaiting_input`
     is only consulted when `cfg.interactive` is true, and only around the
-    *initial* run — see the interactive loop below and ROADMAP.md's
-    decisions log for why task_tracker/verification retries stay fully
+    *initial* run — see the interactive loop below and DECISIONS.md
+    for why task_tracker/verification retries stay fully
     autonomous even in interactive mode. `on_model_choice` is only consulted
     when both `cfg.model_selection == "auto"` and `cfg.interactive` are
     true — see model_selection.py's `ModelChain` for the deterministic
@@ -1283,7 +1283,7 @@ def stream_task(
         if cfg.confirm_mode == "always":
             # Previously parsed/validated in config.py but never attached to
             # an actual ConfirmationPolicyBase, so it was a silent no-op —
-            # see ROADMAP.md. AlwaysConfirm pauses before every tool call;
+            # see DECISIONS.md. AlwaysConfirm pauses before every tool call;
             # _run_with_confirmation resolves each pause via on_confirm.
             conversation.set_confirmation_policy(AlwaysConfirm())
         # A shared, task-level wall-clock budget spanning every phase below —
@@ -1292,7 +1292,7 @@ def stream_task(
         # initial run, then up to max_verify_retries more in each of the two
         # retry loops below), each getting its own fresh iteration budget
         # from the SDK. See _run_with_confirmation's docstring and
-        # ROADMAP.md's decisions log for the exact multiplication this closes.
+        # DECISIONS.md for the exact multiplication this closes.
         deadline = time.monotonic() + cfg.max_task_seconds
 
         # CERTO_ARTIFACTS_DIR: mint a run id up front (server.py passes its
@@ -1328,7 +1328,7 @@ def stream_task(
             # Written even when a phase raises (e.g. every candidate in an
             # auto-selection chain failed at the API level) — that's exactly
             # when the escalation history matters most for debugging. See
-            # the live repro this fixed in ROADMAP.md's decisions log.
+            # the live repro this fixed in DECISIONS.md.
             if model_chain is not None:
                 write_model_decisions(cfg.workspace, model_chain.decisions)
             per_model_metrics = _per_model_metrics(conversation)
@@ -1539,7 +1539,7 @@ def _run_stream_task_phases(
     outcome = _outcome_for_run_result(run_result, task, cfg)
 
     # CERTO_INTERACTIVE=yes, initial run only (see stream_task's
-    # docstring and ROADMAP.md's decisions log): the SDK can't tell a
+    # docstring and DECISIONS.md): the SDK can't tell a
     # genuine clarifying question apart from real completion — both set
     # execution_status = FINISHED identically (see agent.py's
     # _AUTONOMOUS_SUFFIX docstring) — so rather than guessing, always

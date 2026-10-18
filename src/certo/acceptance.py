@@ -10,8 +10,8 @@ or see these; only `cli.py`/`server.py` accept them from the caller.
 
 Deliberately scoped to two check kinds only — `file_exists` and
 `file_contains` — with no arbitrary-command execution kind, even though
-"commands" was one of the kinds originally proposed. See ROADMAP.md's
-decisions log for why: a caller-supplied "run this command" check would be
+"commands" was one of the kinds originally proposed. See DECISIONS.md
+for why: a caller-supplied "run this command" check would be
 a new, harness-triggered remote-code-execution surface, compounding
 directly with server mode's lack of authentication (see `todo.md`'s
 server-mode-auth item) in a way a caller-supplied file *path* check does

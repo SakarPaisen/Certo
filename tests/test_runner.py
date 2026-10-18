@@ -70,7 +70,7 @@ def test_run_task_creates_a_file(tmp_path, monkeypatch):
 )
 def test_run_task_catches_entrypoint_ordering_bug_live(tmp_path, monkeypatch):
     """Closes the "not yet re-verified live" caveat that recurs across
-    ROADMAP.md's Known Limitations for the `entrypoint-ordering`/smoke-run
+    ARCHITECTURE.md's known limitations for the `entrypoint-ordering`/smoke-run
     checks (todo.md #16): those were previously only unit-tested against a
     synthetic fixture and verified against one frozen historical repro
     (`projects/hanoi/`), never through an actual `run_task()` call driving a
@@ -563,7 +563,7 @@ def test_interactive_wait_time_is_excluded_from_the_task_budget(monkeypatch):
 
 # --- CERTO_MAX_TASK_SECONDS: shared task-level budget ---------------------
 #
-# Regression coverage for the gap logged in ROADMAP.md: CERTO_MAX_ITERATIONS
+# Regression coverage for the gap logged in DECISIONS.md: CERTO_MAX_ITERATIONS
 # only bounds a single conversation.run() call, but runner.py can call
 # .run() up to three times per task (the initial run, then up to
 # max_verify_retries more in each of the two retry loops), each getting its
@@ -967,12 +967,12 @@ def test_agent_gets_stuck_mid_retry(monkeypatch):
 # --- task_tracker completion enforcement ------------------------------------
 #
 # Regression coverage for the "agent declares done with incomplete
-# task_tracker items" failure mode logged in ROADMAP.md: prior to this,
+# task_tracker items" failure mode logged in DECISIONS.md: prior to this,
 # only a prompt-level mitigation (_AUTONOMOUS_SUFFIX) existed, which is soft
 # and unverifiable by a test. Live-confirmed the exact failure this guards
 # against: given "create two tasks, mark one done, leave the other todo,
 # then finish", the agent did exactly that and called finish anyway — see
-# ROADMAP.md's decisions log for the transcript.
+# DECISIONS.md for the transcript.
 
 
 def test_task_tracker_never_used_is_not_enforced():

@@ -18,7 +18,7 @@ Reuses the SDK's own git fetch (`fetch_skill_with_resolution`: subpath
 containment, resolved commit SHA) and `Skill.load`, but *not* its
 `InstallationManager`: that enables new installs by default and auto-enables
 any untracked directory it discovers, both contrary to the explicit-opt-in
-rule here (see ROADMAP.md's decisions log).
+rule here (see DECISIONS.md).
 
 Skill content is treated as untrusted: this module never executes a
 downloaded file, loads with `skip_mcp=True` (a skill's `.mcp.json` would

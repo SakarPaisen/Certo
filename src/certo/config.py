@@ -127,7 +127,7 @@ class Config:
     # pytest suite (no LLM involved) and, if it fails, sends the real
     # failure output back and lets the agent try again, up to this many
     # times — a safety net for trusting the agent's own "it's done" self-
-    # report, which live testing showed can be wrong (see ROADMAP.md).
+    # report, which live testing showed can be wrong (see DECISIONS.md).
     verify_tests: str = DEFAULT_VERIFY_TESTS  # one of VERIFY_TESTS_MODES
     max_verify_retries: int = DEFAULT_MAX_VERIFY_RETRIES
 
@@ -136,12 +136,12 @@ class Config:
     # completion's and _verify_and_report's retries — not just the SDK's own
     # max_iteration_per_run, which resets on every single run() call and so
     # cannot on its own bound how long one task can run in total (see
-    # runner.py's _run_with_confirmation and ROADMAP.md's decisions log).
+    # runner.py's _run_with_confirmation and DECISIONS.md).
     max_task_seconds: int = DEFAULT_MAX_TASK_SECONDS
 
     # Provider-neutral reasoning effort, consumed by llm.py and passed
     # straight through to the SDK's own `LLM.reasoning_effort` (LiteLLM
-    # translates it per-provider — see ROADMAP.md's decisions log).
+    # translates it per-provider — see DECISIONS.md).
     # Deliberately not validated against a fixed choice list: the SDK's own
     # field accepts forward-compatible values beyond its documented ones
     # ('none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', ...), so

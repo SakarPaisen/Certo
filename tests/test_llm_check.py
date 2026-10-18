@@ -1,7 +1,7 @@
 """llm_check.py + `certo-admin check-llm` tests. No network: `build_llm`
 is monkeypatched to return a fake LLM, so only result shaping, error
 classification, secret scrubbing, and CLI output/exit codes are exercised.
-(The real call path was verified live — see ROADMAP.md.)
+(The real call path was verified live — see DECISIONS.md.)
 """
 
 from __future__ import annotations

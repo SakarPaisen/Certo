@@ -7,7 +7,7 @@ through the initial run and every retry loop: a ranked list of candidates,
 computed once (see model_catalog.py's `rank_candidates` docstring for why
 this project deliberately never re-scores mid-task), walked forward by
 `.advance()` as failures occur. See MANUAL.md "Automatic model selection"
-and ROADMAP.md's decisions log for the full design.
+and DECISIONS.md for the full design.
 """
 
 from __future__ import annotations

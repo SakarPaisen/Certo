@@ -7,8 +7,8 @@ third_party_skills.py and MANUAL.md "Third-party skills").
 Talks directly to whatever backend `CERTO_TASK_STORE` selects (via
 `build_task_store(load_config())`), the same store `server.py` uses — this
 is the CLI half of "delete all records for a project," alongside the REST
-`DELETE /tasks`/`DELETE /tasks/{id}` endpoints (see ROADMAP.md's decisions
-log for why both were built). Useful for a `memory`/`sqlite` deployment run
+`DELETE /tasks`/`DELETE /tasks/{id}` endpoints (see DECISIONS.md
+for why both were built). Useful for a `memory`/`sqlite` deployment run
 locally as well as a one-off maintenance script pointed at a shared
 redis/mysql/postgres store.
 """
