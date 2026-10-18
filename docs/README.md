@@ -147,6 +147,8 @@ takes you from install to your first verified project.
 ## For contributors
 
 How to work on Certo itself, run its tests and make a release is in
-[CONTRIBUTING.md](../CONTRIBUTING.md). Project status, the backlog and the
-reasons behind design decisions are in [ROADMAP.md](../ROADMAP.md). The
+[CONTRIBUTING.md](../CONTRIBUTING.md). Where the project is going is in
+[ROADMAP.md](../ROADMAP.md), what's left to do in [TODO.md](../TODO.md),
+and the reasons behind design decisions in
+[DECISIONS.md](../DECISIONS.md). The
 original build plan is [SPEC.md](SPEC.md).
