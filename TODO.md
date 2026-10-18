@@ -183,7 +183,7 @@ first item is the suggested next one.
   the verdict and checks in its description.
 - **Docs articles still to write** (ideas from 2026-10-18): build an
   app in several tasks (needs real runs); review the agent's work safely;
-  share your benchmark results; keep costs down; use `certo verify`
+  share your benchmark results (with the benchmark file, as `docs/benchmark/` does); keep costs down; use `certo verify`
   without the agent (pre-commit, any AI tool).
 - **Prebuilt Docker image.** Docker execution from a pip install fails:
   `workspace.py` builds from `docker/agent-server.Dockerfile` relative to

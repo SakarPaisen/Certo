@@ -1,0 +1,12 @@
+# The local half of baseline-0.1.15.md (Certo 0.1.15, 2026-10-18): four
+# local models on Ollama, each alone.
+# Run it with: certo bench --config bench-0.1.15-local.yaml
+# Every model below must be enabled in your models.yaml; see
+# docs/guides/write-a-benchmark-file.md. Expect several hours.
+tasks: all
+repeats: 3
+arms:
+  - {name: qwen3.8,     strategy: single, model: qwen3.8-27b-local}
+  - {name: qwen3.6,     strategy: single, model: qwen3.6-35b-local}
+  - {name: devstral,    strategy: single, model: devstral-small-2-local}
+  - {name: gemma4-qat,  strategy: single, model: gemma4-31b-qat-local}

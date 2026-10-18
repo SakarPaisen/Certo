@@ -186,6 +186,32 @@ def test_the_shipped_example_is_valid_against_the_shipped_models_example(tmp_pat
     assert [a.strategy for a in cfg.arms] == ["single", "single", "escalate"]
 
 
+@pytest.mark.parametrize(
+    "bench_file", sorted((_REPO / "docs/benchmark").glob("*.yaml")), ids=lambda p: p.name
+)
+def test_the_published_benchmark_files_load_against_the_shipped_catalog(tmp_path, bench_file):
+    # docs/benchmark/*.yaml reproduce the published results: each must still
+    # load once every model of the shipped models_list.yaml is enabled.
+    import yaml
+
+    list_path = _REPO / "src/certo/examples/models_list.yaml.example"
+    catalog = yaml.safe_load(list_path.read_text())
+    models = [
+        {"name": m["name"], "base_url": "http://localhost:11434"}
+        if m["model"].startswith("ollama/")
+        else {"name": m["name"], "api_key": "sk-test"}
+        for m in catalog["models"]
+    ]
+    models_path = tmp_path / "models.yaml"
+    models_path.write_text(yaml.safe_dump({"models": models}))
+    path = tmp_path / "bench.yaml"
+    path.write_text(
+        f"models_file: {models_path}\nmodels_list_file: {list_path}\n" + bench_file.read_text()
+    )
+    cfg = load_bench_config(str(path))
+    assert cfg.arms
+
+
 def test_run_config_takes_everything_from_the_catalog_entry(tmp_path, monkeypatch):
     monkeypatch.setenv("CERTO_LLM_MODEL", "openai/should-not-be-used")
     monkeypatch.setenv("CERTO_LLM_API_KEY", "sk-env")

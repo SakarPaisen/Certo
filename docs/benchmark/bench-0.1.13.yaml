@@ -1,0 +1,17 @@
+# The benchmark file behind baseline-0.1.13.md (Certo 0.1.13, 2026-10-17).
+# Run it with: certo bench --config bench-0.1.13.yaml
+# Every model below must be enabled in your models.yaml; see
+# docs/guides/write-a-benchmark-file.md.
+tasks: all
+repeats: 1
+arms:
+  - {name: local,  strategy: single, model: qwen3.8-27b-local}
+  - {name: cloud,  strategy: single, model: claude-sonnet-5-5}
+  - name: ladder
+    strategy: escalate
+    models: [qwen3.8-27b-local, claude-haiku-5-5, claude-sonnet-5-5, claude-opus-5-5]
+  # The ladder Certo derives from the ratings of the models you enabled, so
+  # it depends on your own models.yaml. In the published run it came out as
+  # qwen3.8-27b-local -> claude-haiku-5-5 -> claude-opus-5-5.
+  - name: derived
+    strategy: escalate

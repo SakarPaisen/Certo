@@ -84,6 +84,13 @@ transcript then, so it isn't known whether the agent stopped early or
 wrote its files somewhere else. Since 0.1.15 every benchmark run keeps
 its conversation.
 
+## Reproduce this run
+
+The benchmark file is [bench-0.1.13.yaml](bench-0.1.13.yaml). Copy it,
+enable its models in your `models.yaml`, and run
+`certo bench --config bench-0.1.13.yaml`. The `derived` arm builds its
+ladder from the models you enabled, so it may differ from the one above.
+
 ## Limits of this baseline
 
 - One repeat, nine small tasks, one local and one cloud model.

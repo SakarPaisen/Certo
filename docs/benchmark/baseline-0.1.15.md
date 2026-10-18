@@ -156,6 +156,21 @@ the honest result of the checks Certo had. Catching this needs tests
 written from the task by someone other than the builder, which is on the
 [roadmap](https://github.com/alessioricco/certo/blob/main/ROADMAP.md).
 
+## Reproduce this run
+
+The two benchmark files are
+[bench-0.1.15-local.yaml](bench-0.1.15-local.yaml) and
+[bench-0.1.15-cloud.yaml](bench-0.1.15-cloud.yaml). Copy them, enable
+their models in your `models.yaml`, and run:
+
+```bash
+certo bench --config bench-0.1.15-local.yaml
+certo bench --config bench-0.1.15-cloud.yaml
+```
+
+Your numbers will differ: models vary between runs, and local times
+depend on the machine serving the model.
+
 ## Limits of this baseline
 
 - Nine small tasks. The cloud models, and the two working local models,

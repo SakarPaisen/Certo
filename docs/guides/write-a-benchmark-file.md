@@ -170,6 +170,12 @@ people don't have, keep them out of git instead (add `bench*.yaml` to
 large and personal: they hold a copy of every run's code and its whole
 conversation, so they usually stay out of git.
 
+When you publish or share results, share the benchmark file with them:
+it is the exact recipe, so others can run it and compare. Certo does this
+for its own results: the files behind each baseline are in
+`docs/benchmark/`, next to the results pages, for example
+[bench-0.1.15-local.yaml](../benchmark/bench-0.1.15-local.yaml).
+
 ## Related
 
 - [Benchmark models and strategies](benchmark.md): what the benchmark

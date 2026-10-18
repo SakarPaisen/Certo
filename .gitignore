@@ -229,10 +229,10 @@ secrets/
 models.yaml
 # A personal copy of the model list (Certo ships only the .example).
 models_list.yaml
-bench.yaml
-bench-local.yaml
-bench-cloud.yaml
-bench-ladder.yaml
+# Working benchmark files at the repo root. The files behind published
+# results are committed in docs/benchmark/.
+/bench.yaml
+/bench-*.yaml
 # certo bench results (default output folder)
 bench-results/
 
