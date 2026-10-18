@@ -254,5 +254,7 @@ run the test suite, which checks every task the same way.
 ## Related
 
 - [bench.yaml reference](../reference/bench-yaml.md)
+- [Baseline 0.1.13](../benchmark/baseline-0.1.13.md): the first complete
+  results
 - [Commands: certo bench](../reference/commands.md#certo-bench)
 - [How verification works](../concepts/how-verification-works.md)

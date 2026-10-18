@@ -382,15 +382,17 @@ decisions log below for *why* a given design was chosen.
   the same files" exists. `_stream_escalation` takes the workspace listing
   before each rung, so a "restart" mode (copy the original files back
   before the next rung) is one more branch there; not built.
-- **Escalation not yet benchmarked live** — local and cloud models are
-  available since 2026-10-17. Two `certo bench` runs that day (0.1.10 and
-  0.1.11) had an explicit local→cloud `escalate` arm but stopped at 13 of
-  108 runs, and neither used a derived ladder (the 0.1.11 change), so
-  `docs/benchmark/escalation-<version>.md` doesn't exist yet. Escalation under
-  Docker is covered by fake-workspace tests only, not a real container.
-- **No benchmark baseline yet** — `docs/benchmark/baseline-<version>.md`
-  needs one complete `certo bench` run on a local and a cloud model. The
-  models now exist (2026-10-17); the first runs that day were partial.
+- **Escalation ran live but never climbed** — the 0.1.13 baseline
+  (`docs/benchmark/baseline-0.1.13.md`, 2026-10-17) had an explicit and a
+  derived ladder arm (qwen3.8-27b-local first); all 18 runs ended on rung
+  1, so no climb, handoff or derived-ladder ordering was measured. Needs
+  harder tasks (task set v2). Escalation under Docker is covered by
+  fake-workspace tests only, not a real container.
+- **Benchmark baseline: 0.1.13 only, 1 repeat** —
+  `docs/benchmark/baseline-0.1.13.md`: local qwen3.8-27b and cloud
+  claude-sonnet-5-5 both 9/9, one fooled run (led to `unchanged`, 0.1.14).
+  The 9 tasks don't separate the models; 0.1.14's `unchanged` and 0.1.15's
+  transcripts are not benchmarked yet.
 - **Node "no tests" counts as verified** (found by `certo bench`'s first
   integration run, 2026-10-16): `node --test` exits 0 when it finds no test
   files, so `npm test` passes and the verdict is `verified` for a project
@@ -426,8 +428,8 @@ bench task set v2, milestone mode, independent spec tests, GitHub Action.
 **1. Prove it publicly**
 - **Published benchmark results per release** —
   `docs/benchmark/baseline-<version>.md` (local vs cloud, fooled rate,
-  cost per solved task) and a README badge. Needs one complete run (see
-  "No benchmark baseline yet" above).
+  cost per solved task) and a README badge. The first one exists
+  (0.1.13); the badge and one per release don't.
 - **Bench task set v2: app-scale tasks** — today's 9 are small and mostly
   single-file. Add multi-file, multi-language ones: Go REST API with a
   database, React frontend + API, Rust CLI with subcommands, a fix inside
