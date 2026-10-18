@@ -114,5 +114,7 @@ run: open it in a browser, or add a `package.json` with a `test` script.
 
 ## Related
 
+- [Make your project checkable](../guides/make-a-project-checkable.md):
+  how to set a project up for these checks.
 - [Verdicts](verdicts.md)
 - [How verification works](../concepts/how-verification-works.md)

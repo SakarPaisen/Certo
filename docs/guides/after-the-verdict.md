@@ -54,7 +54,9 @@ the verdict say why. The common cases:
 - **Several projects in one folder.** Run `certo verify` in the one you
   mean.
 
-In scripts and CI, use `--require-verification` so `inconclusive` counts
+To set a project up so this doesn't happen, see
+[Make your project checkable](make-a-project-checkable.md). In scripts and
+CI, use `--require-verification` so `inconclusive` counts
 as a failure. Each case in detail:
 [Troubleshooting](../troubleshooting.md#inconclusive-the-project-has-no-tests).
 

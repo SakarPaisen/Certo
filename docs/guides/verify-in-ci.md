@@ -101,6 +101,7 @@ code. Every verdict and its exit code is in
 
 ## Related
 
+- [Make your project checkable](make-a-project-checkable.md)
 - What runs for each language: [Verification by language](../reference/verification-by-language.md)
 - [How verification works](../concepts/how-verification-works.md)
 - Your own pass/fail rules: [Acceptance checks](acceptance-checks.md)
