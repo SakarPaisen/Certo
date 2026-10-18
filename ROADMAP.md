@@ -215,7 +215,7 @@ decisions log below for *why* a given design was chosen.
 - **`run_summary.py`** — pure: `summarize_run(duration, {usage_id:
   Metrics.get()})` → `RunSummary` (wall-clock time, models that actually
   made calls, tokens, cost; zero cost with nonzero tokens = "unknown",
-  not free). Built in `stream_task`'s `finally` on every run, attached to
+  not free, except for a local-prefix model id, which is free). Built in `stream_task`'s `finally` on every run, attached to
   `TaskOutcome.run_summary`, printed by `cli.py`, written to
   `metadata.json`/`metrics.json`.
 - **`llm_check.py`** + `certo-admin check-llm` — one direct
@@ -1291,6 +1291,17 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   `meta.json` (`estimate`) when the folder is created, outside
   `config`, so the `--resume` fingerprint is unaffected; older folders
   simply have none.
+- **A local model's cost is zero, not unknown** (2026-10-18, found by the
+  first complete benchmark: every total said "+ unknown" because the local
+  arm's 27 runs had tokens and no price). `run_summary.ModelUsage.cost_known`
+  is true for an id with a local prefix (`model_pricing.is_local_model_id`,
+  the prefixes `is_local` already used); the metrics carry only the model
+  id, so an `openai/` model on a local `base_url` is still "unknown".
+  `bench_report` applies the same rule to older records, so a regenerated
+  report is right. Same day: `meta.json` gained `ladders` (a derived
+  escalate arm's real ladder, outside `config` so the `--resume`
+  fingerprint is unchanged), shown in the Models column instead of every
+  active model.
 - **The model catalog is split from personal settings (0.1.10, user's
   design):** `models_list.yaml` (model ids, descriptions, ratings,
   `reasoning_effort`, `timeout_seconds`, task profiles, escalation

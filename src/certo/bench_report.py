@@ -14,6 +14,8 @@ import statistics
 from pathlib import Path
 from typing import Any
 
+from .model_pricing import is_local_model_id
+
 CSV_FIELDS = (
     "run_id",
     "arm",
@@ -50,9 +52,22 @@ def _seconds(seconds: float) -> str:
     return f"{minutes}m {secs:02d}s" if minutes else f"{round(seconds)}s"
 
 
+def _known(record: dict[str, Any]) -> bool:
+    """Whether a run's cost is complete. A run on local models only is free:
+    older records counted it as unknown."""
+    models = record.get("models") or []
+    return record["cost_known"] or (
+        bool(models) and all(is_local_model_id(m.get("model", "")) for m in models)
+    )
+
+
+def _rung_known(rung: dict[str, Any]) -> bool:
+    return rung.get("cost_known", True) or is_local_model_id(rung.get("model", ""))
+
+
 def _cost(records: list[dict[str, Any]]) -> str:
     total = sum(r["cost"] for r in records)
-    if all(r["cost_known"] for r in records):
+    if all(_known(r) for r in records):
         return f"${total:.4f}"
     return f"${total:.4f} + unknown"
 
@@ -78,13 +93,13 @@ def cost_summary(meta: dict[str, Any], records: list[dict[str, Any]]) -> dict[st
                     rung.get("name", ""),
                     rung.get("model", ""),
                     rung.get("cost", 0.0),
-                    rung.get("cost_known", True),
+                    _rung_known(rung),
                 )
         elif len(r.get("models", [])) == 1:
             m = r["models"][0]
-            add(m["name"], m["model"], r["cost"], r["cost_known"])
+            add(m["name"], m["model"], r["cost"], _known(r))
         elif r["cost"]:
-            add("(not attributed)", "", r["cost"], r["cost_known"])
+            add("(not attributed)", "", r["cost"], _known(r))
     models = sorted(per_model.values(), key=lambda row: (-row["cost"], row["name"]))
     for row in models:
         row["cost"] = round(row["cost"], 6)
@@ -92,7 +107,7 @@ def cost_summary(meta: dict[str, Any], records: list[dict[str, Any]]) -> dict[st
     config = meta["config"]
     return {
         "total": round(sum(r["cost"] for r in records), 6),
-        "complete": all(r["cost_known"] for r in records),
+        "complete": all(_known(r) for r in records),
         "runs_recorded": len(records),
         "runs_planned": len(config["tasks"]) * len(config["arms"]) * config["repeats"],
         "per_model": models,
@@ -124,7 +139,7 @@ def _cost_per_solved(records: list[dict[str, Any]]) -> str:
     if not solved:
         return "-"
     per = sum(r["cost"] for r in records) / solved
-    return f"${per:.4f}" + ("" if all(r["cost_known"] for r in records) else " + unknown")
+    return f"${per:.4f}" + ("" if all(_known(r) for r in records) else " + unknown")
 
 
 def rung_shares(records: list[dict[str, Any]]) -> str:
@@ -146,17 +161,38 @@ def rung_shares(records: list[dict[str, Any]]) -> str:
     return ", ".join(parts) or "-"
 
 
-def arm_rows(meta: dict[str, Any], records: list[dict[str, Any]]) -> list[dict[str, str]]:
+def _arm_models(meta: dict[str, Any], arm: dict[str, Any], records: list[dict[str, Any]]) -> str:
+    """The models an arm uses. A derived escalate arm shows its ladder (kept
+    in meta.json by newer versions), not every active model; an older folder
+    without it shows the models its runs really used."""
     models = meta["config"]["models"]
+
+    def named(names: list[str]) -> str:
+        return ", ".join(f"{n} (`{models.get(n, '?')}`)" for n in names)
+
+    derived = arm["strategy"] == "escalate" and arm.get("models") is None
+    if not derived:
+        return named(meta["config"]["arm_models"][arm["name"]])
+    ladder = meta.get("ladders", {}).get(arm["name"])
+    if ladder:
+        return "derived ladder: " + named(ladder)
+    used: list[str] = []
+    for r in records:
+        for rung in r.get("rungs", []):
+            if rung.get("name") and rung["name"] not in used:
+                used.append(rung["name"])
+    return "derived ladder; used: " + (named(used) if used else "none yet")
+
+
+def arm_rows(meta: dict[str, Any], records: list[dict[str, Any]]) -> list[dict[str, str]]:
     rows = []
     for arm in meta["config"]["arms"]:
         mine = [r for r in records if r["arm"] == arm["name"]]
-        names = meta["config"]["arm_models"][arm["name"]]
         rows.append(
             {
                 "Arm": arm["name"],
                 "Strategy": arm["strategy"],
-                "Models": ", ".join(f"{n} (`{models.get(n, '?')}`)" for n in names),
+                "Models": _arm_models(meta, arm, mine),
                 "Hidden tests passed": _rate(
                     sum(r["hidden_tests"]["passed"] for r in mine), len(mine)
                 ),

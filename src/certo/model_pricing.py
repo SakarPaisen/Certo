@@ -17,9 +17,15 @@ ESTIMATE_OUTPUT_TOKENS = 20_000
 _LOCAL_PREFIXES = ("ollama", "ollama_chat", "lm_studio", "hosted_vllm", "llamafile")
 
 
+def is_local_model_id(model: str) -> bool:
+    """A model id whose provider prefix is a local server (Ollama and
+    friends). Without the entry's address this is all that is known."""
+    return model.split("/", 1)[0] in _LOCAL_PREFIXES
+
+
 def is_local(entry: ModelCatalogEntry) -> bool:
     """A model served on this machine or this network (Ollama and friends)."""
-    if entry.model.split("/", 1)[0] in _LOCAL_PREFIXES:
+    if is_local_model_id(entry.model):
         return True
     host = urlparse(entry.base_url or "").hostname
     if not host:

@@ -198,8 +198,8 @@ rung, leaving out caches, environments (`.venv`, `node_modules`) and
 - **Cost.** Set `CERTO_MAX_TASK_COST` (US dollars) to cap a run. Before
   each rung starts, Certo adds up the cost recorded so far; once it reaches
   the cap, the climb stops with the verdict it has, and a note says so.
-  Models with no known price (usually local ones) count as 0, and the note
-  names them.
+  A local model costs nothing. A cloud model with no known price (newer
+  than your LiteLLM) counts as 0, and the note names it.
 
 ## What you see
 
@@ -233,7 +233,7 @@ With `--interactive`, Certo asks before moving to the next rung, with the
 cost so far and a rough price for the next model:
 
 ```text
-qwen-local couldn't finish (no_progress). Try gpt-luna next? Cost so far: $0.0000 (no known price for qwen-local: counted as 0). gpt-luna: roughly $0.24 for a run, from LiteLLM's prices. [Y/n]
+qwen-local couldn't finish (no_progress). Try gpt-luna next? Cost so far: $0.0000. gpt-luna: roughly $0.24 for a run, from LiteLLM's prices. [Y/n]
 ```
 
 Enter climbs; `n` stops with the current verdict. Without `--interactive`

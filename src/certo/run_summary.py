@@ -17,6 +17,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from .model_pricing import is_local_model_id
+
 
 @dataclass(frozen=True)
 class ModelUsage:
@@ -33,9 +35,10 @@ class ModelUsage:
 
     @property
     def cost_known(self) -> bool:
-        # LiteLLM reports 0.0 when it has no pricing for a model (e.g. a
-        # local endpoint) — that's "unknown", not "free".
-        return self.cost > 0 or self.total_tokens == 0
+        # LiteLLM reports 0.0 when it has no pricing for a model: that's
+        # "unknown", not "free". A model on a local server (Ollama and
+        # friends, by its prefix) really is free.
+        return self.cost > 0 or self.total_tokens == 0 or is_local_model_id(self.model)
 
 
 @dataclass(frozen=True)

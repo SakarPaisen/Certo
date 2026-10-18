@@ -23,9 +23,11 @@ Run summary:
   adds a second model, and one line per model with its tokens and cost.
 - **Total tokens** is input plus output. Cached input is part of the input
   number.
-- **Total cost** uses LiteLLM's prices. When LiteLLM has no price for a
-  model (common for local models), the line ends with
-  `+ unknown (no pricing data for ...)`. That means unknown, not free.
+- **Total cost** uses LiteLLM's prices. A local model (an id starting
+  with `ollama/`, `ollama_chat/`, `lm_studio/`, `hosted_vllm/` or
+  `llamafile/`) costs nothing. When LiteLLM has no price for any other
+  model, the line ends with `+ unknown (no pricing data for ...)`. That
+  means unknown, not free.
 
 ## Keep a record of every run
 

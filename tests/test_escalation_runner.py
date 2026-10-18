@@ -274,11 +274,18 @@ def test_the_cost_cap_stops_the_climb(tmp_path, fake_run):
 
 
 def test_unknown_prices_count_as_zero_for_the_cost_cap(tmp_path, fake_run):
-    # The local model reports tokens but no cost: unknown, counted as 0.
+    # A cloud model reports tokens but no cost: unknown, counted as 0.
     fake_run.script[:] = [("no_progress", 0.0, {}), ("verified", 0.0, {})]
-    outcome, _ = _run(tmp_path, _ladder(tmp_path), cfg=_cfg(tmp_path, max_task_cost=0.1))
+    ladder = _ladder(tmp_path, models=["mid", "strong"])
+    outcome, _ = _run(tmp_path, ladder, cfg=_cfg(tmp_path, max_task_cost=0.1))
     assert len(outcome.rungs) == 2
     assert outcome.rungs[0].cost_known is False
+
+
+def test_a_local_rung_is_free_not_unknown(tmp_path, fake_run):
+    fake_run.script[:] = [("verified", 0.0, {})]
+    outcome, _ = _run(tmp_path, _ladder(tmp_path))
+    assert outcome.rungs[0].cost_known is True
 
 
 def test_a_provider_failure_moves_to_the_next_rung(tmp_path, fake_run):
@@ -361,7 +368,7 @@ def test_interactive_yes_climbs_and_shows_the_cost(tmp_path, fake_run):
 
     assert len(outcome.rungs) == 2
     assert questions[0].startswith("local couldn't finish (no_progress). Try mid next?")
-    assert "Cost so far: $0.0000 (no known price for local: counted as 0)." in questions[0]
+    assert "Cost so far: $0.0000. mid:" in questions[0]
 
 
 def test_interactive_no_stops_with_the_current_verdict(tmp_path, fake_run):
@@ -504,7 +511,7 @@ def test_the_per_rung_summary_lines(tmp_path, fake_run):
 
     assert lines[0] == "Rungs:"
     assert lines[1].startswith("  1. local (ollama/qwen3-coder:30b): no_progress, 1 fix attempt, ")
-    assert lines[1].endswith(", 1,100 tokens, $0.0000 + unknown")
+    assert lines[1].endswith(", 1,100 tokens, $0.0000")
     assert lines[2].endswith(", 1,100 tokens, $0.2500")
     assert lines[3] == "Final result from rung 2 (mid)."
 

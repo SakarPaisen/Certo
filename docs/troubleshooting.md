@@ -217,12 +217,15 @@ minutes.`
 
 **You see:** `Total cost: $0.0000 + unknown (no pricing data for ...)`.
 
-**Cause:** LiteLLM, installed with Certo, has no price for this model:
-it is a local model, or newer than your LiteLLM.
+**Cause:** LiteLLM, installed with Certo, has no price for this model.
+It is newer than your LiteLLM, or a local model whose id doesn't start
+with a local provider (`ollama/`, `ollama_chat/`, `lm_studio/`,
+`hosted_vllm/`, `llamafile/`), for example an `openai/` model on a local
+server. A model with one of those prefixes is counted as free.
 
 **Fix:** for a cloud model, upgrade (`uv tool upgrade certo`, or
-`pip install -U litellm`). For local models this is normal. The tokens are
-still counted.
+`pip install -U litellm`). For a local model under another prefix this is
+normal. The tokens are still counted.
 
 ## Ollama
 

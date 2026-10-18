@@ -437,6 +437,16 @@ def test_a_derived_arm_is_planned_and_priced_on_its_ladder_only(tmp_path, monkey
     assert "likely" not in out
 
 
+def test_meta_keeps_a_derived_arms_ladder_outside_the_fingerprint(tmp_path):
+    from certo.bench_config import load_bench_config
+
+    cfg = load_bench_config(_rated_bench(tmp_path))
+    meta = bench._meta(cfg)
+
+    assert meta["ladders"] == {"derived": ["local-coder", "cloud-a", "cloud-b"]}
+    assert "ladders" not in meta["config"]
+
+
 def test_earlier_results_give_a_likely_cost(tmp_path, monkeypatch, capsys):
     _earlier(
         tmp_path / "results",

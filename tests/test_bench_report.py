@@ -85,7 +85,8 @@ def test_arm_table():
     assert local[5:9] == ["1", "1", "0", "1"]  # fooled, caught, unconfirmed, errors
     assert local[9] == "2m 10s"  # median of 300, 200, 60, 60
     assert local[10] == "4,000 / 400"
-    assert local[11] == "$0.0000 + unknown"
+    # A local model is free, although older records said its cost was unknown.
+    assert local[11] == "$0.0000"
     cloud = _row(markdown, "cloud")
     assert cloud[3] == "3/3 (100%)"
     assert cloud[5:9] == ["0", "1", "1", "0"]
@@ -131,9 +132,9 @@ def test_write_report_writes_markdown_and_csv(tmp_path: Path):
 
 def test_cost_per_solved_task():
     markdown = render_markdown(META, RECORDS)
-    # cloud: $1.25 over 3 solved runs; local: no price known, 1 solved run.
+    # cloud: $1.25 over 3 solved runs; local: free, 1 solved run.
     assert _row(markdown, "cloud")[-1] == "$0.4167"
-    assert _row(markdown, "local")[-1] == "$0.0000 + unknown"
+    assert _row(markdown, "local")[-1] == "$0.0000"
 
 
 def test_cost_per_solved_task_with_nothing_solved():
@@ -237,10 +238,40 @@ def test_cost_summary_totals_and_splits_escalation_by_rung():
 def test_cost_line_without_an_estimate_or_a_known_price():
     from certo.bench_report import cost_line, cost_summary
 
-    records = [_record("local", "slugify", 1, verdict="verified", passed=True, cost_known=False)]
+    records = [_record("cloud", "slugify", 1, verdict="verified", passed=True, cost_known=False)]
     # A results folder from before 0.1.12 has no estimate in meta.json.
     assert cost_line(cost_summary(META, records)) == (
         "Total cost: $0.0000 + unknown, for 1 of 8 runs"
+    )
+
+
+def test_a_local_rung_is_free_even_in_an_older_record():
+    from certo.bench_report import cost_summary
+
+    climb = _climb_record("slugify", 1, 1)
+    climb["cost_known"] = False
+    climb["rungs"] = [
+        {"name": "qwen", "model": "ollama/qwen3-coder:30b", "cost": 0.0, "cost_known": False}
+    ]
+    summary = cost_summary(_escalate_meta(), [climb])
+
+    assert summary["complete"]
+    assert summary["per_model"][0]["complete"]
+
+
+def test_a_derived_arm_shows_its_ladder_not_every_active_model():
+    meta = _escalate_meta()
+    meta["config"]["models"]["opus"] = "anthropic/claude-opus-5-5"
+    meta["config"]["arm_models"]["climb"] = ["qwen", "sonnet", "opus"]
+    record = _climb_record("slugify", 1, 1)
+
+    older = _row(render_markdown(meta, [record]), "climb")
+    assert older[2] == "derived ladder; used: qwen (`ollama/qwen3-coder:30b`)"
+
+    meta["ladders"] = {"climb": ["qwen", "opus"]}
+    newer = _row(render_markdown(meta, [record]), "climb")
+    assert newer[2] == (
+        "derived ladder: qwen (`ollama/qwen3-coder:30b`), opus (`anthropic/claude-opus-5-5`)"
     )
 
 

@@ -64,11 +64,18 @@ def test_model_name_falls_back_to_cost_entries_then_usage_id():
 
 
 def test_zero_cost_with_tokens_is_reported_as_unknown_not_free():
-    summary = summarize_run(5, {"certo": _metrics("ollama/llama3", 1000, 100, 0.0)})
+    summary = summarize_run(5, {"certo": _metrics("openai/gpt-new", 1000, 100, 0.0)})
 
     assert not summary.cost_complete
     cost_line = next(line for line in summary.format_lines() if line.startswith("Total cost"))
-    assert "unknown" in cost_line and "ollama/llama3" in cost_line
+    assert "unknown" in cost_line and "openai/gpt-new" in cost_line
+
+
+def test_a_local_model_is_free_not_unknown():
+    summary = summarize_run(5, {"certo": _metrics("ollama/llama3", 1000, 100, 0.0)})
+
+    assert summary.cost_complete
+    assert "Total cost: $0.0000" in summary.format_lines()
 
 
 def test_format_lines_cover_the_four_requested_measures():

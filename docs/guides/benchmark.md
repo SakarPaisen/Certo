@@ -185,6 +185,10 @@ In `results.md`, per arm:
   hidden tests passed. The fair way to compare a cheap model that solves
   less with an expensive one that solves more.
 
+For an `escalate` arm with no `models:`, the **Models** column shows the
+ladder derived from the ratings. (A results folder from before version
+0.1.14 doesn't record that ladder, so it shows the models the runs used.)
+
 A per-task table shows where each arm passes and fails. For `escalate`
 arms, a section shows how often each rung produced the final result,
 for example `rung 1 (qwen-local): 4/9, rung 2 (gpt-luna): 5/9`.
@@ -199,7 +203,8 @@ charged only for what it ran. The same total is printed at the end:
 Total cost: $1.5000 (the plan estimated at most ~$9.00, likely ~$3.50), for 3 of 12 runs
 ```
 
-Costs come from LiteLLM's prices; `+ unknown` means a model had no price.
+Costs come from LiteLLM's prices, and a local model costs nothing;
+`+ unknown` means a cloud model had no price.
 When the benchmark is not finished, the line says how many runs it covers,
 as above.
 A results folder from before version 0.1.13 has no estimate to compare.

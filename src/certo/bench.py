@@ -405,6 +405,13 @@ def _meta(cfg: BenchConfig) -> dict[str, Any]:
         },
         "bench_file": cfg.path,
         "config": cfg.fingerprint(),
+        # The ladder a derived escalate arm uses, for the report. Outside
+        # `config`, so the --resume fingerprint is unchanged.
+        "ladders": {
+            a.name: _plan_models(cfg, a)
+            for a in cfg.arms
+            if a.strategy == "escalate" and a.params.get("models") is None
+        },
     }
 
 
