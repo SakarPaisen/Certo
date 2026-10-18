@@ -1751,3 +1751,14 @@ def test_an_escalation_run_prints_one_line_per_rung(monkeypatch, tmp_path, capsy
     assert "  Rungs:" in out
     assert "    1. local (ollama/q): no_progress, 1 fix attempt, 1m 00s, 0 tokens, $0.0000" in out
     assert "  Final result from rung 2 (mid)." in out
+
+
+@pytest.mark.parametrize(("flag", "expected"), [([], 0), (["--require-verification"], 1)])
+def test_unchanged_exits_like_inconclusive(monkeypatch, capsys, flag, expected):
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg())
+    monkeypatch.setattr(
+        cli, "run_task", lambda task, **_kw: _fake_result(verification_state="unchanged")
+    )
+
+    assert cli.main(["do something", *flag]) == expected
+    assert "Verification: unchanged" in capsys.readouterr().out

@@ -375,6 +375,26 @@ def test_create_task_require_verification_turns_unknown_project_into_failure(mon
     assert "No automated check could be run" in final["error"]
 
 
+def test_create_task_require_verification_turns_unchanged_into_failure(monkeypatch):
+    def _fake_stream_task(task, cfg=None, on_message=None, acceptance_checks=None, **_kwargs):
+        return _fake_outcome(
+            verification_state="unchanged", limitations=["The agent changed no file."]
+        )
+
+    monkeypatch.setattr(server, "load_config", lambda: _cfg())
+    monkeypatch.setattr(server, "stream_task", _fake_stream_task)
+
+    client = TestClient(server.create_app())
+    task_id = client.post(
+        "/tasks", json={"task": "do something", "require_verification": True}
+    ).json()["task_id"]
+
+    final = _wait_for_status(client, task_id)
+
+    assert final["status"] == "failed"
+    assert final["error"].startswith("Verification was unchanged and require_verification=true")
+
+
 def test_create_task_require_verification_turns_a_missing_tool_into_failure(monkeypatch):
     def _fake_stream_task(task, cfg=None, on_message=None, acceptance_checks=None, **_kwargs):
         return _fake_outcome(

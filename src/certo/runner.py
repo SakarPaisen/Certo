@@ -88,9 +88,11 @@ from .workspace import build_workspace
 
 logger = logging.getLogger(__name__)
 
-# The eleven terminal states a task run can end in. Exactly these because
+# The twelve terminal states a task run can end in. Exactly these because
 # they're the ones a caller needs to tell apart to know whether to trust a
-# "done" claim: real, confirmed success; no evidence either way; a confirmed
+# "done" claim: real, confirmed success; no evidence either way; checks that
+# pass but say nothing about the task, because the agent changed no file
+# even after being asked once (see `_require_a_change`); a confirmed
 # problem that automated retries couldn't fix; a fix attempt that produced
 # no observable change at all (see `_failure_signature` below — a distinct
 # problem from "still failing differently"); a check that kept exceeding its
@@ -121,6 +123,7 @@ VERIFICATION_STATES = (
     "verified",
     "failed",
     "inconclusive",
+    "unchanged",
     "retry_exhausted",
     "no_progress",
     "timed_out",
@@ -130,6 +133,11 @@ VERIFICATION_STATES = (
     "acceptance_failed",
     "stuck",
 )
+
+# Final verdicts that prove nothing either way: not a failure, but not
+# `verified` either. `--require-verification` (CLI) and
+# `require_verification` (server) make them count as a failure.
+UNPROVEN_STATES = ("inconclusive", "unchanged")
 
 # VerificationRun states that mean "something needs fixing, worth retrying" —
 # as opposed to "inconclusive" (nothing to retry toward) or "verified".
@@ -1309,6 +1317,7 @@ def stream_task(
                 runner,
                 first_message,
                 state_writer.on_verification if state_writer is not None else None,
+                check_changes=resume_from is None,
             )
         except BaseException as exc:  # recorded for artifacts.py, then always re-raised as-is
             captured_error = exc
@@ -1510,12 +1519,19 @@ def _run_stream_task_phases(
     runner: CommandRunner | None = None,
     first_message: str | None = None,
     on_verification: Callable[[VerificationRun], None] | None = None,
+    check_changes: bool = True,
 ) -> TaskOutcome:
     """The initial run, the interactive checkpoint loop, and the two
     autonomous retry phases — split out of `stream_task` purely so the
     `finally: write_model_decisions(...)` wrapping it can run regardless of
     which phase raises, without an extra indent level for all of it.
+
+    `check_changes` turns a `verified` run that changed no file into one
+    follow-up and then, if still nothing changed, `unchanged` (see
+    `_require_a_change`). A resume passes False: its changes may come from
+    the earlier session.
     """
+    before = workspace_listing(cfg.workspace) if check_changes else None
     # `first_message` is a resume's message; `task` stays the goal that
     # verification and the completion contract are judged against.
     conversation.send_message(first_message or task)
@@ -1567,7 +1583,107 @@ def _run_stream_task_phases(
             runner,
             on_verification,
         )
+    if before is not None and outcome.verification_state == "verified":
+        outcome = _require_a_change(
+            conversation,
+            cfg,
+            emit,
+            task,
+            on_confirm,
+            deadline,
+            model_chain,
+            runner,
+            on_verification,
+            before,
+            outcome,
+        )
     return outcome
+
+
+# Files Certo itself writes in the project folder; they never count as the
+# agent's change. (`.certo/` and environments are skipped by the listing.)
+_CERTO_OWN_FILES = frozenset({"MODEL_DECISIONS.md"})
+
+
+def _agent_changed_files(workspace: str, before: dict[str, tuple[int, int]]) -> bool:
+    changes = FileChanges.between(before, workspace_listing(workspace))
+    paths = changes.created + changes.modified + changes.deleted
+    return any(p not in _CERTO_OWN_FILES for p in paths)
+
+
+def _unchanged_followup(workspace: str) -> str:
+    return (
+        "Certo checked the project folder after you finished: no file in it "
+        "changed during this run. The project's checks pass, but they passed "
+        "before you started too, so they say nothing about this task. If the "
+        "task needs changes, make them now, in this folder "
+        f"({os.path.abspath(workspace)}), and finish again. If it truly needs "
+        "no change, finish again and say why."
+    )
+
+
+def _require_a_change(
+    conversation: Conversation,
+    cfg: Config,
+    emit: Callable[[Message], None],
+    task: str,
+    on_confirm: ConfirmCallback | None,
+    deadline: float,
+    model_chain: ModelChain | None,
+    runner: CommandRunner | None,
+    on_verification: Callable[[VerificationRun], None] | None,
+    before: dict[str, tuple[int, int]],
+    outcome: TaskOutcome,
+) -> TaskOutcome:
+    """A `verified` run that changed no file proves only that the folder
+    passed its checks before the agent started. Ask the agent once (it may
+    have stopped early, or written somewhere else); if a file changes,
+    verify again as usual. If still nothing changed, the verdict is
+    `unchanged`: the agent's reason, if it gave one, is not proof (golden
+    rule 7), and a task that really needs no change is still possible, so
+    it is not a failure either. Found by the first complete benchmark: a
+    local model ended a "fix and extend" task with no edit, and the
+    starter's own tests passed."""
+    if _agent_changed_files(cfg.workspace, before):
+        return outcome
+    _emit_notice(
+        emit,
+        "Certo: the agent changed no file in the project folder, so the passing "
+        "checks say nothing about this task. Asking it once to do the task or say why "
+        "no change is needed.",
+    )
+    retries_used = outcome.retries_used + 1
+    conversation.send_message(_unchanged_followup(cfg.workspace))
+    run_result = _run_with_confirmation(conversation, cfg, emit, on_confirm, deadline, model_chain)
+    stopped = _outcome_for_run_result(
+        run_result, task, cfg, checks=outcome.checks, retries_used=retries_used
+    )
+    if stopped is not None:
+        return stopped
+    again = _verify_and_report(
+        conversation, cfg, emit, task, on_confirm, deadline, model_chain, runner, on_verification
+    )
+    again = replace(again, retries_used=again.retries_used + retries_used)
+    if again.verification_state != "verified" or _agent_changed_files(cfg.workspace, before):
+        return again
+    _emit_notice(
+        emit,
+        "Certo verification: the agent still changed no file. The checks pass, as they "
+        "did before it started, so this is reported as unchanged, not verified.",
+    )
+    limitations = [
+        *again.completion_contract.limitations,
+        (
+            "The agent changed no file in the project folder, even after Certo asked once. "
+            "The checks passed on the folder as it was before the run, so they don't show "
+            "that the task was done."
+        ),
+    ]
+    return replace(
+        again,
+        verification_state="unchanged",
+        completion_contract=replace(again.completion_contract, limitations=limitations),
+    )
 
 
 # Asked before each climb under CERTO_INTERACTIVE: the question (who
@@ -1863,6 +1979,22 @@ def _stream_escalation(
                 if outcome is not None:
                     final_outcome, final_rung = outcome, number
 
+                previous = rungs[-2] if len(rungs) > 1 else None
+                if (
+                    result.verdict == "unchanged"
+                    and previous is not None
+                    and previous.verdict == "unchanged"
+                ):
+                    io.notify(
+                        f"Certo: {rung.name} changed no file either, after {previous.name}: two "
+                        "models found nothing to change, so escalation stops."
+                    )
+                    decide(
+                        "escalation_stop",
+                        rung.name,
+                        f"{rung.name} and {previous.name} both ended unchanged.",
+                    )
+                    break
                 if outcome is not None and not ladder.escalates_on(outcome.verification_state):
                     if outcome.verification_state == "inconclusive":
                         io.notify(

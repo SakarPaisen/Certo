@@ -25,7 +25,9 @@ one verdict that the agent can't influence.
             open to-do items? ─────────► ask to finish ────┤
                            ▼                               │
             run the project's checks                       │
-              all pass ──────────────────► verified        │
+              all pass, a file changed ──► verified        │
+              all pass, no file changed ─► ask once ───────┤
+                still no file changed ───► unchanged       │
               nothing could run ─────────► inconclusive    │
               something failed:                            │
                 same output as last time ► no_progress     │
@@ -66,6 +68,12 @@ gives `verified`. Finding nothing to run gives `inconclusive`, with a note
 that says what was found. `inconclusive` exits 0 by default, because
 nothing was shown to be broken; use `--require-verification` when you need
 proof.
+
+**Passing checks prove nothing if nothing changed.** If the project's
+checks already passed before the agent started, a run that changed no file
+would look like success. Certo asks the agent once, and if it still
+changes nothing, the verdict is `unchanged`, not `verified`. See
+[`unchanged`](../reference/verdicts.md#unchanged-in-more-detail).
 
 **Other checks can only make things worse.** Lint, type checks and the
 Python start-up run can turn a pass into a failure, never a failure into a

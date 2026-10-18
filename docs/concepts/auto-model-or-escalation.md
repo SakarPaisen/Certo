@@ -23,7 +23,7 @@ turn each on. The step-by-step setup is in two guides:
 | **When it decides** | Once, before the run, from the task text | Step by step, after each run, from Certo's verdict |
 | **What it uses** | Task profiles: trigger words and weights | A ladder: one you write, or one derived from capability and cost |
 | **First model** | The best fit for the task's profile, often an expensive one | The cheapest rung |
-| **Changes model when** | The provider fails (rate limit, outage, bad key), or a fix attempt still fails Certo's checks | The model's whole run fails: checks still fail after all its fix attempts, the agent is stuck, or out of time |
+| **Changes model when** | The provider fails (rate limit, outage, bad key), or a fix attempt still fails Certo's checks | The model's whole run fails: checks still fail after all its fix attempts, the agent is stuck, out of time, or changed no file |
 | **How it changes** | Inside the same conversation: the next model carries on from where the last one was | A new conversation in the same folder, with a note on what the previous model did |
 | **Next model** | The next best fit, not necessarily a stronger one | Always the next rung, a stronger one |
 | **Cost** | Set by the choice | Low when the cheap model succeeds; more when it climbs |
@@ -87,13 +87,13 @@ Two things follow from how it works:
    attempts.
 3. **It reads the verdict.** `verified` ends the task. A verdict that says
    the model couldn't finish (`retry_exhausted`, `no_progress`,
-   `timed_out`, `incomplete`, `stuck`) or a provider failure moves the
-   task to the next rung. The next model starts a new conversation in the
+   `timed_out`, `incomplete`, `stuck`), `unchanged` (the model changed no
+   file) or a provider failure moves the task to the next rung. The next model starts a new conversation in the
    same folder, with the files as they are, the failing checks, and a note
    from Certo on what the previous model did.
 4. **It stops** at `verified`, at a verdict that gives no reason to climb
-   (`inconclusive`, `budget_exhausted`, `confirmation_required`), or after
-   the last rung.
+   (`inconclusive`, `budget_exhausted`, `confirmation_required`), when two
+   rungs in a row end `unchanged`, or after the last rung.
 
 The full list of verdicts and what each does is in
 [Escalate between models](../guides/escalate-between-models.md#what-makes-certo-climb).

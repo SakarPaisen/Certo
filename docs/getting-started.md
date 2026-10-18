@@ -154,6 +154,7 @@ agent: Certo ran the project's own checks after the agent finished.
 |---|---|---|
 | `verified` | The project's tests (or build) ran and passed. | 0 |
 | `inconclusive` | Nothing could be checked, for example no tests yet. Not a failure, but not a pass either. | 0 |
+| `unchanged` | The checks passed, but the agent changed no file, even when Certo asked it to. | 0 |
 | `retry_exhausted` | A check kept failing after the automatic fix attempts. | 1 |
 | `no_progress` | A fix attempt changed nothing, so Certo stopped early. | 1 |
 

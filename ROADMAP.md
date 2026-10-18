@@ -72,7 +72,7 @@ decisions log below for *why* a given design was chosen.
 - **`runner.py`** — `stream_task()`/`run_task()` are the core primitives;
   wires `cfg.max_iterations` into `Conversation(max_iteration_per_run=...)`
   (previously unset, silently defaulting to the SDK's `500`). Both return a
-  `TaskOutcome` — a bounded six-state verification verdict from
+  `TaskOutcome` — a bounded verification verdict (`VERIFICATION_STATES`) from
   `_verify_and_report()` (harness-side, no-LLM re-run of the project's own
   checks; doesn't trust the agent's self-report), checking
   `conversation.state.execution_status` for `STUCK`/`ERROR` before verifying
@@ -718,6 +718,15 @@ for full transcripts if a fix needs revisiting:
    resolution checked against the real SDK terminal, and the release check
    passes against a real tool install. The live task is re-run only by
    `release_check.sh --with-llm`.**
+10. **A run that changed nothing was `verified`.** Found by the first
+   complete `certo bench` (2026-10-17, 0.1.13): the `ladder` arm's
+   `inventory-fix` run on `ollama/qwen3.8:27b` ran 4.6 minutes, 117k input
+   tokens, and left the workspace byte-for-byte the starter; the starter's
+   own tests pass, so Certo said `verified` and the hidden tests failed
+   (`ImportError: OutOfStock`). Not known whether the agent stopped early
+   or wrote elsewhere: bench kept no transcript. Fix (0.1.14): the
+   `unchanged` verdict (`runner._require_a_change`), one follow-up first.
+   **Status: applied and unit-tested; not re-run live.**
 
 ## Decisions log (why, not just what)
 
@@ -1291,6 +1300,28 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   `meta.json` (`estimate`) when the folder is created, outside
   `config`, so the `--resume` fingerprint is unaffected; older folders
   simply have none.
+- **A `verified` run that changed no file becomes `unchanged`, after one
+  follow-up** (0.1.14, user's choice among: always `inconclusive`, always
+  a failure, follow-up only). The checks then only prove the starting
+  folder passed, which was true before the agent ran ("confident but
+  wrong" #10). Certo can't tell "nothing to do" from a lazy or misdirected
+  model, so it asks once (cheap, catches stopping early and edits written
+  outside the folder, and the message names the folder), then refuses to
+  take the agent's reason as proof (golden rule 7). Not `inconclusive`:
+  that never climbs, and "nothing to check" differs from "did nothing".
+  Not a failure: "check the tests pass" is a legitimate no-change task, so
+  it exits 0 like `inconclusive` (`runner.UNPROVEN_STATES`, which
+  `--require-verification` / `require_verification` fail). Escalation
+  climbs on it, but two consecutive `unchanged` rungs stop the climb: two
+  models agreeing is evidence, and climbing on would send a genuine
+  no-change task to the most expensive model. Only after `verified` (every
+  other verdict already isn't success); never on `--resume` (changes may
+  predate the session). A change is the escalation before/after listing
+  (`workspace_listing`, which now also skips `target`/`.gradle`, written
+  by verification itself) minus `MODEL_DECISIONS.md`. The follow-up counts
+  as one fix attempt in `retries_used`. A Rust project with no
+  `Cargo.lock` gets one from `cargo test`, which counts as a change: a
+  miss toward the old behaviour, accepted.
 - **A local model's cost is zero, not unknown** (2026-10-18, found by the
   first complete benchmark: every total said "+ unknown" because the local
   arm's 27 runs had tokens and no price). `run_summary.ModelUsage.cost_known`
@@ -1329,7 +1360,8 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   so a catalog with other axis names still orders; a cost rating under
   another name must be named by `escalation.cost_axis`.
 - **What climbs:** `retry_exhausted`, `no_progress`, `timed_out`,
-  `incomplete`, `stuck`; `acceptance_failed` only when the ladder opts in.
+  `incomplete`, `stuck`, `unchanged` (0.1.14, see below);
+  `acceptance_failed` only when the ladder opts in.
   Never `inconclusive` (no signal: a stronger model faces the same blank),
   `budget_exhausted` or `confirmation_required` (the user's limits). A
   provider failure climbs too, recorded as such; on the last rung it is

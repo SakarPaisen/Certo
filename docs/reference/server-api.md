@@ -25,7 +25,7 @@ before any task starts.
 | `api_key` | string | no | As `--api-key`, for this task only. |
 | `base_url` | string | no | As `--base-url`, for this task only. |
 | `reasoning_effort` | string | no | As `--reasoning-effort`, for this task only. |
-| `require_verification` | boolean | no | Default `false`. When `true`, an `inconclusive` verdict counts as a failure (see below). |
+| `require_verification` | boolean | no | Default `false`. When `true`, an `inconclusive` or `unchanged` verdict counts as a failure (see below). |
 | `acceptance_checks` | list | no | A list of check objects, as `--acceptance-checks`, always inline JSON. See [Acceptance checks](../guides/acceptance-checks.md). |
 | `escalate` | boolean or string | no | As `--escalate`: `true` climbs the ladder named `default` (or one built from the ratings), a string names a ladder in `models_list.yaml`. Can't be combined with `model`. A missing model file or an unknown ladder is a `400`. |
 
@@ -75,7 +75,7 @@ Starts a task in the background and returns at once with `202 Accepted`:
 | `messages` | Every message so far, growing while the task runs. |
 | `error` | Why the task failed, once `failed`. |
 
-With `require_verification: true`, an `inconclusive` task ends with
+With `require_verification: true`, an `inconclusive` or `unchanged` task ends with
 `status: "failed"` and `error` explains why. Unknown `task_id`: `404`.
 
 ## `DELETE /tasks/{task_id}`
@@ -107,7 +107,7 @@ then sends messages until the task ends, and closes the connection (code
 |---|---|
 | `message` | One agent message, with all its fields. |
 | `result` | The last message on success: `verification_state`, `completion_contract`, `acceptance_results`, `rungs`. |
-| `error` | `detail` explains the problem: an invalid request, a run-time error, or an `inconclusive` verdict with `require_verification: true`. |
+| `error` | `detail` explains the problem: an invalid request, a run-time error, or an `inconclusive` or `unchanged` verdict with `require_verification: true`. |
 
 ## `POST /v1/chat/completions`
 

@@ -138,6 +138,7 @@ model), write an explicit ladder.
 | `retry_exhausted`, `no_progress`, `timed_out`, `incomplete`, `stuck` | Climb to the next rung. |
 | `acceptance_failed` | Stop, unless the ladder sets `escalate_on_acceptance_failed: true`. |
 | `inconclusive` | Stop. |
+| `unchanged` | Climb, unless the rung before also ended `unchanged`: then stop. |
 | `budget_exhausted`, `confirmation_required` | Stop: these are your own limits. |
 | A provider failure (outage, rate limit, rejected key) | Climb, recorded as a provider failure rather than a quality failure. |
 
@@ -145,6 +146,13 @@ model), write an explicit ladder.
 no tests, no build. A stronger model would face the same blank, so Certo
 stops and says so. Escalation needs a project with something to check.
 Ask for tests in the task ("with pytest tests") to give it one.
+
+**Why `unchanged` climbs, but only once in a row.** The model changed no
+file, even when Certo asked it to (see
+[`unchanged`](../reference/verdicts.md#unchanged-in-more-detail)). A cheap
+model that stops too early is replaced by a stronger one. If that one also
+changes nothing, two models agree that the task needs no change, and
+Certo stops instead of climbing to the most expensive model.
 
 The final verdict is the verdict of the last rung that ran.
 

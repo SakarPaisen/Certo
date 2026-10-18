@@ -21,7 +21,7 @@ from typing import Any
 from .acceptance import parse_acceptance_checks
 from .config import Config, ConfigError, load_config, override_llm, resolve_project_dir
 from .escalation import load_ladder, rung_dicts
-from .runner import run_task, stream_task
+from .runner import UNPROVEN_STATES, run_task, stream_task
 from .skills import write_project_context
 from .task_store import TaskRecord, TaskStore, build_task_store
 
@@ -161,7 +161,8 @@ def create_app():
         base_url: str | None = None
         reasoning_effort: str | None = None
         # Off by default: "inconclusive" (nothing runnable confirmed the
-        # software works) is not treated as a failure unless the caller
+        # software works) and "unchanged" (the agent changed no file) are
+        # not treated as a failure unless the caller
         # explicitly opts in — same rationale and same default as the CLI's
         # --require-verification (see cli.py/ROADMAP.md).
         require_verification: bool = False
@@ -257,10 +258,11 @@ def create_app():
                 else None
             )
             record.rungs = _rung_list(outcome)
-            if require_verification and outcome.verification_state == "inconclusive":
+            if require_verification and outcome.verification_state in UNPROVEN_STATES:
                 record.status = "failed"
                 record.error = (
-                    "Verification was inconclusive and require_verification=true "
+                    f"Verification was {outcome.verification_state} and "
+                    "require_verification=true "
                     "requested treating that as a failure: "
                     + "; ".join(outcome.completion_contract.limitations)
                 )
@@ -395,9 +397,10 @@ def create_app():
                     acceptance_checks=acceptance_checks,
                     ladder=ladder,
                 )
-                if request.require_verification and outcome.verification_state == "inconclusive":
+                if request.require_verification and outcome.verification_state in UNPROVEN_STATES:
                     detail = (
-                        "Verification was inconclusive and require_verification=true "
+                        f"Verification was {outcome.verification_state} and "
+                        "require_verification=true "
                         "requested treating that as a failure: "
                         + "; ".join(outcome.completion_contract.limitations)
                     )

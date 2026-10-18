@@ -45,8 +45,17 @@ from .run_summary import RunSummary, format_duration
 # Final verdicts that mean "this model couldn't finish the job": the next
 # rung gets the task. Never `inconclusive` (nothing to act on), and never
 # `budget_exhausted` or `confirmation_required` (the user's own limits).
-# `acceptance_failed` only when the ladder opts in.
-ESCALATING_VERDICTS = ("retry_exhausted", "no_progress", "timed_out", "incomplete", "stuck")
+# `acceptance_failed` only when the ladder opts in. `unchanged` climbs, but
+# two rungs in a row ending `unchanged` stop the climb (runner.py): two
+# models agreeing there is nothing to change is evidence, not laziness.
+ESCALATING_VERDICTS = (
+    "retry_exhausted",
+    "no_progress",
+    "timed_out",
+    "incomplete",
+    "stuck",
+    "unchanged",
+)
 
 
 class EscalationError(ValueError):
@@ -243,6 +252,9 @@ _LISTING_SKIP_DIRS = {
     ".tox",
     "dist",
     "build",
+    # Rust, Maven and Gradle build output, which verification itself writes.
+    "target",
+    ".gradle",
 }
 _MAX_LISTED_FILES = 30
 
@@ -350,13 +362,23 @@ def handoff_message(task: str, previous: Sequence[RungResult], failing_output: s
     note Certo writes from recorded facts, and the real output of the checks
     that were failing. The files stay in the folder as they were left."""
     last = previous[-1]
-    lines = [
-        (
+    if last.verdict == "unchanged":
+        intro = (
+            "Another model already worked on this task in this folder and changed no "
+            "file, even when Certo asked it to. The project's checks pass, but they "
+            "passed before it started too, so they don't show the task is done. Do what "
+            "the task asks; if it truly needs no change, say why. This summary was "
+            "written by Certo from what it recorded, not by a model."
+        )
+    else:
+        intro = (
             "Another model already worked on this task in this folder and couldn't "
             "finish it. Its files are still here, exactly as it left them: look at them "
             "first, keep what works, and complete the task. This summary was written by "
             "Certo from what it recorded, not by a model."
-        ),
+        )
+    lines = [
+        intro,
         "",
         f"- Model: {last.name} ({last.model})",
         f"- Result: {last.ended}" + (f" ({last.failure})" if last.failure else ""),

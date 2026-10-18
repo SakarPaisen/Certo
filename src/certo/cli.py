@@ -22,7 +22,7 @@ from .escalation import format_rung_lines, load_ladder
 from .init_cmd import check_main, init_main
 from .model_catalog import ModelCatalogEntry
 from .project_state import load_record, status_path
-from .runner import _build_completion_contract, run_task
+from .runner import UNPROVEN_STATES, _build_completion_contract, run_task
 from .skills import write_project_context
 from .worktree import record_created_project, was_created_by_certo, worktree_warning
 
@@ -303,10 +303,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Treat an 'inconclusive' verification result (nothing runnable "
             "confirmed the software works — e.g. an unknown project type, a "
-            "missing tool, or a project with no tests yet) as a failure: "
-            "nonzero exit, same as retry_exhausted/timed_out/stuck/etc. Off "
-            "by default — inconclusive exits 0, since nothing was proven "
-            "broken, only unproven."
+            "missing tool, or a project with no tests yet) or an 'unchanged' "
+            "one (the agent changed no file) as a failure: nonzero exit, same "
+            "as retry_exhausted/timed_out/stuck/etc. Off by default — both "
+            "exit 0, since nothing was proven broken, only unproven."
         ),
     )
     parser.add_argument(
@@ -620,7 +620,7 @@ def main(argv: list[str] | None = None) -> int:
         for line in format_rung_lines(outcome.rungs, outcome.final_rung):
             print(f"  {line}")
     failing = outcome.verification_state in _FAILING_STATES or (
-        args.require_verification and outcome.verification_state == "inconclusive"
+        args.require_verification and outcome.verification_state in UNPROVEN_STATES
     )
     if failing and save_state:
         status = os.path.relpath(status_path(cfg.workspace))

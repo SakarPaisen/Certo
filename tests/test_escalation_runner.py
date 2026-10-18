@@ -20,6 +20,17 @@ from certo.custom_tools.run_tests_tool import CheckOutcome
 from certo.escalation import ladder_from_models, resolve_ladder
 from certo.model_catalog import load_model_catalog
 
+_REAL_AGENT_CHANGED_FILES = runner._agent_changed_files
+
+
+@pytest.fixture(autouse=True)
+def _agent_changes_a_file(monkeypatch):
+    """The fake conversations here never touch the folder. Count every run
+    as changing a file, so they keep testing what they test; the tests of
+    `unchanged` put the real check back."""
+    monkeypatch.setattr(runner, "_agent_changed_files", lambda *_a: True)
+
+
 _CATALOG = """
 models:
   - name: local
@@ -124,7 +135,7 @@ def fake_run(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(runner, "build_workspace", lambda cfg: nullcontext("the-workspace"))
 
-    def phases(conversation, cfg, emit, task, *args):
+    def phases(conversation, cfg, emit, task, *args, **_kwargs):
         deadline, first_message = args[2], args[6]
         calls.append({"cfg": cfg, "first_message": first_message, "deadline": deadline})
         verdict, cost, files = script[len(calls) - 1]
@@ -549,3 +560,34 @@ def test_auto_model_runs_one_conversation_and_never_escalates(tmp_path, fake_run
     assert outcome.rungs == ()
     assert len(_Conversation.instances) == 1
     assert outcome.model_decisions[0].kind == "initial"
+
+
+# --- unchanged ---------------------------------------------------------------------
+
+
+def test_unchanged_climbs_and_the_next_model_is_told_nothing_changed(tmp_path, fake_run):
+    fake_run.script[:] = [("unchanged", 0, {}), ("verified", 0, {"app.py": "x"})]
+    outcome, _ = _run(tmp_path, _ladder(tmp_path))
+
+    assert outcome.verification_state == "verified"
+    assert [r.verdict for r in outcome.rungs] == ["unchanged", "verified"]
+    handoff = fake_run.calls[1]["first_message"]
+    assert "changed no file, even when Certo asked it to" in handoff
+    assert "couldn't finish it" not in handoff
+
+
+def test_two_rungs_in_a_row_unchanged_stop_the_climb(tmp_path, fake_run):
+    fake_run.script[:] = [("unchanged", 0, {}), ("unchanged", 0, {}), ("verified", 0, {})]
+    outcome, progress = _run(tmp_path, _ladder(tmp_path))
+
+    assert outcome.verification_state == "unchanged"
+    assert len(outcome.rungs) == 2
+    assert any("two models found nothing to change" in p for p in progress)
+    assert outcome.model_decisions[-1].kind == "escalation_stop"
+
+
+def test_unchanged_after_another_verdict_still_climbs(tmp_path, fake_run):
+    fake_run.script[:] = [("no_progress", 0, {}), ("unchanged", 0, {}), ("verified", 0, {})]
+    outcome, _ = _run(tmp_path, _ladder(tmp_path))
+
+    assert [r.verdict for r in outcome.rungs] == ["no_progress", "unchanged", "verified"]

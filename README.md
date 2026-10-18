@@ -70,12 +70,13 @@ export CERTO_LLM_BASE_URL=http://localhost:11434
 | --- | --- |
 | `verified` | The project's own tests or build ran and passed. |
 | `inconclusive` | Nothing could be checked (no tests yet, unknown project type, missing toolchain). |
+| `unchanged` | The checks passed, but the agent changed no file, so they don't show the task was done. |
 | `retry_exhausted` | A check kept failing after the automatic fix attempts. |
 | `no_progress` | A fix attempt changed nothing in the failing output, so Certo stopped early. |
 | `incomplete` | The agent left items on its own to-do list unfinished. |
 | `budget_exhausted` | The task ran out of its time budget. |
 
-The exit code is nonzero for every failure state, so Certo works in scripts and CI. Add `--require-verification` to make `inconclusive` fail too. Every state and its exit code: [Verdicts](https://github.com/alessioricco/certo/blob/main/docs/reference/verdicts.md).
+The exit code is nonzero for every failure state, so Certo works in scripts and CI. Add `--require-verification` to make `inconclusive` and `unchanged` fail too. Every state and its exit code: [Verdicts](https://github.com/alessioricco/certo/blob/main/docs/reference/verdicts.md).
 
 ## Features
 

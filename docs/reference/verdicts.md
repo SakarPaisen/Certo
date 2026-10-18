@@ -19,6 +19,7 @@ this way is in [How verification works](../concepts/how-verification-works.md).
 |---|---|---|
 | `verified` | The project's main check (its tests, or its build) ran and passed, and no other check failed. | 0 |
 | `inconclusive` | Nothing could prove the work is right, and nothing proved it wrong. See below. | 0 (1 with `--require-verification`) |
+| `unchanged` | The checks passed, but the agent changed no file in the project folder, even after Certo asked it once. The checks passed before the run too, so they don't show the task was done. See below. | 0 (1 with `--require-verification`) |
 | `failed` | A check ran and failed. Only `certo verify` ends with this verdict; an agent run sends the failure back to the agent instead. | 1 |
 | `retry_exhausted` | A check kept failing after `CERTO_MAX_VERIFY_RETRIES` fix attempts (2 by default), and the failure changed between attempts. | 1 |
 | `no_progress` | A fix attempt changed nothing: the same check failed again with the same exit code and the same output (only timings may differ). Certo stops early instead of using up the retries. | 1 |
@@ -52,6 +53,38 @@ a pass either. It happens when:
 Use `--require-verification` (or `"require_verification": true` in server
 mode) to treat `inconclusive` as a failure.
 
+## `unchanged` in more detail
+
+A project's checks can pass before the agent does anything: a "fix and
+extend" task whose existing tests already pass is one example. If Certo
+said `verified` there, a run in which the agent did nothing would look
+like success. So after a `verified` run Certo compares the project folder
+with how it was before the run:
+
+- **A file was created, changed or deleted:** the verdict stays `verified`.
+- **No file changed:** Certo asks the agent once to do the task, or to say
+  why no change is needed. The agent may have stopped too early, or written
+  its files somewhere else. If it then changes a file, Certo checks the
+  project again as usual.
+- **Still no change:** the verdict is `unchanged`. The agent's reason, if
+  it gave one, is in its last message, but Certo doesn't take it as proof.
+
+Some files never count as a change: Certo's own (`MODEL_DECISIONS.md`,
+`.certo/`), environments and dependencies (`.venv`, `venv`,
+`node_modules`), caches, and build output (`dist`, `build`, `target`,
+`.gradle`).
+
+`unchanged` is not a failure, because some tasks really need no change,
+for example "check that the tests pass". Use `--require-verification` (or
+`"require_verification": true` in server mode) to treat it as a failure.
+A resumed run (`certo --resume`) never ends `unchanged`, since its changes
+may come from the earlier session.
+
+With [escalation](../guides/escalate-between-models.md#what-makes-certo-climb),
+`unchanged` moves the task to the next model, unless the model before it
+also ended `unchanged`: two models agreeing there is nothing to change
+stops the climb.
+
 ## The order of the checks
 
 Certo checks, in this order, and stops at the first that applies:
@@ -65,7 +98,9 @@ Certo checks, in this order, and stops at the first that applies:
 4. Run the project's checks. On a failure, send it to the agent and check
    again → `verified`, `inconclusive`, `retry_exhausted`, `no_progress` or
    `timed_out`
-5. Run the acceptance checks, if any → may turn `verified` into
+5. After `verified`: did any file change? If not, ask the agent once and
+   check again → may turn `verified` into `unchanged`
+6. Run the acceptance checks, if any → may turn `verified` into
    `acceptance_failed`
 
 ## Check statuses

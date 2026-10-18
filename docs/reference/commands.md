@@ -46,7 +46,7 @@ current folder, the file is read instead.
 | `--agents-md TEXT` | none | Write `TEXT` as the project's `AGENTS.md` before the task. Needs `--project`. |
 | `--interactive` | off (`CERTO_INTERACTIVE`) | Let the agent stop and ask you questions. See [Interactive and confirm mode](../guides/interactive-mode.md). |
 | `--auto-model` | off (`CERTO_MODEL_SELECTION`) | Pick the model from the model files (`models_list.yaml`, `models.yaml`). See [Pick models automatically](../guides/pick-models-automatically.md). |
-| `--require-verification` | off | Exit 1 for `inconclusive` too. |
+| `--require-verification` | off | Exit 1 for `inconclusive` and `unchanged` too. |
 | `--acceptance-checks JSON_OR_FILE` | none | Extra file checks for this task, as inline JSON or a JSON file. See [Acceptance checks](../guides/acceptance-checks.md). |
 | `--escalate [LADDER]` | off (`CERTO_MODEL_SELECTION`) | Start on the first rung of a ladder of models from `models_list.yaml`, and move to the next, stronger model only when Certo's verdict shows the model couldn't finish. `LADDER` names a ladder; without it, the ladder named `default` is used, else one built from the ratings. Can't be combined with `--auto-model`, `--model` or `--resume`. A missing model file (the error says which example to copy) or an unknown ladder is a configuration error that lists the ladders found. See [Escalate between models](../guides/escalate-between-models.md). |
 | `--resume` | off | Continue the last run in this folder (or in `--project NAME`) from the state in its `.certo/` folder. `TASK` is optional and is sent as an extra instruction. Errors when there is no saved state; does nothing (exit 0) when the last run ended `verified` and no `TASK` is given. See [Resume an interrupted run](../guides/resume-a-run.md). |
@@ -63,10 +63,10 @@ command (unless `CERTO_SAVE_STATE` is off).
 **State.** Every run keeps its state in the project's `.certo/` folder,
 which git ignores. See [Resume an interrupted run](../guides/resume-a-run.md#the-certo-folder).
 
-**Exit code.** 0 for `verified` and `inconclusive`; 1 for every other
-verdict, for a configuration error (`Configuration error: ...`) and for a
-run-time error (`Error: ...`); 130 when you stop it with Ctrl-C. With
-`--require-verification`, `inconclusive` exits 1. See [Verdicts](verdicts.md).
+**Exit code.** 0 for `verified`, `inconclusive` and `unchanged`; 1 for
+every other verdict, for a configuration error (`Configuration error: ...`)
+and for a run-time error (`Error: ...`); 130 when you stop it with Ctrl-C.
+With `--require-verification`, `inconclusive` and `unchanged` exit 1. See [Verdicts](verdicts.md).
 
 `verify`, `init`, `check` and `bench` are subcommands only when they are
 the whole first argument. `certo "verify the login flow"` runs a task. To

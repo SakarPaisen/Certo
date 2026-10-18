@@ -26,6 +26,16 @@ from certo.acceptance import AcceptanceCheck
 from certo.config import Config, ConfigError, load_config
 from certo.custom_tools.run_tests_tool import CheckOutcome, VerificationRun
 
+_REAL_AGENT_CHANGED_FILES = runner._agent_changed_files
+
+
+@pytest.fixture(autouse=True)
+def _agent_changes_a_file(monkeypatch):
+    """The fake conversations here never touch the folder. Count every run
+    as changing a file, so they keep testing what they test; the tests of
+    `unchanged` put the real check back."""
+    monkeypatch.setattr(runner, "_agent_changed_files", lambda *_a: True)
+
 
 def _config_available() -> bool:
     try:
@@ -2286,7 +2296,7 @@ def _stub_for_state_tests(monkeypatch, outcome=None, raise_in_phases=None):
     monkeypatch.setattr(runner, "build_workspace", lambda cfg: nullcontext(cfg.workspace))
     sent: list = []
 
-    def fake_phases(conversation, cfg, emit, task, *args):
+    def fake_phases(conversation, cfg, emit, task, *args, **_kwargs):
         first_message = args[6]
         sent.append(first_message or task)
         if raise_in_phases is not None:
@@ -2464,3 +2474,131 @@ def test_a_real_sdk_conversation_resumes_from_certo_and_never_saves_the_key(tmp_
     )
     assert "PROBE-42" in saved
     assert "sk-THIS-MUST-NOT-BE-SAVED" not in saved
+
+
+# --- unchanged: verified checks, but the agent changed no file ---------------
+
+
+class _EditingConversation(_FakeConversation):
+    """A fake conversation whose `run()` calls write the given files, one
+    dict per call (an empty dict changes nothing)."""
+
+    def __init__(self, workspace, writes_per_run: list[dict]) -> None:
+        super().__init__()
+        self.workspace = workspace
+        self.writes_per_run = list(writes_per_run)
+
+    def run(self) -> None:
+        super().run()
+        for name, text in (self.writes_per_run.pop(0) if self.writes_per_run else {}).items():
+            (self.workspace / name).write_text(text)
+
+
+def _phases(monkeypatch, tmp_path, writes_per_run, *, check_changes=True):
+    monkeypatch.setattr(runner, "_agent_changed_files", _REAL_AGENT_CHANGED_FILES)
+    monkeypatch.setattr(
+        runner, "_run_verification", lambda _dir, *_a: _run(_check(summary="3 passed"))
+    )
+    (tmp_path / "app.py").write_text("print('starter')\n")
+    conversation = _EditingConversation(tmp_path, writes_per_run)
+    emitted: list = []
+    outcome = runner._run_stream_task_phases(
+        conversation,
+        _cfg(workspace=str(tmp_path), verify_tests="always"),
+        emitted.append,
+        "Fix the starter",
+        None,
+        None,
+        float("inf"),
+        None,
+        [],
+        check_changes=check_changes,
+    )
+    notices = [m.content[0].text for m in emitted]
+    return outcome, conversation, notices
+
+
+def test_a_run_that_changes_a_file_stays_verified_with_no_follow_up(monkeypatch, tmp_path):
+    outcome, conversation, _ = _phases(monkeypatch, tmp_path, [{"app.py": "print('fixed')\n"}])
+
+    assert outcome.verification_state == "verified"
+    assert conversation.sent_messages == ["Fix the starter"]
+    assert outcome.retries_used == 0
+
+
+def test_no_change_gets_one_follow_up_and_a_change_then_verifies(monkeypatch, tmp_path):
+    outcome, conversation, notices = _phases(
+        monkeypatch, tmp_path, [{}, {"app.py": "print('fixed')\n"}]
+    )
+
+    assert outcome.verification_state == "verified"
+    assert conversation.run_calls == 2
+    follow_up = conversation.sent_messages[1]
+    assert "no file in it changed during this run" in follow_up
+    assert str(tmp_path) in follow_up
+    assert any("the agent changed no file in the project folder" in n for n in notices)
+    assert outcome.retries_used == 1
+
+
+def test_still_no_change_after_the_follow_up_is_unchanged(monkeypatch, tmp_path):
+    outcome, conversation, notices = _phases(monkeypatch, tmp_path, [{}, {}])
+
+    assert outcome.verification_state == "unchanged"
+    assert outcome.success is False
+    assert conversation.run_calls == 2
+    assert outcome.retries_used == 1
+    assert any(
+        "changed no file in the project folder, even after Certo asked once" in note
+        for note in outcome.completion_contract.limitations
+    )
+    assert any("reported as unchanged, not verified" in n for n in notices)
+
+
+def test_certos_own_files_are_not_a_change(monkeypatch, tmp_path):
+    outcome, _, _ = _phases(
+        monkeypatch, tmp_path, [{"MODEL_DECISIONS.md": "x"}, {"MODEL_DECISIONS.md": "y"}]
+    )
+    assert outcome.verification_state == "unchanged"
+
+
+def test_a_resumed_run_is_never_unchanged(monkeypatch, tmp_path):
+    outcome, conversation, _ = _phases(monkeypatch, tmp_path, [{}], check_changes=False)
+
+    assert outcome.verification_state == "verified"
+    assert conversation.run_calls == 1
+
+
+def test_only_a_verified_run_is_checked_for_changes(monkeypatch, tmp_path):
+    monkeypatch.setattr(runner, "_agent_changed_files", _REAL_AGENT_CHANGED_FILES)
+    monkeypatch.setattr(runner, "_run_verification", lambda _dir, *_a: _run())
+    conversation = _EditingConversation(tmp_path, [{}])
+    outcome = runner._run_stream_task_phases(
+        conversation,
+        _cfg(workspace=str(tmp_path), verify_tests="always"),
+        lambda _m: None,
+        "Explain the code",
+        None,
+        None,
+        float("inf"),
+        None,
+        [],
+    )
+    assert outcome.verification_state == "inconclusive"
+    assert conversation.run_calls == 1
+
+
+def test_stream_task_turns_off_the_change_check_only_on_resume(monkeypatch, tmp_path):
+    seen: list = []
+
+    def fake_phases(conversation, cfg, emit, task, *args, check_changes=True):
+        seen.append(check_changes)
+        return _verified_outcome()
+
+    from certo.project_state import load_record
+
+    _stub_for_state_tests(monkeypatch)
+    monkeypatch.setattr(runner, "_run_stream_task_phases", fake_phases)
+    runner.stream_task("do the thing", cfg=_cfg(workspace=str(tmp_path)), save_state=True)
+    first = load_record(str(tmp_path))
+    runner.stream_task(first.task, cfg=_cfg(workspace=str(tmp_path)), resume_from=first)
+    assert seen == [True, False]
