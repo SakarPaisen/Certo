@@ -719,4 +719,9 @@ def finish_report(cfg: BenchConfig, out_dir: Path, records: list[dict[str, Any]]
             f"cost {row['Cost']}"
         )
     print(cost_line(cost_summary(meta, records)))
-    print(f"Results: {markdown} (and results.csv, cost.json; conversations in runs/transcripts/)")
+    transcripts = (
+        "; conversations in runs/transcripts/"
+        if (out_dir / "runs" / "transcripts").is_dir()
+        else ""
+    )
+    print(f"Results: {markdown} (and results.csv, cost.json{transcripts})")
