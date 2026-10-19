@@ -242,13 +242,10 @@ escalation.yaml
 # certo bench results (default output folder)
 bench-results/
 
-# Third-party skill content (Apache-2.0, from github.com/anthropics/skills) —
-# not this project's own IP, kept locally but not redistributed from this
-# repo. This project's own skills/ subdirectories (lifecycle/, git/,
-# python-web/, testing/) are NOT excluded — only these three.
-/skills/frontend-design/
-/skills/webapp-testing/
-/skills/web-artifacts-builder/
+# CERTO_SKILLS_DIR's default: a developer's own local skills, loaded on top
+# of the built-in ones (those ship in src/certo/builtin_skills/). Never
+# committed; it may hold copies of third-party skills.
+/skills/
 
 # Third-party skills installed via `certo-admin skills install` — local
 # only, never committed (the lockfile third_party_skills.lock.json is not
