@@ -188,8 +188,20 @@ first item is the suggested next one.
 
 - **A first run in minutes, with one model.** No catalog, no ladders:
   `certo init`, then a first verified project. Getting started shows only
-  that path. Measure it: time from `pip install` to the first `verified`,
-  on a clean machine.
+  that path. Measured 2026-10-19 in an empty home folder: 88.5s from
+  `uv tool install` to `verified` (`docs/benchmark/first-run-0.1.19.md`).
+  Still to do: a truly clean machine (no Python, no uv), and the two
+  items below.
+- **A quieter run.** The SDK's default console output prints the whole
+  system prompt (~500 lines) and the first user message with the skills
+  (~500 more) before the first action. Certo doesn't configure it. Show
+  the banner, the agent's actions and the verdict; keep the full text
+  behind a flag. Feature bump; measure that nothing the user needs is
+  lost.
+- **Fast start-up.** `certo --version` takes ~3s (18.6s on the very first
+  run, compiling bytecode): `certo.cli` imports the SDK at the top
+  (~2.6s). Import it only for the commands that run an agent, so
+  `--version`, `verify` and `check` start at once.
 - **GitHub Action**: an issue labelled `certo` becomes a pull request with
   the verdict and checks in its description.
 - **Docs articles still to write** (ideas from 2026-10-18): build an
