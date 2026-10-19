@@ -782,3 +782,14 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   with a warning, rather than an error or an automatic rewrite: nothing
   breaks, and Certo never edits a user's file. When both exist, the file
   wins.
+- **A step-limit stop is checked, and failing checks switch model**
+  (0.1.20), the Author's option (a). Using all of `CERTO_MAX_ITERATIONS`
+  isn't a failure in itself: twice on 2026-10-19 Haiku stopped there, once
+  with all 116 tests passing. So the checks run first; failing checks go
+  through the normal fix loop, where `--auto-model` already moves to the
+  next model, and escalation climbs once the rung's fix attempts are used.
+  Nothing to check stays `stuck`. The next model is the next by weights,
+  not necessarily a stronger one (option (b), "only to a model at least as
+  capable", was not chosen: one rule for every failed attempt). Runaway
+  loops stay bounded by the per-run step limit, the finite model list,
+  the time budget and the cost cap.

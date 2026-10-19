@@ -27,6 +27,7 @@ from openhands.sdk import (
 from openhands.sdk.conversation import ConversationState
 from openhands.sdk.conversation.exceptions import ConversationRunError
 from openhands.sdk.event import ActionEvent, ObservationEvent
+from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.llm.exceptions.types import LLMError
 from openhands.sdk.security.confirmation_policy import AlwaysConfirm
 from openhands.tools.task_tracker import TaskTrackerTool
@@ -168,6 +169,34 @@ _RETRIABLE_STATES = ("failed", "timed_out")
 # finish — retrying or verifying against whatever state the workspace is in
 # would be building on top of a run the agent itself never completed coherently.
 _ABORTED_STATUSES = (ConversationExecutionStatus.STUCK, ConversationExecutionStatus.ERROR)
+
+
+def _hit_step_limit(conversation: Conversation) -> bool:
+    """Whether the run ended in ERROR only because the agent used all its
+    steps (`CERTO_MAX_ITERATIONS`): the SDK then emits a
+    `ConversationErrorEvent` with code "MaxIterationsReached" and returns
+    normally (v1.47.0). Nothing broke, so the work is checked like a run
+    that finished, instead of ending `stuck` unchecked. Seen live
+    2026-10-19: claude-haiku-5-5's 50th step ran 116 passing tests, and the
+    run still ended `stuck`. Any other error, or an event log that can't be
+    read (Docker), keeps the old `stuck`."""
+    try:
+        if conversation.state.execution_status != ConversationExecutionStatus.ERROR:
+            return False
+        for event in reversed(conversation.state.events):
+            if isinstance(event, ConversationErrorEvent):
+                return event.code == "MaxIterationsReached"
+    except Exception:  # noqa: BLE001 - unknown means "not the step limit"
+        return False
+    return False
+
+
+def _step_limit_notice(cfg: Config) -> str:
+    return (
+        f"Certo: the agent used all its {cfg.max_iterations} steps (CERTO_MAX_ITERATIONS) "
+        "before finishing. Checking the work it left."
+    )
+
 
 # Wall-clock durations a test/build tool prints in its own summary line
 # (pytest's "in 3.85s", etc.) — the one kind of noise expected to differ
@@ -762,7 +791,10 @@ def _verify_and_report(
         )
 
     status = conversation.state.execution_status
-    if status in _ABORTED_STATUSES:
+    step_limited = status in _ABORTED_STATUSES and _hit_step_limit(conversation)
+    if step_limited:
+        _emit_notice(emit, _step_limit_notice(cfg))
+    elif status in _ABORTED_STATUSES:
         contract = _build_completion_contract(task, None, skipped=False, aborted=True)
         _emit_notice(
             emit,
@@ -837,7 +869,10 @@ def _verify_and_report(
             return outcome
 
         retry_status = conversation.state.execution_status
-        if retry_status in _ABORTED_STATUSES:
+        step_limited = retry_status in _ABORTED_STATUSES and _hit_step_limit(conversation)
+        if step_limited:
+            _emit_notice(emit, _step_limit_notice(cfg))
+        elif retry_status in _ABORTED_STATUSES:
             contract = _build_completion_contract(task, run, skipped=False, aborted=True)
             _emit_notice(
                 emit,
@@ -881,6 +916,22 @@ def _verify_and_report(
                 retries_used=retries_used,
             )
 
+    if step_limited and run.state != "verified":
+        # Cut off before finishing, and the checks found nothing that shows
+        # the task done: nothing to claim, as before.
+        contract = _build_completion_contract(task, run, skipped=False, aborted=True)
+        _emit_notice(
+            emit,
+            "Certo verification: the agent used all its steps before finishing, and "
+            "the project's checks can't show the task is done. This task needs "
+            "manual attention.",
+        )
+        return TaskOutcome(
+            verification_state="stuck",
+            completion_contract=contract,
+            checks=tuple(run.checks),
+            retries_used=retries_used,
+        )
     contract = _build_completion_contract(task, run, skipped=False, aborted=False)
     if run.state == "inconclusive" and not _is_clean_no_tests_collected(run):
         summaries = "; ".join(c.summary for c in run.checks) or "no applicable check was found"
@@ -995,6 +1046,8 @@ def _enforce_task_tracker_completion(
         )
 
     status = conversation.state.execution_status
+    if status in _ABORTED_STATUSES and _hit_step_limit(conversation):
+        return None  # the project's checks decide (see _hit_step_limit)
     if status in _ABORTED_STATUSES:
         contract = _build_completion_contract(task, None, skipped=False, aborted=True)
         _emit_notice(
@@ -1058,6 +1111,8 @@ def _enforce_task_tracker_completion(
             return outcome
 
         retry_status = conversation.state.execution_status
+        if retry_status in _ABORTED_STATUSES and _hit_step_limit(conversation):
+            return None  # the project's checks decide (see _hit_step_limit)
         if retry_status in _ABORTED_STATUSES:
             contract = _build_completion_contract(task, None, skipped=False, aborted=True)
             _emit_notice(

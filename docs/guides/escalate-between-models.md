@@ -144,6 +144,7 @@ model), write an explicit ladder.
 |---|---|
 | `verified` | Stop. The task is done. |
 | `retry_exhausted`, `no_progress`, `timed_out`, `incomplete`, `stuck` | Climb to the next rung. |
+| The model used all its steps (`CERTO_MAX_ITERATIONS`) | The checks run first. If they pass, stop: `verified`. If they fail, the rung gets its fix attempts, then climbs like any failure. |
 | `acceptance_failed` | Stop, unless the ladder sets `escalate_on_acceptance_failed: true`. |
 | `inconclusive`, and the model changed files | Stop. |
 | `inconclusive`, and the model changed no file | Climb, unless the rung before also changed no file: then stop. |

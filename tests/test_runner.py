@@ -966,6 +966,95 @@ def test_agent_gets_stuck_mid_retry(monkeypatch):
     assert outcome.retries_used == 1
 
 
+def _step_limit_event(code: str = "MaxIterationsReached"):
+    from openhands.sdk.event.conversation_error import ConversationErrorEvent
+
+    return ConversationErrorEvent(
+        source="environment", code=code, detail="Agent reached maximum iterations limit (10)."
+    )
+
+
+def test_a_step_limit_stop_is_checked_and_can_be_verified(monkeypatch):
+    # Live 2026-10-19: the agent's 50th step ran 116 passing tests and the
+    # run ended `stuck`. A step-limit stop is now checked like a finish.
+    monkeypatch.setattr(
+        runner, "_run_verification", lambda _dir, *_a: _run(_check(status="passed"))
+    )
+    conversation = _FakeConversation(
+        initial_status=ConversationExecutionStatus.ERROR, initial_events=[_step_limit_event()]
+    )
+    emitted = []
+
+    outcome = runner._verify_and_report(
+        conversation, _cfg(verify_tests="always"), emitted.append, "do the thing"
+    )
+
+    assert outcome.verification_state == "verified"
+    assert "used all its 10 steps (CERTO_MAX_ITERATIONS)" in emitted[0].content[0].text
+
+
+def test_a_step_limit_stop_with_failing_checks_gets_a_fix_attempt(monkeypatch):
+    results = iter([_run(_check(status="failed", exit_code=1)), _run(_check(status="passed"))])
+    monkeypatch.setattr(runner, "_run_verification", lambda _dir, *_a: next(results))
+    conversation = _FakeConversation(
+        initial_status=ConversationExecutionStatus.ERROR,
+        initial_events=[_step_limit_event()],
+        statuses_after_run=[ConversationExecutionStatus.FINISHED],
+    )
+
+    outcome = runner._verify_and_report(
+        conversation, _cfg(verify_tests="always", max_verify_retries=2), lambda _m: None, "t"
+    )
+
+    assert conversation.run_calls == 1  # one fix attempt, with fresh steps
+    assert outcome.verification_state == "verified"
+    assert outcome.retries_used == 1
+
+
+def test_a_step_limit_stop_with_nothing_to_check_stays_stuck(monkeypatch):
+    monkeypatch.setattr(runner, "_run_verification", lambda _dir, *_a: _run())
+    conversation = _FakeConversation(
+        initial_status=ConversationExecutionStatus.ERROR, initial_events=[_step_limit_event()]
+    )
+    emitted = []
+
+    outcome = runner._verify_and_report(
+        conversation, _cfg(verify_tests="always"), emitted.append, "do the thing"
+    )
+
+    assert outcome.verification_state == "stuck"
+    assert "used all its steps before finishing" in emitted[-1].content[0].text
+
+
+def test_another_error_still_ends_stuck_without_checks(monkeypatch):
+    calls = []
+    monkeypatch.setattr(runner, "_run_verification", lambda *_a: calls.append(1) or _run())
+    conversation = _FakeConversation(
+        initial_status=ConversationExecutionStatus.ERROR,
+        initial_events=[_step_limit_event(code="SomethingElse")],
+    )
+
+    outcome = runner._verify_and_report(
+        conversation, _cfg(verify_tests="always"), lambda _m: None, "do the thing"
+    )
+
+    assert outcome.verification_state == "stuck"
+    assert calls == []
+
+
+def test_a_step_limit_stop_skips_the_task_tracker_follow_up():
+    conversation = _FakeConversation(
+        initial_status=ConversationExecutionStatus.ERROR, initial_events=[_step_limit_event()]
+    )
+
+    outcome = runner._enforce_task_tracker_completion(
+        conversation, _cfg(), lambda _m: None, "do the thing"
+    )
+
+    assert outcome is None  # verification decides, not `stuck`
+    assert conversation.run_calls == 0
+
+
 # --- task_tracker completion enforcement ------------------------------------
 #
 # Regression coverage for the "agent declares done with incomplete
@@ -2135,6 +2224,36 @@ def test_quality_failure_escalates_during_verify_retry(monkeypatch, tmp_path):
     assert len(conversation.switched_llms) == 1
     kinds = [d.kind for d in outcome.model_decisions]
     assert kinds == ["initial", "escalation_quality_failure"]
+    assert outcome.verification_state == "verified"
+
+
+def test_auto_model_switches_after_a_step_limit_stop_with_failing_checks(monkeypatch, tmp_path):
+    # Option (a): a step-limit stop whose checks fail is a failed attempt,
+    # so --auto-model moves to the next model, which gets fresh steps.
+    conversation = _SwitchableConversation(
+        [ConversationExecutionStatus.ERROR, ConversationExecutionStatus.FINISHED]
+    )
+    conversation.state.events.append(_step_limit_event())
+    monkeypatch.setattr(runner, "Conversation", lambda **_kwargs: conversation)
+    monkeypatch.setattr(runner, "build_agent", lambda cfg, **_kw: "fake-agent")
+    monkeypatch.setattr(runner, "build_workspace", lambda cfg: nullcontext(str(tmp_path)))
+    results = iter(
+        [_run(_check(status="failed", summary="1 failed")), _run(_check(status="passed"))]
+    )
+    monkeypatch.setattr(runner, "_run_verification", lambda _dir, *_a: next(results))
+
+    outcome = runner.stream_task(
+        "do the thing",
+        cfg=_cfg(
+            workspace=str(tmp_path),
+            model_selection="auto",
+            **_catalog_files(tmp_path),
+            execution="local",
+        ),
+    )
+
+    assert [d.kind for d in outcome.model_decisions] == ["initial", "escalation_quality_failure"]
+    assert len(conversation.switched_llms) == 1
     assert outcome.verification_state == "verified"
 
 

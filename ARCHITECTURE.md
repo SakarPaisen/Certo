@@ -72,7 +72,14 @@ given design was chosen.
   checked before every `.run()` call across all three call sites. `CERTO_INTERACTIVE`
   wires an `OnAwaitingInput` checkpoint around the *initial* run only (`cli.py`
   supplies a terminal handler, `server.py` doesn't); the deadline is paused,
-  not spent, while waiting on a human reply. `CERTO_MODEL_SELECTION=auto`
+  not spent, while waiting on a human reply. The runner
+  treats an `ERROR` whose last `ConversationErrorEvent` has code
+  `MaxIterationsReached` (the SDK's step-limit stop, v1.47.0; `run()`
+  returns normally and a later `run()` resets the step count) as a finish
+  to check, not `stuck`: `_hit_step_limit()`, in both the task-tracker and
+  the verify phases (0.1.20). Failing checks then go through the normal
+  retry loop, which is where auto-model's quality switch happens.
+  `CERTO_MODEL_SELECTION=auto`
   wires a `ModelChain` (see `model_selection.py`) with automatic fallback on
   a `ConversationRunError` wrapping the SDK's own `LLMError` hierarchy
   (the provider-failure path, through the real `switch_llm`, confirmed

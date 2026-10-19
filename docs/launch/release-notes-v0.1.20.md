@@ -1,9 +1,9 @@
 # Certo v0.1.20 (not released yet)
 
 The task profiles and the escalation ladders move out of
-`models_list.yaml` into files of their own, a task profile can name the
-model to use, and `--auto-model` reads a task's title instead of its
-whole text.
+`models_list.yaml` into files of their own, a run that uses all its steps
+is checked instead of ending `stuck`, a task profile can name the model to
+use, and `--auto-model` reads a task's title instead of its whole text.
 
 ## Changed: one file per mode for your model choices
 
@@ -38,6 +38,28 @@ To move, cut each section, with its key, into its new file next to
 `models_list.yaml`; nothing inside changes. A later version will stop
 reading the old sections. See
 [The model files](../reference/models-yaml.md#moving-from-one-file-0119-and-earlier).
+
+## Changed: a run that uses all its steps is checked, and can switch model
+
+When the agent used all its steps (`CERTO_MAX_ITERATIONS`, 50 by
+default), the run ended `stuck` and Certo checked nothing, even when the
+work was done. On 2026-10-19 a run of the Hanoi example ended `stuck` on
+its 50th step, right after that step ran 116 passing tests; `certo
+verify` afterwards said `verified`.
+
+Now Certo runs the project's checks after such a run, as after a normal
+finish:
+
+- the checks pass → `verified`;
+- the checks fail → the usual fix attempts, each with a fresh set of
+  steps. With `--auto-model`, the next attempt runs on the next model, in
+  the same conversation; with `--escalate`, the rung climbs as for any
+  failure once its fix attempts are used;
+- nothing can be checked → `stuck`, as before.
+
+Any other error still ends `stuck` at once. The time budget and the cost
+cap still bound the whole task, so a model can't loop forever. See
+[Verdicts](../reference/verdicts.md#the-order-of-the-checks).
 
 ## New: a task profile can name its model
 

@@ -115,7 +115,11 @@ way for every command: errors stop the run, warnings are printed (see
    when the current one:
    - fails at the provider (bad key, rate limit, outage, context too long),
      or
-   - makes a fix attempt that still fails Certo's checks.
+   - makes a fix attempt that still fails Certo's checks, or
+   - uses all its steps (`CERTO_MAX_ITERATIONS`) with the checks still
+     failing. The next model carries on in the same conversation, with a
+     fresh set of steps. If the checks pass, nothing switches: the task is
+     `verified`.
 
 When every model has been tried, the task ends as it would without
 automatic selection.

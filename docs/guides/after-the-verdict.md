@@ -154,7 +154,10 @@ ran out. The work so far is in the folder.
 ## `stuck`
 
 The agent's run ended stuck (the agent repeated itself) or in an error,
-before it finished. Certo didn't check a run that never finished.
+before it finished. Certo didn't check a run that broke off. (A run that
+only used all its steps is checked; it ends `stuck` only when nothing
+could be checked. If your model often needs more than 50 steps, raise
+`CERTO_MAX_ITERATIONS`.)
 
 - Resume once: `certo --resume`, perhaps with a hint.
 - With a local model, check the context window first: a model that can't
