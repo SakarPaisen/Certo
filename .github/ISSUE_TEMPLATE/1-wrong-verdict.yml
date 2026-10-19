@@ -1,0 +1,69 @@
+name: "Wrong verdict (the most useful report)"
+description: Certo said `verified` but the work was wrong, or it failed work that was right.
+title: "[wrong verdict] "
+labels: ["wrong-verdict"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Thank you. These are the most valuable reports Certo gets.** Certo's
+        whole job is to give a verdict you can trust, so every wrong one shows
+        a gap to close. Remove API keys and anything private before you post.
+  - type: dropdown
+    id: direction
+    attributes:
+      label: Which way was it wrong?
+      options:
+        - Certo said `verified`, but the work was wrong
+        - Certo gave a failing verdict, but the work was right
+        - Another verdict that didn't match what happened
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Certo version
+      description: The output of `certo --version`.
+      placeholder: certo 0.1.18
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      description: "`CERTO_LLM_MODEL`, or the ladder with `--escalate`."
+      placeholder: ollama/qwen3.8:27b
+    validations:
+      required: true
+  - type: textarea
+    id: task
+    attributes:
+      label: The task and the command
+      description: What you asked for, and the exact `certo` command you ran.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: verdict
+    attributes:
+      label: The verdict line
+      placeholder: "Verification: verified"
+    validations:
+      required: true
+  - type: textarea
+    id: what-was-wrong
+    attributes:
+      label: What was actually wrong (or right)
+      description: |
+        How you found out: a command that fails, a test Certo didn't run, a
+        rule from the task the code breaks. The smallest example helps most.
+    validations:
+      required: true
+  - type: textarea
+    id: checks
+    attributes:
+      label: The checks Certo ran
+      description: |
+        The lines Certo printed about verification, and the run summary. If
+        the project is shareable, a link to it or to `.certo/STATUS.md`.
+      render: text

@@ -1,6 +1,12 @@
 # Contributing
 
-Issues and pull requests are welcome. To work on the code:
+Issues and pull requests are welcome. When you open an issue, pick its
+form: **Wrong verdict** is for a run where Certo said `verified` and the
+work was wrong, or the reverse. Those are the most useful reports, since
+a verdict you can trust is Certo's whole job. There are also forms for
+bugs, feature requests and your own benchmark results.
+
+To work on the code:
 
 ```bash
 git clone https://github.com/alessioricco/certo.git
