@@ -121,6 +121,11 @@ first item is the suggested next one.
 
 ## 4. Models and strategies
 
+- **A `certo bench` strategy for `--auto-model`.** Only `single` and
+  `escalate` exist (`bench_strategies.py`), so the README can say auto-model
+  is unmeasured but not show a number. Add an `auto` strategy (task
+  profiles plus fallback, as the CLI runs it) and bench it next to the
+  single models and a ladder.
 - **Tool calls written as text.** In the 0.1.15 local benchmark, every
   failed `qwen3.6` and `qwen3.8` run and 18 of 22 failed `devstral` runs
   ended because the model wrote its tool call as JSON in a text answer;
