@@ -45,3 +45,11 @@ With `CERTO_ARTIFACTS_DIR` set, runs started through the WebSocket
 (`/tasks/stream`) or `/v1/chat/completions` were filed under `_unscoped`
 even when the request named a `project`. They are now filed under that
 project, as `POST /tasks` already did.
+
+## Fixed: model check messages no longer say ".env"
+
+When `certo check` or `certo init` found a problem, the message said to
+fix the setting "in .env", for example "Check CERTO_LLM_API_KEY in .env".
+Since 0.1.5 the value usually comes from the user settings file or the
+shell instead. The messages now say "in your settings"; `certo check`
+shows where each setting comes from.

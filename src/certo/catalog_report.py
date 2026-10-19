@@ -22,12 +22,12 @@ from .model_catalog import (
 from .model_files import find, missing_message, resolve
 from .model_selection import config_for_entry
 
-# llm_check.explain() names the .env settings; for a catalog entry the fix
+# llm_check.explain() names the CERTO_LLM_* settings; for a catalog entry the fix
 # is in its models.yaml fields instead.
 _FIELD_NAMES = {
-    "CERTO_LLM_API_KEY in .env": "its api_key in models.yaml",
-    "CERTO_LLM_MODEL in .env": "its model id in models_list.yaml",
-    "CERTO_LLM_BASE_URL in .env": "its base_url in models.yaml",
+    "CERTO_LLM_API_KEY in your settings": "its api_key in models.yaml",
+    "CERTO_LLM_MODEL in your settings": "its model id in models_list.yaml",
+    "CERTO_LLM_BASE_URL in your settings": "its base_url in models.yaml",
 }
 
 

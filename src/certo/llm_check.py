@@ -259,20 +259,20 @@ def explain(result: LLMCheckResult, provider: str | None = None) -> str:
         )
     if result.error_kind == "authentication":
         return (
-            f"{who} rejected the API key. Check CERTO_LLM_API_KEY in .env: it must "
+            f"{who} rejected the API key. Check CERTO_LLM_API_KEY in your settings: it must "
             f"be a valid key for {who}, pasted with no spaces."
         )
     suggestion = " Coder models such as qwen3-coder support it." if ollama else ""
     if any(s in text for s in _TOOLS_UNSUPPORTED):
         return (
             f"The model {result.model} doesn't support tool calling, which Certo's "
-            "agent needs. Choose another model in CERTO_LLM_MODEL in .env." + suggestion
+            "agent needs. Choose another model in CERTO_LLM_MODEL in your settings." + suggestion
         )
     if result.error_kind == "no_tool_call":
         return (
             f"The model {result.model} answered, but without calling a tool. "
             "Certo's agent works only through tool calls, so choose a model that "
-            "supports tool calling in CERTO_LLM_MODEL in .env." + suggestion
+            "supports tool calling in CERTO_LLM_MODEL in your settings." + suggestion
         )
     model_unknown = result.error_kind == "model_not_found" or any(s in text for s in _MODEL_UNKNOWN)
     if ollama and "not found" in text and "model" in text:
@@ -285,7 +285,7 @@ def explain(result: LLMCheckResult, provider: str | None = None) -> str:
             )
         return (
             f"{who} doesn't know the model {result.model}. Check the spelling of "
-            "CERTO_LLM_MODEL in .env against the provider's model list."
+            "CERTO_LLM_MODEL in your settings against the provider's model list."
         )
     if result.error_kind in ("unavailable", "timeout"):
         if result.base_url:
@@ -296,7 +296,7 @@ def explain(result: LLMCheckResult, provider: str | None = None) -> str:
             )
             return (
                 f"Couldn't reach the server at {result.base_url}. Check "
-                f"CERTO_LLM_BASE_URL in .env and that the server is running.{tip}"
+                f"CERTO_LLM_BASE_URL in your settings and that the server is running.{tip}"
             )
         return (
             f"Couldn't reach {who}. Check your internet connection; if it works, "

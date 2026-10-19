@@ -147,7 +147,7 @@ that `certo check` names, or export it. Then run `certo check`.
 **You see**, from `certo check`:
 
 ```text
-Checking the model openai/gpt-6.1-sol... OpenAI rejected the API key. Check CERTO_LLM_API_KEY in .env: it must be a valid key for OpenAI, pasted with no spaces.
+Checking the model openai/gpt-6.1-sol... OpenAI rejected the API key. Check CERTO_LLM_API_KEY in your settings: it must be a valid key for OpenAI, pasted with no spaces.
 ```
 
 **Cause:** the key is wrong, expired, or belongs to another provider than
@@ -192,7 +192,7 @@ to it; for Ollama, the model isn't pulled.
 **You see**, from `certo check`:
 
 ```text
-The model ... doesn't support tool calling, which Certo's agent needs. Choose another model in CERTO_LLM_MODEL in .env.
+The model ... doesn't support tool calling, which Certo's agent needs. Choose another model in CERTO_LLM_MODEL in your settings.
 ```
 
 or `... answered, but without calling a tool.`
@@ -234,7 +234,7 @@ normal. The tokens are still counted.
 **You see:**
 
 ```text
-Checking the model ollama/qwen3-coder:30b (a local model may take a minute to load)... Couldn't reach the server at http://localhost:11434. Check CERTO_LLM_BASE_URL in .env and that the server is running. If Ollama runs on another machine, start it there with OLLAMA_HOST=0.0.0.0.
+Checking the model ollama/qwen3-coder:30b (a local model may take a minute to load)... Couldn't reach the server at http://localhost:11434. Check CERTO_LLM_BASE_URL in your settings and that the server is running. If Ollama runs on another machine, start it there with OLLAMA_HOST=0.0.0.0.
 ```
 
 **Cause:** Ollama isn't started, or listens on another address.

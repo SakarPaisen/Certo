@@ -1169,3 +1169,20 @@ def test_certo_check_with_only_the_list_says_to_create_models_yaml(tmp_path, mon
 
     assert init_cmd.check_main([], out=out) == 1
     assert "Error: No models.yaml found" in out.getvalue()
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        _result("authentication", "invalid x-api-key"),
+        _result("model_not_found", "no such model"),
+        _result("no_tool_call", "no tool call"),
+        _result("unavailable", "Connection refused", base_url="http://h:11434"),
+    ],
+)
+def test_explain_does_not_claim_the_setting_is_in_dot_env(result):
+    # The value usually comes from the user settings file or the shell,
+    # and certo check prints where; the message mustn't say ".env".
+    text = explain(result, "Anthropic")
+    assert ".env" not in text
+    assert "in your settings" in text

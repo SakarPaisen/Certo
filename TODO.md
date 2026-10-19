@@ -297,9 +297,6 @@ database).
   9] Bad file descriptor` (`subprocess_terminal.py`): it reads a terminal
   that was already closed. Harmless but alarming; users read it as a
   crash. Close the conversations' terminals before exit, or silence it.
-- **`llm_check.explain()` always says "in .env"** ("Check
-  CERTO_LLM_API_KEY in .env"), although since 0.1.5 the value usually
-  comes from the user settings file or the environment.
 - **Third-party skills: narrow license detection, `SKILL.md` only.** Eight
   permissive licenses are recognised; anything else is `unknown` and needs
   acknowledgement. Legacy single-file upstream skills can't be installed.
