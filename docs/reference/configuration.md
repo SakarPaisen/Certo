@@ -66,7 +66,7 @@ Per-run overrides: `--model`, `--api-key`, `--base-url`,
 | Variable | Default | Meaning |
 |---|---|---|
 | `CERTO_MAX_ITERATIONS` | `50` | The most steps the agent may take in one run. Each retry after a failed check is a new run with the same limit. |
-| `CERTO_MAX_TASK_SECONDS` | `1800` | The time budget for the whole task, in seconds: the first run plus every retry. When it runs out, the verdict is `budget_exhausted`. Checked between runs, so a single slow step can go a little past it. |
+| `CERTO_MAX_TASK_SECONDS` | `1800` | The time budget for the whole task, in seconds: the first run plus every retry. When it runs out, the verdict is `budget_exhausted`, and the project's checks don't run. Checked only between runs, not during one: a run can make many model calls, each up to `CERTO_LLM_TIMEOUT_SECONDS` and retried up to 5 times on a timeout, so with a slow local model a task can end far past its budget. |
 | `CERTO_VERIFY_TESTS` | `always` | `always` or `never`. With `never`, Certo doesn't check the result, and the verdict is always `inconclusive`. |
 | `CERTO_MAX_VERIFY_RETRIES` | `2` | How many times a failure is sent back to the agent to fix. Must be at least 1. Also used for unfinished to-do items. |
 | `CERTO_CONFIRM_MODE` | `never` | `never` or `always`. `always` asks you to approve every action. See [Interactive and confirm mode](../guides/interactive-mode.md). |

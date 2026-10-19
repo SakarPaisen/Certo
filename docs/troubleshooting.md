@@ -451,9 +451,14 @@ failed after the allowed attempts.
 **You see:** `Verification: budget_exhausted`.
 
 **Cause:** the whole task took longer than `CERTO_MAX_TASK_SECONDS` (30
-minutes by default).
+minutes by default). Certo checks the budget only between runs of the
+agent, so a task can end well past it: one model call can wait up to
+`CERTO_LLM_TIMEOUT_SECONDS` and be tried again up to 5 times. When the
+budget is gone, Certo doesn't run the project's checks either, so the work
+may be fine.
 
-**Fix:** if the model is slow, see [very slow steps](#every-step-is-very-slow).
+**Fix:** run `certo verify` on the folder to check the work without a
+model. If the model is slow, see [very slow steps](#every-step-is-very-slow).
 Otherwise split the task into smaller ones, or raise
 `CERTO_MAX_TASK_SECONDS`. The work done so far stays in the folder, and
 `certo --resume` continues it with a fresh time budget.

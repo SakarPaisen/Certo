@@ -133,9 +133,23 @@ first item is the suggested next one.
   Starter issue: [#5](https://github.com/alessioricco/certo/issues/5).
 - **Slow local models lose correct work to the time budget.** Three runs
   in the 0.1.15 local benchmark passed the hidden tests but ended
-  `budget_exhausted`. Consider a per-arm budget in `bench.yaml`. Also: a
-  `devstral` run (`token-bucket` r3) ran 57 minutes under the 30-minute
-  budget; find why the budget overran (a single long model call?).
+  `budget_exhausted`. Two causes, found 2026-10-19 (documented in
+  configuration and troubleshooting, not fixed):
+  - **Certo doesn't check the work once the budget is gone**
+    (`_verify_and_report` returns `budget_exhausted` first). The checks
+    need no model; running them would turn these into `verified` or a
+    real failure. Decide whether the verdict should then be `verified`
+    or stay `budget_exhausted` with the check results shown.
+  - **The budget can't stop a run in progress.** It is checked only
+    before each `.run()`; one run makes up to 50 model calls, each up to
+    `CERTO_LLM_TIMEOUT_SECONDS` × 6 attempts (the SDK retries timeouts 5
+    times). `devstral` `token-bucket` r3 (timeout 1200s) wrote its files
+    in the first 6 minutes, then spent ~50 on 4 calls: 57 minutes in all.
+    Unproven, since bench transcripts carry no timestamps; add them.
+    Fix by pausing the conversation at the deadline (SDK
+    `conversation.pause()`, verify first) and capping the per-call
+    timeout at the time left.
+  Also consider a per-arm budget in `bench.yaml`.
 - **Bench estimates from recorded cost.** The plan prices every run at a
   fixed ~500k input / ~20k output tokens (far too high: a cloud run used
   ~124k in the baseline). Use the per-model average from earlier
