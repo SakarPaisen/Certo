@@ -60,3 +60,19 @@ After the results, `certo bench` often printed a red traceback ending in
 `OSError: [Errno 9] Bad file descriptor` (`PTY reader thread error`). It
 was harmless: a terminal was closed while it was still being read. Certo
 now hides that one message; any other terminal error still shows.
+
+## Docs: four features marked experimental
+
+Docker execution, the server's task stores other than `memory`, the
+OpenAI-compatible `/v1/chat/completions` endpoint and third-party skills
+work and have tests, but haven't been proven in real use yet. The docs now
+mark them experimental and say what isn't proven for each. They may change
+between minor versions. See
+[Experimental features](../README.md#experimental-features).
+
+## Other changes
+
+- The release workflow uses the Node.js 24 versions of its GitHub
+  actions, and runs on `ubuntu-24.04` instead of `ubuntu-latest`.
+- The repository has issue forms for a wrong verdict, a bug, benchmark
+  results and a feature request.
