@@ -16,6 +16,7 @@ from openhands.sdk.event import ActionEvent
 
 from . import __version__
 from .acceptance import AcceptanceCheck, AcceptanceCheckError, parse_acceptance_checks
+from .banner import format_banner
 from .config import ConfigError, load_config, override_llm, resolve_project_dir
 from .custom_tools.run_tests_tool import detect_project, run_full_verification
 from .escalation import format_rung_lines, load_ladder
@@ -500,7 +501,6 @@ def main(argv: list[str] | None = None) -> int:
         if created:
             record_created_project(cfg.projects_dir, args.project)
         cfg = replace(cfg, workspace=project_dir)
-        print(f"Project workspace: {cfg.workspace}")
 
     resume_from = None
     if args.resume:
@@ -519,7 +519,6 @@ def main(argv: list[str] | None = None) -> int:
                 'say what to do next: certo --resume "..."'
             )
             return 0
-        print(f"Resuming: {_first_line(resume_from.task)}")
 
     ladder = None
     if cfg.model_selection == "escalate":
@@ -534,6 +533,21 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Configuration error: {exc}", file=sys.stderr)
             return 1
 
+    acceptance_checks: list[AcceptanceCheck] | None = None
+    if args.acceptance_checks is not None:
+        try:
+            acceptance_checks = resolve_acceptance_checks(args.acceptance_checks)
+        except ValueError as exc:
+            print(f"Configuration error: {exc}", file=sys.stderr)
+            return 1
+
+    # After every check that can refuse the run, so it only shows for a run
+    # that starts.
+    for line in format_banner(cfg, ladder=ladder, project=args.project):
+        print(line)
+    if resume_from is not None:
+        print(f"Resuming: {_first_line(resume_from.task)}")
+
     certo_made = args.project is not None and was_created_by_certo(cfg.projects_dir, args.project)
     if not cfg.no_worktree_warning and not certo_made:
         warning = worktree_warning(cfg.workspace)
@@ -542,14 +556,6 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.agents_md is not None:
         write_project_context(cfg.workspace, args.agents_md)
-
-    acceptance_checks: list[AcceptanceCheck] | None = None
-    if args.acceptance_checks is not None:
-        try:
-            acceptance_checks = resolve_acceptance_checks(args.acceptance_checks)
-        except ValueError as exc:
-            print(f"Configuration error: {exc}", file=sys.stderr)
-            return 1
 
     on_confirm = _confirm_pending_actions if cfg.confirm_mode == "always" else None
     on_awaiting_input = _prompt_for_continuation if cfg.interactive else None

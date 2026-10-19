@@ -115,7 +115,9 @@ given design was chosen.
   makes an `inconclusive` result exit nonzero too (default behavior
   unchanged otherwise). `--auto-model` sets `cfg.model_selection="auto"`;
   prompts for a choice only when `--interactive` is also set. Before
-  `run_task` it prints `worktree.worktree_warning()` to stderr, unless
+  `run_task` it prints `banner.format_banner()` (version and run
+  settings; after every check that can refuse the run, never the key or a
+  URL's userinfo), then `worktree.worktree_warning()` to stderr, unless
   silenced or the `--project` folder is one Certo created.
 - **`worktree.py`** — stdlib only. `worktree_warning(path)`: None for an
   empty folder or a clean repository, a warning for uncommitted changes

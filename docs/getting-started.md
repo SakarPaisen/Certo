@@ -129,6 +129,19 @@ certo tasks/wordle.md --project wordle
 - `--project wordle` puts the result in its own folder,
   `projects/wordle/`.
 
+Certo first prints a banner with its version and the settings for this
+run, so you can stop it (Ctrl-C) if the model or the folder is wrong:
+
+```text
+── Certo 0.1.18 ────────────────────────────────────────────
+  Model    openai/gpt-5.6-luna
+  Folder   /home/you/certo-workspace/projects/wordle (project wordle)
+  Runs on  this computer
+  Checks   on, up to 2 fix attempts
+  Limits   30 min · 50 steps
+────────────────────────────────────────────────────────────
+```
+
 The agent now works for a few minutes. It writes files, runs commands and
 runs the tests. When it says it is done, Certo checks the result itself.
 The end of the output looks like this:

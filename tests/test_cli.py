@@ -242,6 +242,25 @@ def test_project_flag_creates_subfolder_and_overrides_workspace(monkeypatch, tmp
     assert (tmp_path / "myapp").is_dir()
 
 
+def test_a_run_starts_with_the_banner(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg(projects_dir=str(tmp_path)))
+    monkeypatch.setattr(cli, "run_task", lambda *a, **k: _fake_result())
+
+    assert cli.main(["do something", "--project", "myapp"]) == 0
+
+    out = capsys.readouterr().out
+    assert out.startswith(f"── Certo {cli.__version__} ")
+    assert f"Folder   {tmp_path / 'myapp'} (project myapp)" in out
+
+
+def test_a_refused_run_prints_no_banner(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg(projects_dir=str(tmp_path)))
+
+    assert cli.main(["do something", "--project", "../escaped"]) == 1
+
+    assert "Certo" not in capsys.readouterr().out
+
+
 def test_project_flag_rejects_a_path_escape_attempt(monkeypatch, tmp_path, capsys):
     def _fail_if_called(*args, **kwargs):
         raise AssertionError("run_task should not be called")
