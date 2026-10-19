@@ -1973,6 +1973,50 @@ def test_api_failure_triggers_a_switch_to_the_next_candidate(monkeypatch, tmp_pa
     assert outcome.verification_state == "verified"
 
 
+def _pinned_catalog_files(tmp_path) -> dict[str, str]:
+    """The test catalog, with `default` pinned to `strong` (which the
+    weights rank last)."""
+    from model_file_helpers import write_model_files
+
+    yaml_text = _MODEL_CATALOG_YAML.replace("  default:\n", "  default:\n    model: strong\n")
+    list_path, models_path = write_model_files(tmp_path, yaml_text)
+    return {"models_file": models_path, "models_list_file": list_path}
+
+
+def test_auto_mode_runs_the_profiles_pinned_model_first(monkeypatch, tmp_path):
+    conversation = _SwitchableConversation([])
+    _stub_stream_task_dependencies(monkeypatch, conversation, tmp_path)
+
+    outcome = runner.stream_task(
+        "do the thing",
+        cfg=_cfg(
+            workspace=str(tmp_path), model_selection="auto", **_pinned_catalog_files(tmp_path)
+        ),
+    )
+
+    decision = outcome.model_decisions[0]
+    assert decision.chosen == "strong"
+    assert "the profile names strong; fallbacks ranked by weights" in decision.reason
+
+
+def test_after_the_pinned_model_fails_the_weights_pick_the_next(monkeypatch, tmp_path):
+    conversation = _SwitchableConversation([_run_error("auth failed"), None])
+    _stub_stream_task_dependencies(monkeypatch, conversation, tmp_path)
+
+    outcome = runner.stream_task(
+        "do the thing",
+        cfg=_cfg(
+            workspace=str(tmp_path),
+            model_selection="auto",
+            **_pinned_catalog_files(tmp_path),
+            execution="local",
+        ),
+    )
+
+    assert [d.chosen for d in outcome.model_decisions] == ["strong", "cheap"]
+    assert outcome.verification_state == "verified"
+
+
 def test_api_failure_reraises_once_the_chain_is_exhausted(monkeypatch, tmp_path):
     conversation = _SwitchableConversation([_run_error("e1"), _run_error("e2"), _run_error("e3")])
     _stub_stream_task_dependencies(monkeypatch, conversation, tmp_path)

@@ -586,6 +586,9 @@ task_profiles:
   # High correctness + deep reasoning + coding.
   debugging:
     triggers: [fix, bug, crash, "failing test", "race condition", debug, debugging, error, exception, regression]
+    # Optional: always run this model first for the profile, whatever the
+    # weights say (used only when it is enabled in models.yaml).
+    # model: claude-sonnet-5-5
     weights: {reasoning: 3, precision: 2, code: 2, cost: 0.5}
 
   # Cheap generation/scaffolding. Don't waste frontier inference here.

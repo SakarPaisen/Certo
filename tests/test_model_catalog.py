@@ -20,6 +20,7 @@ from certo.model_catalog import (
     find_trigger,
     load_model_catalog,
     rank_candidates,
+    rank_for_profile,
     score_entry,
     task_title,
 )
@@ -337,6 +338,80 @@ def test_shipped_profiles_classify_the_bundled_tasks(tmp_path, task_file, expect
     task = (_BUNDLED_TASKS / task_file).read_text()
 
     assert classify_task(task, catalog).name == expected
+
+
+# --- a profile's pinned model ------------------------------------------------
+
+_PINNED_YAML = """
+models:
+  - name: cheap
+    model: openai/gpt-4o-mini
+    ratings: {reasoning: 2, cost: 5}
+  - name: strong
+    model: anthropic/claude-opus-4
+    ratings: {reasoning: 5, cost: 1}
+  - name: parked
+    model: openai/gpt-old
+    ratings: {reasoning: 9, cost: 9}
+    activated: false
+task_profiles:
+  debugging:
+    triggers: [fix]
+    model: MODEL
+    weights: {cost: 1}
+"""
+
+
+def _pinned(tmp_path, model):
+    catalog = load_model_catalog(
+        *_write(tmp_path, _PINNED_YAML.replace("MODEL", model)), strict=False
+    )
+    return catalog, catalog.task_profiles[0]
+
+
+def test_a_profile_can_name_a_model(tmp_path):
+    _catalog, profile = _pinned(tmp_path, "strong")
+
+    assert profile.model == "strong"
+
+
+def test_a_profile_model_must_be_a_name(tmp_path):
+    with pytest.raises(ModelCatalogError, match="'model' must be the name of a model"):
+        load_model_catalog(*_write(tmp_path, _PINNED_YAML.replace("MODEL", "[a, b]")))
+
+
+def test_the_pinned_model_goes_first_and_the_weights_order_the_rest(tmp_path):
+    # The weights (cost only) would put `cheap` first.
+    catalog, profile = _pinned(tmp_path, "strong")
+
+    ranked, how = rank_for_profile(catalog, profile)
+
+    assert [m.name for m in ranked] == ["strong", "cheap"]
+    assert how == "the profile names strong; fallbacks ranked by weights"
+
+
+@pytest.mark.parametrize(
+    ("model", "why"),
+    [("parked", "isn't enabled in models.yaml"), ("nonesuch", "isn't in models_list.yaml")],
+)
+def test_a_pinned_model_that_cant_run_falls_back_to_the_weights(tmp_path, model, why):
+    catalog, profile = _pinned(tmp_path, model)
+
+    ranked, how = rank_for_profile(catalog, profile)
+
+    assert [m.name for m in ranked] == ["cheap", "strong"]
+    assert how == f"the profile names {model}, which {why}; ranked by weights"
+
+
+def test_without_a_pinned_model_the_weights_decide(tmp_path):
+    catalog = load_model_catalog(
+        *_write(tmp_path, _PINNED_YAML.replace("    model: MODEL\n", "")), strict=False
+    )
+
+    ranked, how = rank_for_profile(catalog, catalog.task_profiles[0])
+
+    assert [m.name for m in ranked] == ["cheap", "strong"]
+    assert how == "ranked by the profile's weights"
 
 
 # --- score_entry / rank_candidates -----------------------------------------

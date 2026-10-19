@@ -43,7 +43,8 @@ The two modes can't be combined: `--escalate` with `--auto-model` or
    match wins. With no match, the profile named `default` is used.
 2. **It scores every active model.** A model's score is each rating times
    the profile's weight for it, added up.
-3. **It runs the model with the highest score.** If the provider fails,
+3. **It runs the model with the highest score**, or the model the profile
+   names with `model:`, when that one is enabled. If the provider fails,
    or a fix attempt still fails Certo's checks, Certo moves to the next
    model in the same order and carries on in the same conversation. The
    order is computed once, so the next model is the next best fit for the

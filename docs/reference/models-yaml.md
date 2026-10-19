@@ -143,6 +143,7 @@ A profile says which axes matter for a kind of task, for `--auto-model`.
 |---|---|
 | `triggers` | A list of words or phrases. A profile matches when one of them appears in the task's first line with text (a task file's title, or the whole task when it is one line), as a whole word or with a plural `s`/`es`, in any case. |
 | `weights` | A map of axis name to number. |
+| `model` | Optional. The name of a model in `models_list.yaml` to run first for this profile, whatever the weights say. Used only when that model is enabled in `models.yaml`; otherwise the weights decide, and `MODEL_DECISIONS.md` says why. The weights still order the fallbacks after it. A name that isn't in `models_list.yaml` is an error in `certo check`; a model that isn't enabled is a warning. |
 
 **Choosing the profile.** The profiles are tried in the order of the file,
 skipping the one named `default`. The first that matches wins. If none

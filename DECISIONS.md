@@ -766,3 +766,9 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   words (plus a plain `s`/`es` plural) match how skill triggers work.
   `MODEL_DECISIONS.md` now names the matched word. Supersedes the
   substring rule of the original auto-model design.
+- **A task profile can pin one model (`model:`), not a list** (0.1.20).
+  The Author's request: say "debugging runs on Sonnet" directly instead
+  of tuning weights until it wins. The pinned model runs first only when
+  enabled; the weights order the fallbacks, so a failure still has
+  somewhere to go. A single name, not a list: an ordered list would be a
+  second kind of ladder; add one only if someone needs it.

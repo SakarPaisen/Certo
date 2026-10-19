@@ -118,6 +118,21 @@ def check_catalog(catalog: ModelCatalog) -> CatalogReport:
                     "the order."
                 )
 
+    for profile in catalog.task_profiles:
+        if profile.model is None:
+            continue
+        where = f"Task profile {profile.name!r}"
+        if profile.model not in by_name:
+            errors.append(
+                f"{where}: there is no model named {profile.model!r}. "
+                f"Models: {_names(catalog.models)}."
+            )
+        elif not by_name[profile.model].activated:
+            warnings.append(
+                f"{where}: {profile.model} isn't enabled in models.yaml, so tasks of this "
+                "profile use the model the weights rank first."
+            )
+
     weighted: dict[str, list[str]] = {}
     for profile in catalog.task_profiles:
         for axis, weight in profile.weights.items():

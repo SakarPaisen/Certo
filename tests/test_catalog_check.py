@@ -67,6 +67,27 @@ def test_a_rung_naming_a_missing_model_lists_the_known_names(tmp_path):
     )
 
 
+def test_a_profile_naming_a_missing_model_is_an_error(tmp_path):
+    report = _report(tmp_path, models=_MODELS.replace(
+        "  default:\n", "  debugging:\n    triggers: [fix]\n    model: stronk\n  default:\n"
+    ))  # fmt: skip
+    assert (
+        "Task profile 'debugging': there is no model named 'stronk'. "
+        "Models: local, mid, strong, parked." in report.errors
+    )
+
+
+def test_a_profile_naming_a_disabled_model_is_a_warning(tmp_path):
+    report = _report(tmp_path, models=_MODELS.replace(
+        "  default:\n", "  debugging:\n    triggers: [fix]\n    model: parked\n  default:\n"
+    ))  # fmt: skip
+    assert report.ok
+    assert (
+        "Task profile 'debugging': parked isn't enabled in models.yaml, so tasks of this "
+        "profile use the model the weights rank first." in report.warnings
+    )
+
+
 def test_a_duplicate_rung(tmp_path):
     report = _report(
         tmp_path,

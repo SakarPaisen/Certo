@@ -73,6 +73,10 @@ class TaskProfile:
     name: str
     triggers: tuple[str, ...] = ()
     weights: dict[str, float] = field(default_factory=dict)
+    # A catalog model's name to run first for this profile, whatever the
+    # weights say. Used only when that model is enabled in models.yaml;
+    # the weights still order the fallbacks.
+    model: str | None = None
 
 
 @dataclass(frozen=True)
@@ -214,10 +218,16 @@ def _parse_task_profile(name: str, data: Any) -> TaskProfile:
     triggers_raw = data.get("triggers", []) or []
     if not isinstance(triggers_raw, list) or not all(isinstance(t, str) for t in triggers_raw):
         raise ModelCatalogError(f"Task profile {name!r}: 'triggers' must be a list of strings.")
+    model = data.get("model")
+    if model is not None and (not isinstance(model, str) or not model.strip()):
+        raise ModelCatalogError(
+            f"Task profile {name!r}: 'model' must be the name of a model in models_list.yaml."
+        )
     return TaskProfile(
         name=name,
         triggers=tuple(triggers_raw),
         weights=_parse_weights(data, context=f"Task profile {name!r}"),
+        model=model.strip() if model else None,
     )
 
 
@@ -556,3 +566,22 @@ def rank_candidates(catalog: ModelCatalog, weights: dict[str, float]) -> list[Mo
             "least one to 'true' before using CERTO_MODEL_SELECTION=auto."
         )
     return sorted(active, key=lambda entry: score_entry(entry, weights), reverse=True)
+
+
+def rank_for_profile(
+    catalog: ModelCatalog, profile: TaskProfile
+) -> tuple[list[ModelCatalogEntry], str]:
+    """The models to try for a task of this profile, in order, and one line
+    saying how the first was chosen. A profile's `model`, when it is
+    enabled, goes first and the rest follow by the weights; otherwise the
+    weights decide, and the line says why the pinned model wasn't used."""
+    ranked = rank_candidates(catalog, profile.weights)
+    if profile.model is None:
+        return ranked, "ranked by the profile's weights"
+    pinned = next((m for m in ranked if m.name == profile.model), None)
+    if pinned is not None:
+        rest = [m for m in ranked if m is not pinned]
+        return [pinned, *rest], f"the profile names {pinned.name}; fallbacks ranked by weights"
+    known = any(m.name == profile.model for m in catalog.models)
+    why = "isn't enabled in models.yaml" if known else "isn't in models_list.yaml"
+    return ranked, f"the profile names {profile.model}, which {why}; ranked by weights"

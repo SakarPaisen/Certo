@@ -99,7 +99,9 @@ way for every command: errors stop the run, warnings are printed (see
 2. **Score every active model.** The score is the sum of
    `rating × weight` over the profile's weights.
 3. **Run the best one.** Models are ranked by score, once, at the start.
-   Ties keep the order of the file.
+   Ties keep the order of the file. A profile can name a model instead
+   (`model:`, see below): that model runs first, and the others follow by
+   score.
 4. **Fall back when needed.** Certo moves to the next model in the ranking
    when the current one:
    - fails at the provider (bad key, rate limit, outage, context too long),
@@ -108,6 +110,28 @@ way for every command: errors stop the run, warnings are printed (see
 
 When every model has been tried, the task ends as it would without
 automatic selection.
+
+## Always use one model for a kind of task
+
+When you already know which model you want for a profile, name it with
+`model:` instead of tuning the weights until it wins:
+
+```yaml
+task_profiles:
+  debugging:
+    triggers: [fix, bug, crash, "failing test"]
+    model: claude-sonnet-5-5        # always first for debugging tasks
+    weights: {reasoning: 3, precision: 2, code: 2, cost: 0.5}
+```
+
+- The name is a model in `models_list.yaml`, as in a ladder.
+- It runs first only when it is enabled in `models.yaml`. If it isn't
+  (no key for it, or `activated: false`), the weights pick the model as
+  before, and `MODEL_DECISIONS.md` says why the named model wasn't used.
+- If it fails (the provider refuses it, or a fix attempt still fails the
+  checks), Certo moves on to the model the weights rank first, and so on.
+- `certo check` reports a name that isn't in `models_list.yaml` as an
+  error, and a model that isn't enabled as a warning.
 
 With `--interactive` as well, Certo shows the ranked list and asks which
 model to use, with the best one as the default.

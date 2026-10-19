@@ -1,5 +1,27 @@
 # Certo v0.1.20 (not released yet)
 
+A task profile can now name the model to use, and `--auto-model` reads a
+task's title instead of its whole text.
+
+## New: a task profile can name its model
+
+`--auto-model` picks a model by scoring every model against the
+profile's weights. Now a profile can also say which model to use:
+
+```yaml
+task_profiles:
+  debugging:
+    triggers: [fix, bug, crash, "failing test"]
+    model: claude-sonnet-5-5
+    weights: {reasoning: 3, precision: 2, code: 2, cost: 0.5}
+```
+
+The named model runs first when it is enabled in `models.yaml`; if it
+fails, the weights pick the next one. When it isn't enabled, the weights
+decide as before, and `MODEL_DECISIONS.md` says why. `certo check` reports
+a name that doesn't exist. See
+[Pick models automatically](../guides/pick-models-automatically.md#always-use-one-model-for-a-kind-of-task).
+
 ## Fixed: `--auto-model` reads the task's title, not its whole text
 
 `--auto-model` picks a task profile by looking for trigger words in the
