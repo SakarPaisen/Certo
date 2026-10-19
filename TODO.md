@@ -46,9 +46,10 @@ first item is the suggested next one.
   nothing could be checked and haiku was never asked. Decide whether a
   rung whose last message is a tool call written as text should climb.
   Done when decided (DECISIONS.md) and, if yes, tested.
-- **Re-verify the "confident but wrong" fixes live**: #1, #2, #4, #5, #6
-  and #10 in `ARCHITECTURE.md` say "not re-verified live". At least the
-  ones a benchmark task can reach.
+- **Re-verify the "confident but wrong" fixes live**: #1, #3, #5, #10
+  and #6 for Java in `ARCHITECTURE.md` say "not re-verified live" (#2, #4
+  and #6 for Go/Rust were, 2026-10-19). #1 and #5 are hard to trigger on
+  purpose; #10 is reachable from a benchmark task.
 - **Pull-request CI with tests and a ruff gate.** Only `release.yml`
   exists, and `main` has lint/format findings (`server.py`, tests) to
   clear first ([#2](https://github.com/alessioricco/certo/issues/2), a starter issue). Add `release_check.sh` to it
@@ -286,6 +287,13 @@ database).
 
 ## Smaller bugs
 
+- **`.certo/` makes a new project folder non-empty**, so scaffolders that
+  want an empty folder (`npm create vite .`) ask to overwrite, and with no
+  terminal the prompt is cancelled. Seen live 2026-10-19: the agent lost
+  two attempts, then wrote the files by hand. Create `.certo/` only when
+  first needed, tell the agent it is there, or teach the Node skill to
+  scaffold into a subfolder. Done when `npm create vite .` works in a
+  new `--project`.
 - **Third-party skills: narrow license detection, `SKILL.md` only.** Eight
   permissive licenses are recognised; anything else is `unknown` and needs
   acknowledgement. Legacy single-file upstream skills can't be installed.

@@ -380,7 +380,12 @@ for full transcripts if a fix needs revisiting:
    with no TTY, agent doesn't notice and re-runs the identical command** —
    confirmed live (`npm create vite` interactive prompt, 200K+ tokens
    burned re-running it). Fix: `_NONINTERACTIVE_TOOLING_SUFFIX`. **Status:
-   applied, not re-verified live.**
+   re-verified live 2026-10-19 (0.1.19, claude-sonnet-4-5, a Vite React
+   task): `npm create vite@latest . -- --template react` auto-cancelled
+   twice (the second time piped through `yes`, a changed command, not a
+   repeat); the agent then named the cause and wrote the files by hand.
+   `verified` in 6m27s, $0.54. The cause it named was Certo's own `.certo/`
+   making the folder non-empty (see TODO).**
 3. **Agent called `finish` admitting known failures, with an invented wrong
    diagnosis** — confirmed live (Hanoi: blamed "sequence handling," the file
    actually had a literal `IndentationError` and never parsed). Fix (two,
@@ -391,8 +396,12 @@ for full transcripts if a fix needs revisiting:
 4. **Same pattern, non-Python project, pytest-based verification blind to
    it** — a Vite/React JSX parse error; pytest reported "no tests
    collected" as a false pass. Fix: generalized to run `npm run build` for
-   a detected Node project. **Status: applied, unit-tested against real
-   npm/node subprocesses; not re-verified against the original repro.**
+   a detected Node project. **Status: re-verified 2026-10-19 against the
+   original repro's shape: a live-built Vite React app (`npm run build` +
+   `npm test`, `verified`), then one closing `</div>` removed from
+   `App.jsx` — `npm test` still passed, `npm run build` failed with
+   esbuild's "Unexpected end of file before a closing \"div\" tag", and
+   `certo verify` said `failed`, exit 1.**
 5. **The verification loop couldn't tell "confirmed working" from "found
    nothing to check," and had no visibility into a `STUCK`/`ERROR` run** —
    fixed with the five-state model (`verified`/`failed`/`inconclusive`/
@@ -403,8 +412,12 @@ for full transcripts if a fix needs revisiting:
    around the four named stages and the five-value `CheckOutcome.status`
    enum described above, covering Go/Rust/Java. **Status: applied,
    unit-tested per stage plus real-subprocess runs for every toolchain
-   installed in this dev environment; not re-verified against a live
-   Go/Rust/Java build task end to end.**
+   installed in this dev environment. Go and Rust re-verified live end to
+   end 2026-10-19 (claude-sonnet-4-5): a `wordfreq` CLI ran `go test ./...`
+   + `go vet ./...`, a `tempconv` CLI ran `cargo test`/`check`/`clippy`,
+   both `verified` (2m33s $0.37, 2m37s $0.39), and both programs behaved
+   as asked when run by hand. Java still not run end to end (no Maven or
+   Gradle installed here).**
 7. **Agent repeatedly re-edited already-correct code chasing a wrong test**
    (Hanoi: the test's own state assumption was wrong, not the
    implementation) **and its diagnostic prose degraded into fluent but
