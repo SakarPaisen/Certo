@@ -221,9 +221,10 @@ __marimo__/
 private/
 /projects/
 /artifacts/
-# examples/compare-models.sh.example: your edited copy, and its results
+# examples/compare-models.sh.example: your edited copy, and its results,
+# wherever you put them
 /compare-models.sh
-/compare-results/
+compare-results/
 
 # Secrets
 .env

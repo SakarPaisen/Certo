@@ -234,6 +234,8 @@ bundled set: [Write or contribute a benchmark task](contribute-a-benchmark-task.
 
 ## Related
 
+- [Compare models on one task](compare-models-on-a-task.md): a quicker,
+  rougher look: one of your own tasks, once per model, no hidden tests
 - [Write a benchmark file](write-a-benchmark-file.md)
 - [Write or contribute a benchmark task](contribute-a-benchmark-task.md)
 - [bench.yaml reference](../reference/bench-yaml.md)

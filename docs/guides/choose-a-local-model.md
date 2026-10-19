@@ -90,10 +90,12 @@ such as `{"command": "view", ...}`, the model has the problem from step
 1 even though `certo check` passed: see
 [The run ends at once, with a tool call as the agent's last message](../troubleshooting.md#the-run-ends-at-once-with-a-tool-call-as-the-agents-last-message).
 
-### 3. Compare models with the benchmark
+### 3. Compare models
 
-To compare two or more models on your own machine, run `certo bench` with
-one arm per model. It grades every run with hidden tests and shows how
+For a first look, run one of your own tasks on each model with the
+script in [Compare models on one task](compare-models-on-a-task.md).
+
+For an answer you can trust, run `certo bench` with one arm per model. It grades every run with hidden tests and shows how
 often each model was right, how long it took, and how often Certo was
 fooled. See [Write a benchmark file](write-a-benchmark-file.md) ("Which
 of my local models is best?").

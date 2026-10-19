@@ -83,10 +83,11 @@ takes you from install to your first verified project.
 | See what a run did and what it cost | [Run records and costs](guides/run-records-and-costs.md) |
 | Continue a task after an interruption or a failed verdict | [Resume an interrupted run](guides/resume-a-run.md) |
 | Teach the agent my conventions, or give it new tools | [Add skills and tools](guides/add-skills-and-tools.md) |
+| Try the same task on several models, side by side | [Compare models on one task](guides/compare-models-on-a-task.md) |
 | Measure which models and strategies really deliver | [Benchmark models and strategies](guides/benchmark.md) |
 | Set up my own benchmark file | [Write a benchmark file](guides/write-a-benchmark-file.md) |
 | Benchmark my own tasks, or add one to Certo's set | [Write or contribute a benchmark task](guides/contribute-a-benchmark-task.md) |
-| See how Certo did on its own benchmark | [Baseline 0.1.15](benchmark/baseline-0.1.15.md) (and [0.1.13](benchmark/baseline-0.1.13.md)), [escalation in 0.1.17](benchmark/escalation-0.1.17.md) |
+| See how Certo did on its own benchmark | [Baseline 0.1.18, local](benchmark/baseline-0.1.18-local.md), [0.1.15](benchmark/baseline-0.1.15.md) (and [0.1.13](benchmark/baseline-0.1.13.md)), [escalation in 0.1.17](benchmark/escalation-0.1.17.md), [provider swap in 0.1.19](benchmark/provider-swap-0.1.19.md) |
 
 **Looking something up?** The reference pages are complete and exact:
 

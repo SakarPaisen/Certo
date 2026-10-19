@@ -89,7 +89,8 @@ certo "Add input validation to the signup form" --model openai/gpt-5.6-terra --a
 | `--reasoning-effort` | `CERTO_LLM_REASONING_EFFORT` |
 
 A flag you leave out keeps its configured value. This is useful to compare
-two models on the same task. Note that `--api-key` puts the key in your
+two models on the same task; to run one task on a whole list of models,
+see [Compare models on one task](compare-models-on-a-task.md). Note that `--api-key` puts the key in your
 shell history; prefer a variable as in the example.
 
 ## Reasoning effort
