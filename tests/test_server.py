@@ -896,7 +896,7 @@ def test_list_models_reflects_configured_model(monkeypatch):
 def test_chat_completions_returns_openai_shaped_response(monkeypatch):
     calls = {}
 
-    def _fake_run_task(task, cfg=None):
+    def _fake_run_task(task, cfg=None, **_kwargs):
         calls["task"] = task
         calls["cfg"] = cfg
         # Matches reality (confirmed live): the agent's human-readable
@@ -931,7 +931,7 @@ def test_chat_completions_returns_openai_shaped_response(monkeypatch):
 def test_chat_completions_llm_model_override_swaps_model_not_wire_field(monkeypatch):
     calls = {}
 
-    def _fake_run_task(task, cfg=None):
+    def _fake_run_task(task, cfg=None, **_kwargs):
         calls["cfg"] = cfg
         return [_FakeMessage("tool", "The answer is 4.")]
 
@@ -960,7 +960,7 @@ def test_chat_completions_llm_model_override_swaps_model_not_wire_field(monkeypa
 def test_chat_completions_llm_reasoning_effort_override(monkeypatch):
     calls = {}
 
-    def _fake_run_task(task, cfg=None):
+    def _fake_run_task(task, cfg=None, **_kwargs):
         calls["cfg"] = cfg
         return [_FakeMessage("tool", "The answer is 4.")]
 
@@ -985,7 +985,7 @@ def test_chat_completions_llm_reasoning_effort_override(monkeypatch):
 def test_chat_completions_without_llm_override_keeps_configured_model(monkeypatch):
     calls = {}
 
-    def _fake_run_task(task, cfg=None):
+    def _fake_run_task(task, cfg=None, **_kwargs):
         calls["cfg"] = cfg
         return [_FakeMessage("tool", "hi")]
 
@@ -1228,3 +1228,44 @@ def test_websocket_result_includes_the_rungs(monkeypatch, tmp_path):
             pass
 
     assert [r["name"] for r in item["rungs"]] == ["local", "cloud"]
+
+
+# --- run records are filed under the request's project ----------------------
+
+
+def test_stream_files_its_run_records_under_the_project(monkeypatch, tmp_path):
+    calls = {}
+
+    def _fake_stream_task(task, cfg=None, on_message=None, **kwargs):
+        calls["project"] = kwargs.get("project")
+        return _fake_outcome()
+
+    monkeypatch.setattr(server, "load_config", lambda: _cfg(projects_dir=str(tmp_path)))
+    monkeypatch.setattr(server, "stream_task", _fake_stream_task)
+
+    client = TestClient(server.create_app())
+    with client.websocket_connect("/tasks/stream") as ws:
+        ws.send_json({"task": "do something", "project": "my-api"})
+        ws.receive_json()
+
+    assert calls["project"] == "my-api"
+
+
+def test_chat_completions_files_its_run_records_under_the_project(monkeypatch, tmp_path):
+    calls = {}
+
+    def _fake_run_task(task, cfg=None, **kwargs):
+        calls["project"] = kwargs.get("project")
+        return [_FakeMessage("tool", "done")]
+
+    monkeypatch.setattr(server, "load_config", lambda: _cfg(projects_dir=str(tmp_path)))
+    monkeypatch.setattr(server, "run_task", _fake_run_task)
+
+    client = TestClient(server.create_app())
+    response = client.post(
+        "/v1/chat/completions",
+        json={"model": "m", "messages": [{"role": "user", "content": "hi"}], "project": "my-api"},
+    )
+
+    assert response.status_code == 200
+    assert calls["project"] == "my-api"

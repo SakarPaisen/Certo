@@ -237,10 +237,6 @@ first item is the suggested next one.
   `api_key`/`base_url` with no validation. Minimal fix: a shared-secret
   header (e.g. `CERTO_SERVER_API_KEY`) checked on every task route, and a
   loud docs warning against a public `--host` without it.
-- **WS and `/v1/chat/completions` file artifacts under `_unscoped`.** They
-  call `stream_task` without `run_id`/`project`, so with
-  `CERTO_ARTIFACTS_DIR` set their records land in `_unscoped/<uuid>` even
-  when a `project` was sent. Only `POST /tasks` files them correctly.
 - **`/v1/chat/completions` has no verdict.** Its wire format has no field
   for `verification_state`, so a caller gets the agent's own claim only.
   Needs a deliberate wire-format choice (a custom field, or a trailing

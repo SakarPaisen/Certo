@@ -38,3 +38,10 @@ run:
 
 It names every model that wrote code there, and a later run updates the
 same line. Certo never edits the README of a folder you brought.
+
+## Fixed: server run records under the right project
+
+With `CERTO_ARTIFACTS_DIR` set, runs started through the WebSocket
+(`/tasks/stream`) or `/v1/chat/completions` were filed under `_unscoped`
+even when the request named a `project`. They are now filed under that
+project, as `POST /tasks` already did.
