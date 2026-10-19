@@ -92,3 +92,14 @@ Rust and Java, a check that ran past its 5-minute limit came back with
 exit code 0 and no output, so the agent couldn't tell it apart from a
 pass. It now comes back as a failure, with the output so far. Certo's own
 verification after the run was not affected.
+
+## Fixed: project scaffolders and the `.certo/` folder
+
+Certo creates `.certo/` in a new project folder before the agent starts,
+so the folder isn't empty. A tool that wants an empty folder then
+refused: `npm create vite .` printed "Operation cancelled" and exited 0,
+and its `--overwrite` option deletes `.certo/`, with the saved run. The
+agent is now told to leave `.certo/` alone and to create the project in a
+subfolder, then move the files up. In a test with a Vite React task, the
+agent did that at its first attempt, and the run took 3m27s instead of
+6m27s.

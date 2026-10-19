@@ -740,3 +740,11 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   The one exception to "no file in the user's project": a marked note in
   `README.md` naming the models, the Author's request, written only in a
   folder Certo created, so it never edits a README the user brought.
+- **`.certo/` stays created at the start; the agent is told to keep it**
+  (0.1.19). It makes a new project folder non-empty, which broke
+  `npm create vite .` live (cancelled, exit 0) and whose `--overwrite`
+  deletes it. Creating it later was rejected: the SDK saves the
+  conversation there from the first step, and `--resume` after a Ctrl-C
+  needs it. Instead `agent._CERTO_STATE_SUFFIX` tells every model to
+  leave `.certo/` alone and scaffold into a subfolder. Not gated by tier:
+  it is a fact about the folder, not a strategy for weaker models.

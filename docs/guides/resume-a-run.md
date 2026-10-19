@@ -96,7 +96,12 @@ Good to know:
 - **No API key is saved.** But the conversation holds every command
   output the agent saw, so if the agent printed a secret from a file, the
   secret is in there. Delete `.certo/` when you no longer need it; it is
-  always safe to delete.
+  always safe to delete between runs.
+- **The folder is never empty during a run.** Certo creates `.certo/`
+  before the agent starts, so a tool that wants an empty folder, such as
+  `npm create vite .`, refuses or cancels. The agent is told to keep
+  `.certo/` and to create the project in a subfolder, then move the files
+  up.
 - **To turn it off**, set `CERTO_SAVE_STATE=0`. `certo --resume` still
   works when there is a saved state.
 

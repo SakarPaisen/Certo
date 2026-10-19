@@ -307,19 +307,6 @@ database).
 
 ## Smaller bugs
 
-- **`.certo/` makes a new project folder non-empty**, so scaffolders that
-  want an empty folder (`npm create vite .`) ask to overwrite, and with no
-  terminal the prompt is cancelled. Seen live 2026-10-19: the agent lost
-  two attempts, then wrote the files by hand. Tested with create-vite
-  9.3.0: without `--overwrite` it prints "Operation cancelled" and exits
-  **0**; with `--overwrite` it **deletes `.certo/`** (conversation state,
-  `RUNS.md`); scaffolding into a subfolder and copying the files up works.
-  Creating `.certo/` later isn't an option: the SDK saves the
-  conversation there from the first step, which `--resume` needs after a
-  Ctrl-C. Proposed: tell the agent `.certo/` is Certo's and must stay,
-  and to scaffold into a subfolder, never with `--overwrite`/`--force` in
-  the project root; the same in the Node skill. Done when a Vite task in
-  a new `--project` scaffolds first time and `.certo/` survives.
 - **Third-party skills: narrow license detection, `SKILL.md` only.** Eight
   permissive licenses are recognised; anything else is `unknown` and needs
   acknowledgement. Legacy single-file upstream skills can't be installed.
