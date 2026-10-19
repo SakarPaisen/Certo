@@ -30,7 +30,8 @@ first item is the suggested next one.
   subcommands, a fix inside an existing mid-size repo. Grading supports
   only Python and Node, with no packages, so Go/Rust tasks need grading
   support first. Bump the task-set `VERSION`. Today's 9 tasks don't
-  separate a local 27B model from a cloud one.
+  separate a local 27B model from a cloud one. Contributed tasks in the
+  current format help meanwhile: [#3](https://github.com/alessioricco/certo/issues/3).
 - **Escalation after a `failed` rung is unmeasured.** The 0.1.17
   escalation run climbed 10 times, all past a model that did no work.
   Climbing after a failed verification, the handoff of half-done work and
@@ -53,13 +54,19 @@ first item is the suggested next one.
   ones a benchmark task can reach.
 - **Pull-request CI with tests and a ruff gate.** Only `release.yml`
   exists, and `main` has lint/format findings (`server.py`, tests) to
-  clear first. Add `release_check.sh` to it too.
+  clear first ([#2](https://github.com/alessioricco/certo/issues/2), a starter issue). Add `release_check.sh` to it
+  too.
+- **Move the historical planning docs into `docs/history/`**
+  (`docs/KICKOFF.md`, `docs/SPEC.md`, `docs/ROADMAP.txt`), so readers
+  don't take them for current docs; fix every reference. Starter issue:
+  [#4](https://github.com/alessioricco/certo/issues/4).
 - **Docker verification has never run against a real container**, and
   neither has escalation under Docker. Fake-workspace tests only.
 - **`tests/test_bench_tasks.py` fixes the task-set size** (8–10 tasks,
   2–3 in Node), so any contributed task fails it. Loosen it, or make it
   check per-task rules only. `docs/guides/contribute-a-benchmark-task.md`
-  tells contributors to update it until then.
+  tells contributors to update it until then. Starter issue:
+  [#1](https://github.com/alessioricco/certo/issues/1).
 
 ## 2. Complex tasks
 
@@ -125,6 +132,7 @@ first item is the suggested next one.
 - **Record the Ollama setup in bench results.** `meta.json` has no Ollama
   version or context length, so a local result can't be traced to the
   setup (`/api/version`, `/api/ps`). Done when the report shows both.
+  Starter issue: [#5](https://github.com/alessioricco/certo/issues/5).
 - **Slow local models lose correct work to the time budget.** Three runs
   in the 0.1.15 local benchmark passed the hidden tests but ended
   `budget_exhausted`. Consider a per-arm budget in `bench.yaml`. Also: a
