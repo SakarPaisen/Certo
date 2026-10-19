@@ -256,3 +256,5 @@ bench-results/
 .claude/settings.local.json
 # Private project review and plan (not published)
 /PROJECT_REVIEW.md
+
+examples/compare-models.sh
