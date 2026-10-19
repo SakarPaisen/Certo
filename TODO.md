@@ -326,12 +326,17 @@ database).
   Print the error alone, after the banner or instead of it.
 - **Using all the steps ends in `stuck`, unchecked.** When the agent
   reaches `CERTO_MAX_ITERATIONS`, the SDK ends in an error state, Certo
-  says `stuck` ("stuck or errored") and runs no check. Seen 2026-10-19:
-  `claude-haiku-5-5` on the Asteroids example used its 50 steps while
-  still editing; `certo verify` afterwards said `failed` (a lint error,
-  and `npm test` passing with 0 tests). Name the cause in the message, and
-  run the checks anyway, as for `budget_exhausted` (see the budget item
-  above).
+  says `stuck` ("stuck or errored") and runs no check. Seen twice on
+  2026-10-19, both with `claude-haiku-5-5` and 50 steps:
+  - the Asteroids example: still editing at step 50; `certo verify`
+    afterwards said `failed` (a lint error, and `npm test` passing with 0
+    tests);
+  - the Hanoi example, with `--auto-model`: its 50th step ran the tests,
+    116 passed, and the run still ended `stuck`; `certo verify` afterwards
+    said `verified` (pytest, the entry-point check, `python hanoi.py`).
+    9m 35s, $0.33. Checking would have given the right verdict.
+  Name the cause in the message, and run the checks anyway, as for
+  `budget_exhausted` (see the budget item above).
 - **The `--resume` hint ignores `CERTO_PROJECTS_DIR` from the
   environment.** It prints `certo --resume --project NAME`, which then
   looks in the default projects folder. Print the setting too when it
