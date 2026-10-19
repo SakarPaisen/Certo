@@ -1,15 +1,26 @@
 # Certo documentation
 
-Certo is a coding agent that checks its own work. You give it a task. An
-agent plans, edits files and runs commands until it says it is done. Then
-Certo runs your project's real tests and build itself, with no AI involved,
-and tells you if the work is really verified.
+Certo runs coding tasks on a model on your own machine, checks the work
+with your project's own tests, and calls in a cloud model only when the
+local one couldn't finish. You give it a task. An agent plans, edits files
+and runs commands until it says it is done. Then Certo runs your project's
+real tests and build itself, with no AI involved, and tells you if the work
+is really verified. That verdict is what makes it safe to start local: it
+decides when the local model's work is good enough, and when to hand over.
 
 This page explains what Certo is and where to read next.
 
 ## Why Certo exists
 
-Coding agents are confident, and often wrong about being finished. While
+A local model keeps your code on your machine and costs nothing per task,
+but it gets more tasks wrong than a strong cloud model. Starting local is
+only safe if something reliable tells you which tasks it got wrong. In
+Certo's own [escalation benchmark](benchmark/escalation-0.1.17.md), a
+local `qwen3.8:27b` with `claude-haiku-5-5` as the safety net passed all 9
+tasks, and 7 of them never left the machine.
+
+That something can't be the agent itself. Coding agents are confident,
+and often wrong about being finished. While
 building Certo, an agent wrote a Tower of Hanoi game. Every unit test
 passed. The game crashed the moment a player chose "solve". The agent said
 the work was done, and so did the test runner.
@@ -27,6 +38,9 @@ The stories behind each of these checks are in
 
 ## What Certo can do
 
+- Start every task on a local model and escalate to a stronger one only
+  when Certo's verification shows the local model couldn't finish:
+  `--escalate`.
 - Work with almost any model: OpenAI, Anthropic, Google Gemini, Ollama on
   your own machine, or any model that [LiteLLM](https://docs.litellm.ai/docs/providers)
   supports. Switching is one setting.
@@ -34,9 +48,6 @@ The stories behind each of these checks are in
 - Check a project with no agent and no model at all: `certo verify`.
 - Pick the best model for each task from a list you write, and fall back to
   the next one when a provider fails.
-- Escalate per task: start on a cheap or local model, and move to a
-  stronger one only when Certo's verification shows the cheaper model
-  couldn't finish.
 - Enforce limits: an iteration cap, a time budget, and an optional "approve
   every action" mode.
 - Run the agent in a Docker container, or as an HTTP server.
