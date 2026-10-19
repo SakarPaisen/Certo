@@ -144,9 +144,9 @@ The exit code is nonzero for every failure state, so Certo works in scripts and 
 
 - **Resume.** `certo --resume "hint"` continues a run with its earlier conversation, or with a stronger `--model`.
 - **Run records.** Full transcript, token counts and cost per run, plus a log of which model was picked and why.
-- **Sandboxed runs.** Add `--execution docker` to run the agent in a container.
-- **Server mode.** REST, WebSocket streaming, and an OpenAI-compatible `/v1/chat/completions` endpoint.
-- **Skills and custom tools.** Add project conventions or new tools by dropping files in a folder.
+- **Sandboxed runs** ([experimental](https://github.com/alessioricco/certo/blob/main/docs/README.md#experimental-features)). Add `--execution docker` to run the agent in a container.
+- **Server mode.** REST and WebSocket streaming. The OpenAI-compatible `/v1/chat/completions` endpoint and the SQL and Redis task stores are [experimental](https://github.com/alessioricco/certo/blob/main/docs/README.md#experimental-features).
+- **Skills and custom tools.** Add project conventions or new tools by dropping files in a folder. Installing third-party skills is [experimental](https://github.com/alessioricco/certo/blob/main/docs/README.md#experimental-features).
 
 ## More ways to run it
 
@@ -175,7 +175,7 @@ Certo is built on the [OpenHands Software Agent SDK](https://docs.openhands.dev/
 
 - Server mode has no authentication. Run it on localhost or behind your own gateway.
 - Java projects are detected, but verification needs Maven or Gradle installed.
-- Under Docker, automatic model selection makes the initial pick but does not fall back mid-task.
+- Docker execution, the OpenAI-compatible endpoint, the SQL and Redis task stores and third-party skills are [experimental](https://github.com/alessioricco/certo/blob/main/docs/README.md#experimental-features): tested, not yet proven in real use. Under Docker, automatic model selection makes the initial pick but does not fall back mid-task.
 - Small local models can struggle with multi-step tool use. A coder-tuned model gives the best results.
 - `verified` proves what the project's tests test, and nothing more. Read the tests: [Write a task Certo can check](https://github.com/alessioricco/certo/blob/main/docs/guides/write-a-good-task.md).
 

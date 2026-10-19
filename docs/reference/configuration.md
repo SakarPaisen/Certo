@@ -76,7 +76,7 @@ Per-run overrides: `--model`, `--api-key`, `--base-url`,
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `CERTO_EXECUTION` | `local` | `local` or `docker`: where the agent's tools run. See [Run in Docker](../guides/run-in-docker.md). |
+| `CERTO_EXECUTION` | `local` | `local` or `docker`: where the agent's tools run. `docker` is [experimental](../README.md#experimental-features). See [Run in Docker](../guides/run-in-docker.md). |
 | `CERTO_DOCKER_IMAGE` | `certo/agent-server:local` | The image for Docker mode. Built on first use from a source checkout. |
 | `CERTO_DOCKER_PLATFORM` | `linux/arm64` on ARM machines, `linux/amd64` otherwise | `linux/amd64` or `linux/arm64`. Leave empty to detect. |
 
@@ -95,7 +95,7 @@ Per-run overrides: `--model`, `--api-key`, `--base-url`,
 | Variable | Default | Meaning |
 |---|---|---|
 | `CERTO_SKILLS_DIR` | `./skills` | Your own skills, loaded on top of the built-in ones. A missing folder is fine. |
-| `CERTO_THIRD_PARTY_SKILLS_DIR` | `./third_party_skills` | Where `certo-admin skills` installs third-party skills. Must not be inside, or contain, `CERTO_SKILLS_DIR` or the built-in skills folder. |
+| `CERTO_THIRD_PARTY_SKILLS_DIR` | `./third_party_skills` | Where `certo-admin skills` installs third-party skills ([experimental](../README.md#experimental-features)). Must not be inside, or contain, `CERTO_SKILLS_DIR` or the built-in skills folder. |
 | `CERTO_THIRD_PARTY_SKILLS_LOCK` | `./third_party_skills.lock.json` | The lockfile for third-party skills: source, commit, license, hashes and enabled state. Never the skill content. |
 
 ## Run records
@@ -107,7 +107,8 @@ Per-run overrides: `--model`, `--api-key`, `--base-url`,
 ## Server task records
 
 Read only by `certo-server` and `certo-admin`. See
-[Run as a server](../guides/run-as-a-server.md#keep-task-records).
+[Run as a server](../guides/run-as-a-server.md#keep-task-records). Every
+store except `memory` is [experimental](../README.md#experimental-features).
 
 | Variable | Default | Meaning |
 |---|---|---|

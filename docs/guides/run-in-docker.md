@@ -4,6 +4,8 @@ This guide shows how to run the agent inside a Docker container instead of
 directly on your machine. The agent's terminal commands then run in the
 container, while the project files stay in a normal folder on your disk.
 
+> **Experimental.** Docker execution works and is tested, but isn't yet proven in real use, and may change between minor versions. See [Experimental features](../README.md#experimental-features).
+
 ## What you need
 
 - Docker, installed and running (`docker ps` works).

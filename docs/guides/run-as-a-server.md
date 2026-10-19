@@ -71,6 +71,8 @@ The last message before the server closes the connection has
 
 ## Use it from an OpenAI-compatible client
 
+> **Experimental.** This endpoint works and is tested, but isn't yet proven in real use, and may change between minor versions. See [Experimental features](../README.md#experimental-features).
+
 Tools that can only talk to an OpenAI-style API can use
 `POST /v1/chat/completions`:
 
@@ -97,6 +99,8 @@ Know its limits:
 By default, task records live in the server's memory and are lost on
 restart. For records that survive restarts or are shared between several
 server processes, set `CERTO_TASK_STORE`:
+
+> **Experimental.** Every store except `memory` works and is tested, but isn't yet proven in real use, and may change between minor versions. See [Experimental features](../README.md#experimental-features).
 
 | Store | Install | Good for |
 |---|---|---|

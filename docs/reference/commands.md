@@ -38,7 +38,7 @@ current folder, the file is read instead.
 |---|---|---|
 | `--version` | | Print the version, e.g. `certo 0.1.5`, and exit. |
 | `--project NAME` | none | Work in `CERTO_PROJECTS_DIR/NAME`, created if missing. Without it, Certo works in `CERTO_WORKSPACE` (default: the current folder). `NAME` must be a relative path with no `..`, and must stay inside `CERTO_PROJECTS_DIR`. |
-| `--execution {local,docker}` | `CERTO_EXECUTION` | Where the agent's tools run, for this run. See [Run in Docker](../guides/run-in-docker.md). |
+| `--execution {local,docker}` | `CERTO_EXECUTION` | Where the agent's tools run, for this run. `docker` is [experimental](../README.md#experimental-features). See [Run in Docker](../guides/run-in-docker.md). |
 | `--model MODEL` | `CERTO_LLM_MODEL` | Model for this run only. |
 | `--api-key KEY` | `CERTO_LLM_API_KEY` | API key for this run only. It ends up in your shell history. |
 | `--base-url URL` | `CERTO_LLM_BASE_URL` | Server address for this run only. |
@@ -234,7 +234,9 @@ plan wasn't confirmed; 130 when interrupted (finished runs are kept).
 
 ## `certo-server`
 
-Run Certo as an HTTP and WebSocket server. Needs the `server` extra.
+Run Certo as an HTTP and WebSocket server. Needs the `server` extra. Its
+`/v1/chat/completions` endpoint and every task store except `memory` are
+[experimental](../README.md#experimental-features).
 
 ```text
 certo-server [--host HOST] [--port PORT]
@@ -317,7 +319,7 @@ removed from any error text. Exit 0 on success, 1 otherwise.
 
 ### `certo-admin skills`
 
-Manage third-party skills. Guide:
+Manage third-party skills ([experimental](../README.md#experimental-features)). Guide:
 [Add skills and tools](../guides/add-skills-and-tools.md#third-party-skills).
 
 #### `certo-admin skills install`

@@ -101,6 +101,24 @@ takes you from install to your first verified project.
 
 **Something went wrong?** See [Troubleshooting](troubleshooting.md).
 
+## Experimental features
+
+Four features are **experimental**: they work and have tests, but haven't
+been proven in real use the way the core has (verification, escalation and
+the benchmark). Use them, report what breaks, and expect them to change
+between minor versions. Fixes to the core come first.
+
+| Feature | What isn't proven yet |
+|---|---|
+| [Docker execution](guides/run-in-docker.md) (`--execution docker`) | Verification has never run inside a real container, only in tests with a fake workspace. The image must be built from a source checkout. Automatic model selection can't switch models during a run. |
+| [Server task stores](guides/run-as-a-server.md#keep-task-records) other than `memory` (`sqlite`, `mysql`, `postgres`, `redis`) | `sqlite` is tested on a real file. `mysql` and `postgres` share its code and were checked live once, not in the test suite. `redis` is tested only where `redis-server` is installed. |
+| [The OpenAI-compatible endpoint](guides/run-as-a-server.md#use-it-from-an-openai-compatible-client) (`/v1/chat/completions`) | The answer has no verdict, earlier messages aren't replayed, and `usage` is always zero. |
+| [Third-party skills](guides/add-skills-and-tools.md#third-party-skills) (`certo-admin skills`) | Licenses are detected with a text match, only `SKILL.md` folders can be installed, and no third-party skill has been benchmarked. |
+
+The rest of server mode (`POST /tasks`, the WebSocket stream, the memory
+store) is not experimental, but has no authentication: see the first
+limitation below.
+
 ## Known limitations
 
 - **Server mode has no authentication.** Run it on `127.0.0.1` or behind
@@ -113,11 +131,13 @@ takes you from install to your first verified project.
 - **Covered languages:** Python, Node, Go, Rust and Java. Other projects,
   and standalone HTML pages, end `inconclusive`. Java needs Maven or Gradle
   installed. See [Verification by language](reference/verification-by-language.md).
-- **Docker mode needs an image built from a source checkout**, and
-  automatic model selection can't switch models in the middle of a Docker
-  run. See [Run in Docker](guides/run-in-docker.md).
-- **Small local models** often struggle with long, multi-step tasks. Coder
-  models do best. See [Ollama and local models](guides/ollama-and-local-models.md).
+- **Docker mode is experimental** (see above): it needs an image built
+  from a source checkout, and automatic model selection can't switch
+  models in the middle of a Docker run. See [Run in Docker](guides/run-in-docker.md).
+- **Some local models do no work on some setups**: they write their tool
+  calls as plain text, and the run ends at once. `certo check` tests for
+  it. Which models worked in Certo's benchmark:
+  [Choose a local model](guides/choose-a-local-model.md).
 - **Costs show as unknown** for models newer than your installed LiteLLM.
 - **New, empty folders:** the agent starts with a Python environment only
   if the task mentions Python (or a Python tool such as pytest). Otherwise
@@ -127,8 +147,9 @@ takes you from install to your first verified project.
   verified.** `node --test` and some other runners exit successfully when
   there is nothing to run. See
   [Verification by language](reference/verification-by-language.md#node-in-detail).
-- **Escalation climbs only on a verification signal.** A task whose
-  project has nothing to check ends `inconclusive` and never escalates.
+- **Escalation climbs only on a verification signal.** A rung that wrote
+  files the project can't check (code with no tests) ends `inconclusive`
+  and stops the climb; a rung that changed no file at all climbs.
   In Docker mode a provider failure can't be told apart from another run
   error. See [Escalate between models](guides/escalate-between-models.md).
 - **Resume in Docker mode starts a new conversation**: the agent gets the
@@ -139,9 +160,10 @@ takes you from install to your first verified project.
 - **Interactive mode covers only the first part of a task**, and neither it
   nor confirm mode works in server mode. See
   [Interactive and confirm mode](guides/interactive-mode.md).
-- **The OpenAI-compatible endpoint** returns no verdict and doesn't replay
-  chat history. See [Run as a server](guides/run-as-a-server.md#use-it-from-an-openai-compatible-client).
-- **Third-party skill licenses** are detected with a simple text match,
+- **The OpenAI-compatible endpoint** is experimental: it returns no
+  verdict and doesn't replay chat history. See [Run as a server](guides/run-as-a-server.md#use-it-from-an-openai-compatible-client).
+- **Third-party skills** are experimental. Their licenses are detected
+  with a simple text match,
   and only `SKILL.md` folders can be installed. See
   [Add skills and tools](guides/add-skills-and-tools.md#third-party-skills).
 

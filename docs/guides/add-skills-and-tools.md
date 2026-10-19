@@ -80,6 +80,8 @@ them and decides itself when to open one.
 
 ### Third-party skills
 
+> **Experimental.** Installing third-party skills works and is tested, but isn't yet proven in real use, and may change between minor versions. See [Experimental features](../README.md#experimental-features).
+
 To use skills published by others, install them with `certo-admin skills`.
 They are kept apart from your own skills, and Certo records where each one
 came from:
