@@ -89,6 +89,7 @@ takes you from install to your first verified project.
 | See what a run did and what it cost | [Run records and costs](guides/run-records-and-costs.md) |
 | Continue a task after an interruption or a failed verdict | [Resume an interrupted run](guides/resume-a-run.md) |
 | Teach the agent my conventions, or give it new tools | [Add skills and tools](guides/add-skills-and-tools.md) |
+| Give one project its own instructions and skills | [Add skills to a project](guides/add-skills-to-a-project.md) |
 | Try the same task on several models, side by side | [Compare models on one task](guides/compare-models-on-a-task.md) |
 | Measure which models and strategies really deliver | [Benchmark models and strategies](guides/benchmark.md) |
 | Set up my own benchmark file | [Write a benchmark file](guides/write-a-benchmark-file.md) |

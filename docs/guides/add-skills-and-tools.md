@@ -47,7 +47,9 @@ checks.
 
 Put Markdown files in `./skills/` (or the folder named by
 `CERTO_SKILLS_DIR`). Subfolders are fine; they only help you organise.
-There is no other registration step.
+There is no other registration step. These skills apply to every project
+you run Certo on. For skills that belong to one project, see
+[Add skills to a project](add-skills-to-a-project.md).
 
 ```markdown
 ---
@@ -125,7 +127,9 @@ certo "Add a /health endpoint" --project my-api --agents-md "This project uses F
 ```
 
 `--agents-md` replaces the file and needs `--project`. In server mode, send
-`agents_md` together with `project`.
+`agents_md` together with `project`. A project can also have its own
+skills, in `.agents/skills/`: see
+[Add skills to a project](add-skills-to-a-project.md).
 
 ## Custom tools
 
