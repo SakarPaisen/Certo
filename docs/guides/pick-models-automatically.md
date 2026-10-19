@@ -8,23 +8,27 @@ and strong models on hard ones.
 The choice uses simple keyword rules and scores you write. It makes no
 extra model call.
 
-## 1. Create `models_list.yaml` and `models.yaml`
+## 1. Create the model files
 
-Certo uses two files, and ships both only as examples:
+`--auto-model` uses three files, and Certo ships each only as an example:
 
-- **`models_list.yaml`**, the catalog: the models, their ratings and the
-  task profiles. No keys.
+- **`models_list.yaml`**, the catalog: the models and their ratings. No
+  keys.
 - **`models.yaml`**, your personal settings: the models you use, by name,
   each with its key or server address. It holds keys: keep it out of git,
   like `.env`.
+- **`task_profiles.yaml`**, the kinds of task and what matters for each.
+  Optional: without it, every task ranks the models with no weights, so
+  the order of `models_list.yaml` decides.
 
-Copy both examples into your user settings folder (or into a project
+Copy the examples into your user settings folder (or into a project
 folder, which then overrides them). `certo check` prints the exact
 commands for your installation when a file is missing:
 
 ```bash
 cp <examples>/models_list.yaml.example ~/.config/certo/models_list.yaml
 cp <examples>/models.yaml.example ~/.config/certo/models.yaml
+cp <examples>/task_profiles.yaml.example ~/.config/certo/task_profiles.yaml
 ```
 
 The list describes the models. A short one:
@@ -41,7 +45,12 @@ models:
     model: ollama/qwen3-coder:30b
     description: "Free, local, weaker on hard tasks."
     ratings: {reasoning: 1, precision: 2, code: 1, cost: 5}
+```
 
+The task profiles say which ratings matter for which kind of task:
+
+```yaml
+# task_profiles.yaml
 task_profiles:
   debugging:
     triggers: [fix, bug, crash, "failing test"]
@@ -81,7 +90,7 @@ certo "Fix the failing test in payments.py" --auto-model
 ```
 
 Or set `CERTO_MODEL_SELECTION=auto` in your settings. Where Certo finds
-the two files is in the [reference](../reference/models-yaml.md#where-certo-looks).
+the files is in the [reference](../reference/models-yaml.md#where-certo-looks).
 
 `CERTO_LLM_MODEL` must still be set: Certo checks the normal settings
 before it reads the model files. Problems in them are reported the same
@@ -111,12 +120,16 @@ way for every command: errors stop the run, warnings are printed (see
 When every model has been tried, the task ends as it would without
 automatic selection.
 
+With `--interactive` as well, Certo shows the ranked list and asks which
+model to use, with the best one as the default.
+
 ## Always use one model for a kind of task
 
 When you already know which model you want for a profile, name it with
 `model:` instead of tuning the weights until it wins:
 
 ```yaml
+# task_profiles.yaml
 task_profiles:
   debugging:
     triggers: [fix, bug, crash, "failing test"]
@@ -133,9 +146,6 @@ task_profiles:
 - `certo check` reports a name that isn't in `models_list.yaml` as an
   error, and a model that isn't enabled as a warning.
 
-With `--interactive` as well, Certo shows the ranked list and asks which
-model to use, with the best one as the default.
-
 ## See what was chosen and why
 
 Before the verdict, the output says which model did the work:
@@ -150,15 +160,15 @@ when the task failed. For the task and file above:
 ```markdown
 # Model Decisions
 
-## initial — 2026-10-16T06:18:18.190751+00:00
+## initial — 2026-10-19T20:29:17.140969+00:00
 
-Reason: Task classified as 'debugging' (weights: {'reasoning': 3.0, 'precision': 2.0, 'code': 2.0, 'cost': 0.5}).
+Reason: Task classified as 'debugging': "fix" in the task's first line ('Fix the failing test in payments.py') (weights: {'reasoning': 3.0, 'precision': 2.0, 'code': 2.0, 'cost': 0.5}). Model order: ranked by the profile's weights.
 
 Task profile: `debugging` (weights: {'reasoning': 3.0, 'precision': 2.0, 'code': 2.0, 'cost': 0.5})
 
 Ranked candidates:
-- **claude-sonnet** (score 31.50)
-- local-coder (score 25.50)
+- **claude-sonnet** (score 31.00)
+- local-coder (score 11.50)
 
 Chosen: **claude-sonnet**
 ```
@@ -184,6 +194,6 @@ first), use [escalation](escalate-between-models.md) instead:
 
 ## Related
 
-- [models.yaml and models_list.yaml](../reference/models-yaml.md)
+- [The model files](../reference/models-yaml.md)
 - [Escalate between models](escalate-between-models.md)
 - [Run records and costs](run-records-and-costs.md): tokens and cost per model

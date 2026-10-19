@@ -19,13 +19,14 @@ cd certo-workspace && certo tasks/wordle.md --project wordle
 
 ## One task, more than one model
 
-With `--escalate`, Certo runs a task on the first model of a ladder you write, and hands it to the next model only when the verdict shows the model couldn't finish, or when its provider fails. Three ladders, three uses. Each goes in `models_list.yaml`; `certo ... --escalate NAME` picks one by name, and `--escalate` alone uses the one called `default`.
+With `--escalate`, Certo runs a task on the first model of a ladder you write, and hands it to the next model only when the verdict shows the model couldn't finish, or when its provider fails. Three ladders, three uses. Each goes in `escalation.yaml`; `certo ... --escalate NAME` picks one by name, and `--escalate` alone uses the one called `default`.
 
 ### Local first, cloud when needed
 
 Keep the code on your machine, and pay for a cloud model only for the tasks the local one can't do.
 
 ```yaml
+# escalation.yaml
 escalation:
   ladders:
     default:
@@ -75,6 +76,7 @@ Run summary:
 Start on a fast, cheap cloud model, and move to a stronger one when it can't finish.
 
 ```yaml
+# escalation.yaml
 escalation:
   ladders:
     cheap-first:
@@ -94,6 +96,7 @@ This ladder hasn't been benchmarked yet.
 Two models from different providers, so an outage doesn't stop the task.
 
 ```yaml
+# escalation.yaml
 escalation:
   ladders:
     other-provider:
@@ -119,7 +122,7 @@ Most coding agents are built around one provider. Certo isn't tied to any: the m
 | **Escalation** | Runs the task on the first model of your ladder, and moves to the next one when the verdict shows the model couldn't finish, or its provider fails (see above). The next model is told what the last one left. | `--escalate` |
 | **Measure it** | Runs the same tasks on your models and strategies, graded by hidden tests, so you choose from your own numbers. | `certo bench` |
 
-`--auto-model` and `--escalate` are two ways to choose, and can't be combined in one run. You describe your models once, in two files: `models_list.yaml` (ids, ratings, task profiles, ladders) and `models.yaml` (the ones you enabled, with keys). Every choice is written down: `MODEL_DECISIONS.md` says why each model was picked, and `.certo/RUNS.md` which models worked on the project. Of the ladders, only local first, cloud when needed has been measured; auto-model has no benchmark yet. Guides: [Escalate between models](https://github.com/alessioricco/certo/blob/main/docs/guides/escalate-between-models.md), [Pick models automatically](https://github.com/alessioricco/certo/blob/main/docs/guides/pick-models-automatically.md), [Auto-model or escalation](https://github.com/alessioricco/certo/blob/main/docs/concepts/auto-model-or-escalation.md).
+`--auto-model` and `--escalate` are two ways to choose, and can't be combined in one run. You describe your models once, in `models_list.yaml` (ids and ratings) and `models.yaml` (the ones you enabled, with keys), and your choices in one file per mode: `task_profiles.yaml` for `--auto-model`, `escalation.yaml` for `--escalate`. Every choice is written down: `MODEL_DECISIONS.md` says why each model was picked, and `.certo/RUNS.md` which models worked on the project. Of the ladders, only local first, cloud when needed has been measured; auto-model has no benchmark yet. Guides: [Escalate between models](https://github.com/alessioricco/certo/blob/main/docs/guides/escalate-between-models.md), [Pick models automatically](https://github.com/alessioricco/certo/blob/main/docs/guides/pick-models-automatically.md), [Auto-model or escalation](https://github.com/alessioricco/certo/blob/main/docs/concepts/auto-model-or-escalation.md).
 
 ### Measured
 
@@ -169,10 +172,12 @@ certo tasks/wordle.md --project wordle
 
 ### More than one model
 
-`--escalate` and `--auto-model` read two model files. The first time, Certo prints the `cp` commands that copy the examples it ships:
+`--escalate` and `--auto-model` read the model files. The first time, Certo prints the `cp` commands that copy the examples it ships:
 
-- `models_list.yaml`, the catalog: every model's id and ratings, task profiles and your ladders.
+- `models_list.yaml`, the catalog: every model's id and ratings.
 - `models.yaml`, your settings: the models you enabled, with their key or server address.
+- `escalation.yaml`, your ladders, for `--escalate`; optional: without it, Certo builds a ladder from the ratings.
+- `task_profiles.yaml`, the kinds of task and what matters for each, for `--auto-model`; optional.
 
 Then add `--escalate` (with a ladder from [One task, more than one model](https://github.com/alessioricco/certo#one-task-more-than-one-model)) or `--auto-model` to a run. `certo check --models` tests every model you enabled before you rely on it.
 
@@ -235,7 +240,7 @@ The exit code is nonzero for every failure state, so Certo works in scripts and 
 
 **Model choice and escalation**
 
-- **Picks the best model per task.** Rate your models in `models_list.yaml`, enable the ones you have keys for in `models.yaml`, and Certo routes each task to the best fit, with fallback when a provider fails. No extra LLM call to decide. Add `--auto-model`.
+- **Picks the best model per task.** Rate your models in `models_list.yaml`, enable the ones you have keys for in `models.yaml`, describe your kinds of task in `task_profiles.yaml`, and Certo routes each task to the best fit, with fallback when a provider fails. No extra LLM call to decide. Add `--auto-model`.
 - **Hands over when a model fails.** Give Certo a ladder of models. Each task starts on the first, and moves to the next when verification shows the model couldn't finish, or its provider fails. Add `--escalate`. See [Escalate between models](https://github.com/alessioricco/certo/blob/main/docs/guides/escalate-between-models.md).
 - **A benchmark.** `certo bench` compares models and strategies on tasks graded by hidden tests, and counts how often Certo itself was fooled. See [Benchmark models and strategies](https://github.com/alessioricco/certo/blob/main/docs/guides/benchmark.md).
 - **Compare models on your own task.** A small script runs one task on a list of models, each in its own folder, and ends with a table of verdicts, times and costs. See [Compare models on one task](https://github.com/alessioricco/certo/blob/main/docs/guides/compare-models-on-a-task.md), and a real example with screenshots: [five models build Asteroids](https://github.com/alessioricco/certo/blob/main/docs/benchmark/compare-asteroids-0.1.19.md), where the cheapest cloud model, GPT-5.6 Luna, built a verified game for $0.07.

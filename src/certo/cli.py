@@ -293,9 +293,9 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="LADDER",
         help=(
-            "Start on the first, cheapest model of a ladder from models_list.yaml and move "
-            "to the next, stronger one only when Certo's verification shows the model "
-            "couldn't finish. LADDER names a ladder under escalation.ladders; without "
+            "Start on the first model of a ladder from escalation.yaml and move to the "
+            "next one only when Certo's verification shows the model couldn't finish, or "
+            "its provider fails. LADDER names a ladder under escalation.ladders; without "
             "it, the ladder named 'default' is used, else one built from the ratings. "
             "Can't be combined with --auto-model or --model."
         ),
@@ -529,6 +529,8 @@ def main(argv: list[str] | None = None) -> int:
                 cfg.models_file,
                 cfg.models_list_file,
                 cfg.escalation_ladder or None,
+                escalation_file=cfg.escalation_file,
+                task_profiles_file=cfg.task_profiles_file,
                 on_warning=lambda w: print(f"Warning (models.yaml): {w}", file=sys.stderr),
             )
         except ValueError as exc:  # EscalationError, ModelCatalogError

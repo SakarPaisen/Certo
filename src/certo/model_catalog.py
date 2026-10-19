@@ -120,6 +120,9 @@ class ModelCatalog:
     # Problems between the two files that a non-strict load collects for
     # catalog_check.py instead of raising (duplicate or unknown names).
     load_problems: tuple[str, ...] = ()
+    # Things to tell the user that don't stop a run, such as a section of
+    # models_list.yaml that now belongs in its own file.
+    load_warnings: tuple[str, ...] = ()
 
 
 _DEFAULT_PROFILE = TaskProfile(name="default", triggers=(), weights={})
@@ -315,6 +318,11 @@ def _parse_escalation(raw: Any, path: str) -> EscalationSettings:
 
 LIST_FILE = "models_list.yaml"
 MODELS_FILE = "models.yaml"
+# Optional, one per mode that reads them (0.1.20): --auto-model's task
+# profiles, and --escalate's ladders. Before 0.1.20 both were sections of
+# models_list.yaml, which is still read, with a warning.
+PROFILES_FILE = "task_profiles.yaml"
+ESCALATION_FILE = "escalation.yaml"
 # Personal settings: they live in models.yaml, never in the shared list.
 _PERSONAL_ONLY = ("api_key", "base_url", "activated")
 _PERSONAL_KEYS = {
@@ -342,9 +350,37 @@ def _read_mapping(path: str) -> dict:
     return raw
 
 
+def _parse_profiles(raw: Any, path: str) -> list[TaskProfile]:
+    profiles_raw = raw or {}
+    if not isinstance(profiles_raw, dict):
+        raise ModelCatalogError(f"{path}: 'task_profiles' must be a mapping of name -> profile.")
+    return [_parse_task_profile(name, data) for name, data in profiles_raw.items()]
+
+
+def _read_section_file(path: str, key: str) -> Any:
+    """task_profiles.yaml or escalation.yaml: one top-level key, the same
+    section models_list.yaml used to hold, so moving it is cut and paste.
+    A file with only comments is fine: it sets nothing."""
+    file_path = Path(path)
+    try:
+        if yaml.safe_load(file_path.read_text(encoding="utf-8")) is None:
+            return None
+    except (OSError, yaml.YAMLError):
+        pass  # _read_mapping reports it
+    raw = _read_mapping(path)
+    extra = sorted(set(raw) - {key})
+    if extra:
+        raise ModelCatalogError(
+            f"{path} may only contain '{key}:', but it has {', '.join(extra)}. "
+            f"Models go in {LIST_FILE}, keys and addresses in {MODELS_FILE}."
+        )
+    return raw.get(key)
+
+
 def _parse_list(path: str) -> tuple[list[ModelCatalogEntry], list[TaskProfile], EscalationSettings]:
-    """models_list.yaml: the models (ids, descriptions, ratings), task
-    profiles and escalation settings. No personal settings."""
+    """models_list.yaml: the models (ids, descriptions, ratings). Task
+    profiles and escalation settings are still read from it when present,
+    the layout before 0.1.20. No personal settings."""
     raw = _read_mapping(path)
     models_raw = raw.get("models")
     if not isinstance(models_raw, list) or not models_raw:
@@ -358,19 +394,21 @@ def _parse_list(path: str) -> tuple[list[ModelCatalogEntry], list[TaskProfile], 
                     f"personal settings and belong in {MODELS_FILE}, next to the model's name."
                 )
     models = [_parse_model_entry(entry) for entry in models_raw]
-    profiles_raw = raw.get("task_profiles", {}) or {}
-    if not isinstance(profiles_raw, dict):
-        raise ModelCatalogError(f"{path}: 'task_profiles' must be a mapping of name -> profile.")
-    profiles = [_parse_task_profile(name, data) for name, data in profiles_raw.items()]
+    profiles = _parse_profiles(raw.get("task_profiles"), path)
     return models, profiles, _parse_escalation(raw.get("escalation"), path)
+
+
+def _list_has(path: str, key: str) -> bool:
+    return _read_mapping(path).get(key) is not None
 
 
 def _old_format_error(path: str, what: str) -> ModelCatalogError:
     return ModelCatalogError(
         f"{path} {what}. Since version 0.1.10, {MODELS_FILE} holds only your personal "
         f"settings: for each model, its `name` from {LIST_FILE} plus api_key, base_url, "
-        f"activated and optional overrides. Model ids, descriptions, task_profiles and "
-        f"escalation go in {LIST_FILE}. See docs/reference/models-yaml.md."
+        f"activated and optional overrides. Model ids and descriptions go in "
+        f"{LIST_FILE}, task_profiles in {PROFILES_FILE}, escalation in {ESCALATION_FILE}. "
+        f"See docs/reference/models-yaml.md."
     )
 
 
@@ -435,11 +473,24 @@ def _merge(listed: ModelCatalogEntry, personal: dict | None) -> ModelCatalogEntr
     )
 
 
-def load_model_catalog(list_path: str, models_path: str, *, strict: bool = True) -> ModelCatalog:
-    """Build the catalog from `models_list.yaml` (the models, task profiles
-    and escalation settings) and `models.yaml` (which of them to use, with
-    keys, addresses and overrides). Ratings in models.yaml replace the
-    list's axis by axis. A model missing from models.yaml is never used.
+def load_model_catalog(
+    list_path: str,
+    models_path: str,
+    *,
+    profiles_path: str | None = None,
+    escalation_path: str | None = None,
+    strict: bool = True,
+) -> ModelCatalog:
+    """Build the catalog from `models_list.yaml` (the models) and
+    `models.yaml` (which of them to use, with keys, addresses and
+    overrides), plus the optional `task_profiles.yaml` and
+    `escalation.yaml`. Ratings in models.yaml replace the list's axis by
+    axis. A model missing from models.yaml is never used.
+
+    A `task_profiles:` or `escalation:` section still in models_list.yaml
+    (the layout before 0.1.20) is used when its own file isn't given, with
+    a warning to move it; when the file is given, the file wins and the
+    section is ignored, also with a warning.
 
     Raises `ModelCatalogError` for a missing or malformed file, personal
     settings in the list, and the pre-0.1.10 single-file models.yaml. With
@@ -449,6 +500,29 @@ def load_model_catalog(list_path: str, models_path: str, *, strict: bool = True)
     through `catalog_check.load_checked_catalog`. No minimum catalog size
     is enforced (see `rank_candidates()`)."""
     listed, profiles, escalation = _parse_list(list_path)
+    warnings: list[str] = []
+    for key, own_path, own_file in (
+        ("task_profiles", profiles_path, PROFILES_FILE),
+        ("escalation", escalation_path, ESCALATION_FILE),
+    ):
+        in_list = _list_has(list_path, key)
+        if own_path:
+            section = _read_section_file(own_path, key)
+            if key == "task_profiles":
+                profiles = _parse_profiles(section, own_path)
+            else:
+                escalation = _parse_escalation(section, own_path)
+            if in_list:
+                warnings.append(
+                    f"{list_path} still has the '{key}:' section; it is ignored, because "
+                    f"{own_path} is used instead. Delete the section from {LIST_FILE}."
+                )
+        elif in_list:
+            warnings.append(
+                f"{list_path} has the '{key}:' section. Since 0.1.20 it belongs in its own "
+                f"file, {own_file}, next to {LIST_FILE}: move the section there as it is. "
+                "It is still read for now."
+            )
     personal = _parse_personal(models_path)
     problems: list[str] = []
 
@@ -481,6 +555,7 @@ def load_model_catalog(list_path: str, models_path: str, *, strict: bool = True)
         task_profiles=profiles,
         escalation=escalation,
         load_problems=tuple(problems),
+        load_warnings=tuple(warnings),
     )
 
 

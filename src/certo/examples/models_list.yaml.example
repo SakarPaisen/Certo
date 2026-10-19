@@ -1,15 +1,17 @@
 # models_list.yaml: the catalog of models Certo can choose from, with
-# their ratings, the task profiles and the escalation ladders. No keys,
-# no addresses: those are personal and go in models.yaml.
+# their ratings. No keys, no addresses: those are personal and go in
+# models.yaml. The task profiles (--auto-model) are in task_profiles.yaml,
+# and the escalation ladders (--escalate) in escalation.yaml; both are
+# optional.
 #
 # Certo ships this file only as an example and never reads the example.
 # Copy it to models_list.yaml (in your project folder, or in
-# ~/.config/certo/) and edit it: add models, change ratings, write
-# ladders. A new Certo release updates this example, never your copy.
+# ~/.config/certo/) and edit it: add models, change ratings. A new Certo
+# release updates this example, never your copy.
 #
 # Read by --auto-model, --escalate, certo bench and certo check, together
-# with models.yaml. With the default (manual) model selection, neither file
-# is read. See docs/reference/models-yaml.md,
+# with models.yaml. With the default (manual) model selection, no model
+# file is read. See docs/reference/models-yaml.md,
 # docs/guides/pick-models-automatically.md and
 # docs/guides/escalate-between-models.md.
 #
@@ -18,7 +20,7 @@
 # =============================================================================
 #
 # Each model gets a `ratings` map (whole numbers 1-5). Each task profile
-# (further down) gets a `weights` map over the same axis names. For
+# (in task_profiles.yaml) gets a `weights` map over the same axis names. For
 # auto-selection a model's score for a task is:
 #
 #     score = sum( rating[axis] * weight[axis] for axis in weights )
@@ -563,104 +565,3 @@ models:
       is slow and token-hungry (about 2x the average output tokens in AA's
       index run).
     ratings: {reasoning: 4, precision: 3, code: 3, cost: 2}
-
-# =============================================================================
-# DETERMINISTIC TASK -> WEIGHT-VECTOR CLASSIFICATION
-# =============================================================================
-#
-# Deterministic (no LLM call) task -> weight-vector classification, reused
-# from this harness's existing KeywordTrigger pattern (see skills/). The task
-# text is matched against each profile's `triggers` (case-insensitive
-# substring match) IN THE ORDER PROFILES ARE DECLARED BELOW — the first one
-# that matches wins, so put a more specific profile earlier if its triggers
-# could also appear in a broader one. `default` is the fallback when nothing
-# else matches; its own position doesn't matter for that purpose, but keep it
-# last for readability.
-#
-# Add your own axes/profiles freely — scoring just sums whatever keys a
-# profile's `weights` declares against whatever `ratings` each model
-# provides (see the ratings/weights note at the top of this file for how
-# `cost` in particular is scored).
-
-task_profiles:
-  # High correctness + deep reasoning + coding.
-  debugging:
-    triggers: [fix, bug, crash, "failing test", "race condition", debug, debugging, error, exception, regression]
-    # Optional: always run this model first for the profile, whatever the
-    # weights say (used only when it is enabled in models.yaml).
-    # model: claude-sonnet-5-5
-    weights: {reasoning: 3, precision: 2, code: 2, cost: 0.5}
-
-  # Cheap generation/scaffolding. Don't waste frontier inference here.
-  scaffolding:
-    triggers: [scaffold, "create a new", "set up", setup, boilerplate, initialize, initialization, "starter project", template, prototype]
-    weights: {cost: 2, code: 1, reasoning: 0.5, precision: 0.5}
-
-  # Code quality matters more than raw generation speed.
-  refactor:
-    triggers: [refactor, "clean up", simplify, restructure, redesign, optimize, modernization]
-    weights: {code: 2, precision: 2, reasoning: 1, cost: 0.5}
-
-  # Architecture needs stronger reasoning and precision.
-  architecture:
-    triggers: [architecture, "system design", "design system", "technical design", "architecture decision", ADR, "distributed system", scalability, "data architecture"]
-    weights: {reasoning: 3, precision: 3, code: 1, cost: 0.5}
-
-  # Research / analysis favors reasoning and precision.
-  research:
-    triggers: [research, analyze, analysis, investigate, compare, evaluate, "deep dive", "trade-off", "tradeoff"]
-    weights: {reasoning: 3, precision: 3, code: 0.5, cost: 0.5}
-
-  # High-volume mechanical work should bias heavily toward cheap models.
-  extraction:
-    triggers: [extract, extraction, classify, classification, categorize, normalize, transform, parse, summarize]
-    weights: {cost: 3, precision: 2, reasoning: 0.5, code: 0}
-
-  # Agentic tasks need reasoning + code, with cost still relevant.
-  agent:
-    triggers: [agent, agentic, "multi-step", "long-running", "tool use", tools, automate, automation, workflow]
-    weights: {reasoning: 3, code: 2, precision: 2, cost: 1}
-
-  # Default balanced profile — used when nothing above matches.
-  default:
-    weights: {reasoning: 1, cost: 3, precision: 1, code: 1}
-
-# =============================================================================
-# ESCALATION (`certo --escalate`): start cheap, climb only when verification fails
-# =============================================================================
-#
-# Optional. With no `escalation:` section at all, `--escalate` builds a
-# "derived" ladder from the active models' ratings: the best of the
-# cheapest models first, then only models more capable than every cheaper
-# one, most capable last, at most `max_rungs` long (see
-# docs/guides/escalate-between-models.md). An explicit ladder written here
-# always wins over the derived one.
-#
-# Every rung names a model from `models:` above. A rung whose model isn't
-# enabled in models.yaml is skipped, with a notice.
-#
-# With the ratings above, the cheapest model at each capability level is:
-#   qwen3.6-35b-local (6, free) -> qwen3.8-27b-local (8, free) ->
-#   gpt-6-luna / claude-haiku-5-5 (10, ~$0.20) ->
-#   claude-sonnet-5-5 / gpt-6.1-sol (13, ~$4) -> claude-opus-5-5 (15, ~$8)
-# (capability = reasoning + precision + code; price = blended per 1M).
-# At 10, claude-haiku-5-5 is the better coder (code 4 against 3): the
-# capability sum doesn't see that, so the example ladder names it.
-#
-# escalation:
-#   cost_axis: cost       # the rating axis that means cost-effectiveness (default: cost)
-#   max_rungs: 3          # longest derived ladder (default: 3, at least 2)
-#   ladders:
-#     # Used by `--escalate` with no name, when it exists.
-#     default:
-#       - model: qwen3.8-27b-local
-#         retries: 1      # fix attempts on this rung (default: CERTO_MAX_VERIFY_RETRIES)
-#       - model: claude-haiku-5-5
-#       - model: claude-sonnet-5-5
-#     # `--escalate local-only`. Written as a mapping to set an option.
-#     local-only:
-#       escalate_on_acceptance_failed: true   # also climb on acceptance_failed
-#       rungs:
-#         - model: qwen3.6-35b-local
-#         - model: qwen3.8-27b-local
-#           reasoning_effort: xhigh           # this rung only

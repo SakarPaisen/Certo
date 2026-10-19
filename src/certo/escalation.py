@@ -189,7 +189,7 @@ def resolve_ladder(catalog: ModelCatalog, name: str | None) -> ResolvedLadder:
         if name not in ladders:
             known = ", ".join(sorted(ladders)) or "none (only a derived ladder is available)"
             raise EscalationError(
-                f"There is no escalation ladder named '{name}' in models_list.yaml. "
+                f"There is no escalation ladder named '{name}' in escalation.yaml. "
                 f"Ladders: {known}."
             )
         return explicit_ladder(catalog, ladders[name])
@@ -203,13 +203,21 @@ def load_ladder(
     models_list_file: str,
     name: str | None,
     *,
+    escalation_file: str = "",
+    task_profiles_file: str = "",
     on_warning: Callable[[str], None] | None = None,
 ) -> ResolvedLadder:
-    """Find, load and check `models_list.yaml` and `models.yaml` ("" looks
-    them up, see model_files.py), then resolve the ladder. Raises
-    `EscalationError` or `ModelCatalogError` (both `ValueError`s) with a
-    message for the user, including how to create a missing file."""
-    catalog = load_checked_catalog(models_file, models_list_file, on_warning=on_warning)
+    """Find, load and check the model files ("" looks them up, see
+    model_files.py), then resolve the ladder. Raises `EscalationError` or
+    `ModelCatalogError` (both `ValueError`s) with a message for the user,
+    including how to create a missing file."""
+    catalog = load_checked_catalog(
+        models_file,
+        models_list_file,
+        task_profiles_file=task_profiles_file,
+        escalation_file=escalation_file,
+        on_warning=on_warning,
+    )
     return resolve_ladder(catalog, name)
 
 

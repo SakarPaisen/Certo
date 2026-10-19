@@ -14,6 +14,7 @@ package (`certo/examples/`).
 ```yaml
 models_file: ./models.yaml             # optional
 models_list_file: ./models_list.yaml   # optional
+escalation_file: ./escalation.yaml     # optional
 tasks_dir: ./my-tasks        # optional
 tasks: all                   # or a list of task names
 repeats: 3
@@ -32,6 +33,7 @@ arms:
 | `repeats` | `1` | Runs per task per arm, a whole number of at least 1. Results vary between runs, so more repeats give a fairer comparison. |
 | `models_file` | looked up | Your personal `models.yaml`. Without it: `./models.yaml`, else `~/.config/certo/models.yaml`. `CERTO_MODELS_FILE` is not read. |
 | `models_list_file` | looked up | The model catalog, `models_list.yaml`, the same way. `CERTO_MODELS_LIST_FILE` is not read. |
+| `escalation_file` | looked up | `escalation.yaml`, the same way, for the `cost_axis` and `max_rungs` of a derived `escalate` arm. Optional: without one, the defaults apply. `CERTO_ESCALATION_FILE` is not read. |
 | `tasks_dir` | the bundled task set | A folder of your own tasks, in the same shape. |
 
 Any other key is an error. Relative paths are relative to the folder where
@@ -78,7 +80,7 @@ arms:
 
 Grading is the same as for every arm: the hidden tests decide. Each run
 records every rung that ran and which one gave the final verdict.
-`escalation.ladders` in `models_list.yaml` are not used here: an arm's ladder
+The named ladders in `escalation.yaml` are not used here: an arm's ladder
 is its `models` list, or a derived one.
 
 ## How models are used
@@ -94,9 +96,9 @@ is its `models` list, or a derived one.
 - Problems in the model files are checked as for every command (see
   [Checks](models-yaml.md#checks)): errors stop the benchmark,
   warnings are printed with the plan.
-- `task_profiles` in `models_list.yaml` are not used. The `escalation`
-  settings (`cost_axis`, `max_rungs`) are used only by a derived
-  `escalate` arm, to build its ladder.
+- `task_profiles.yaml` is not used. The `escalation` settings
+  (`cost_axis`, `max_rungs`) are used only by a derived `escalate` arm, to
+  build its ladder.
 
 ## Strategies to come
 

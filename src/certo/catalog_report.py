@@ -19,7 +19,7 @@ from .model_catalog import (
     ModelCatalogError,
     load_model_catalog,
 )
-from .model_files import find, missing_message, resolve
+from .model_files import find, missing_message, resolve, resolve_optional
 from .model_selection import config_for_entry
 
 # llm_check.explain() names the CERTO_LLM_* settings; for a catalog entry the fix
@@ -100,9 +100,20 @@ def print_catalog_report(
     print("Model files:", file=out)
     try:
         list_path, models_path = resolve(models_file, list_file)
+        profiles_path, escalation_path = resolve_optional(
+            _setting("TASK_PROFILES_FILE"), _setting("ESCALATION_FILE")
+        )
         print(f"  List: {list_path}", file=out)
         print(f"  Personal settings: {models_path}", file=out)
-        catalog = load_model_catalog(list_path, models_path, strict=False)
+        print(f"  Task profiles: {profiles_path or 'none (optional, for --auto-model)'}", file=out)
+        print(f"  Escalation: {escalation_path or 'none (optional, for --escalate)'}", file=out)
+        catalog = load_model_catalog(
+            list_path,
+            models_path,
+            profiles_path=profiles_path,
+            escalation_path=escalation_path,
+            strict=False,
+        )
     except ModelCatalogError as exc:
         print(f"  Error: {exc}", file=out)
         print(file=out)

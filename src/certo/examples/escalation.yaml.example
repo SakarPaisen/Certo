@@ -1,0 +1,50 @@
+# escalation.yaml: the escalation ladders --escalate climbs, and the
+# settings for the ladder Certo derives when there is none. Optional:
+# without it, --escalate derives a ladder from the ratings in
+# models_list.yaml. Also read by certo bench for its `escalate` arms.
+#
+# Certo ships this file only as an example and never reads the example.
+# Copy it to escalation.yaml (in your project folder, or in
+# ~/.config/certo/, or set CERTO_ESCALATION_FILE) and edit it. See
+# docs/guides/escalate-between-models.md.
+#
+# =============================================================================
+# ESCALATION (`certo --escalate`): start cheap, climb only when verification fails
+# =============================================================================
+#
+# With no ladder named `default` (none below is, until you uncomment one),
+# `--escalate` builds a "derived" ladder from the active models' ratings: the best of the
+# cheapest models first, then only models more capable than every cheaper
+# one, most capable last, at most `max_rungs` long (see
+# docs/guides/escalate-between-models.md). An explicit ladder written here
+# always wins over the derived one.
+#
+# Every rung names a model from models_list.yaml. A rung whose model isn't
+# enabled in models.yaml is skipped, with a notice.
+#
+# With the ratings above, the cheapest model at each capability level is:
+#   qwen3.6-35b-local (6, free) -> qwen3.8-27b-local (8, free) ->
+#   gpt-6-luna / claude-haiku-5-5 (10, ~$0.20) ->
+#   claude-sonnet-5-5 / gpt-6.1-sol (13, ~$4) -> claude-opus-5-5 (15, ~$8)
+# (capability = reasoning + precision + code; price = blended per 1M).
+# At 10, claude-haiku-5-5 is the better coder (code 4 against 3): the
+# capability sum doesn't see that, so the example ladder names it.
+#
+escalation:
+  cost_axis: cost       # the rating axis that means cost-effectiveness (default: cost)
+  max_rungs: 3          # longest derived ladder (default: 3, at least 2)
+  # Uncomment `ladders:` and the ladders you want.
+#   ladders:
+#     # Used by `--escalate` with no name, when it exists.
+#     default:
+#       - model: qwen3.8-27b-local
+#         retries: 1      # fix attempts on this rung (default: CERTO_MAX_VERIFY_RETRIES)
+#       - model: claude-haiku-5-5
+#       - model: claude-sonnet-5-5
+#     # `--escalate local-only`. Written as a mapping to set an option.
+#     local-only:
+#       escalate_on_acceptance_failed: true   # also climb on acceptance_failed
+#       rungs:
+#         - model: qwen3.6-35b-local
+#         - model: qwen3.8-27b-local
+#           reasoning_effort: xhigh           # this rung only

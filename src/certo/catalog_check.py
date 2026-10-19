@@ -22,7 +22,7 @@ from .model_catalog import (
     capability,
     load_model_catalog,
 )
-from .model_files import resolve
+from .model_files import resolve, resolve_optional
 
 
 @dataclass
@@ -50,6 +50,7 @@ def check_catalog(catalog: ModelCatalog) -> CatalogReport:
     errors, warnings = report.errors, report.warnings
     by_name: dict[str, ModelCatalogEntry] = {}
     errors.extend(catalog.load_problems)
+    warnings.extend(catalog.load_warnings)
     for entry in catalog.models:
         if entry.name in by_name:
             errors.append(
@@ -158,13 +159,23 @@ def load_checked_catalog(
     models_file: str = "",
     models_list_file: str = "",
     *,
+    task_profiles_file: str = "",
+    escalation_file: str = "",
     on_warning: Callable[[str], None] | None = None,
 ) -> ModelCatalog:
-    """Find, load and check `models_list.yaml` and `models.yaml` (see
-    model_files.py; "" means look them up). Raises `ModelCatalogError`
-    listing every error; passes each warning to `on_warning`."""
+    """Find, load and check the model files (see model_files.py; "" means
+    look them up; task_profiles.yaml and escalation.yaml are optional).
+    Raises `ModelCatalogError` listing every error; passes each warning to
+    `on_warning`."""
     list_path, models_path = resolve(models_file, models_list_file)
-    catalog = load_model_catalog(list_path, models_path, strict=False)
+    profiles_path, escalation_path = resolve_optional(task_profiles_file, escalation_file)
+    catalog = load_model_catalog(
+        list_path,
+        models_path,
+        profiles_path=profiles_path,
+        escalation_path=escalation_path,
+        strict=False,
+    )
     report = check_catalog(catalog)
     if report.errors:
         raise ModelCatalogError(

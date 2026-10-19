@@ -505,12 +505,13 @@ edit it:` followed by a `cp` command (the same for `models.yaml`).
 
 **Cause:** `--auto-model`, `--escalate`, `certo bench` and
 `certo check --models` need both model files, and Certo ships them only as
-examples, which it never reads.
+examples, which it never reads. (`task_profiles.yaml` and
+`escalation.yaml` are optional: a missing one is never this error.)
 
 **Fix:** run the `cp` command the message prints, then edit the copy: name
 the models you use in `models.yaml`, with their keys. Put the files in a
 project folder instead to use them for that project only. See
-[models.yaml and models_list.yaml](reference/models-yaml.md).
+[The model files](reference/models-yaml.md).
 
 ### `models.yaml` is in the old format
 
@@ -519,12 +520,13 @@ task_profiles` / `has escalation`) `. Since version 0.1.10, models.yaml
 holds only your personal settings: ...`
 
 **Cause:** before 0.1.10, everything was in `models.yaml`. Now model ids,
-descriptions, ratings, task profiles and ladders go in `models_list.yaml`.
+descriptions and ratings go in `models_list.yaml`, task profiles in
+`task_profiles.yaml`, and ladders in `escalation.yaml`.
 
 **Fix:** copy the shipped `models_list.yaml.example` (or move your own
 models into a `models_list.yaml`), and keep in `models.yaml` only `name`,
 `api_key`, `base_url`, `activated` and any overrides for each model you
-use.
+use. Move `task_profiles:` and `escalation:` into their own files.
 
 ### The model files have problems
 
@@ -547,6 +549,9 @@ way, and stops on an error. The errors and their fixes:
 | `Ladder '...', rung N (...): retries must be 0 or more` | Use 0 or a positive number. |
 | `escalation.cost_axis is '...', but no model has a rating with that name` | Set `cost_axis` to the rating you use for cost-effectiveness, usually `cost`. |
 | `Ladder '...' has no usable rung` | Enable at least one of its models in `models.yaml`, or fix the names. |
+| `Task profile '...': there is no model named '...'` | The profile's `model:` names a model that isn't in `models_list.yaml`. Fix the spelling, or remove `model:`. |
+| `... may only contain 'task_profiles:'` (or `'escalation:'`) | `task_profiles.yaml` and `escalation.yaml` each hold one section. Move anything else to `models_list.yaml` or `models.yaml`. |
+| `CERTO_TASK_PROFILES_FILE names ..., which doesn't exist` (or `CERTO_ESCALATION_FILE`) | Fix the path, or clear the setting to let Certo look for the file. |
 
 **Fix:** run `certo check` after each change: it lists every problem at
 once.
@@ -564,13 +569,16 @@ once.
 | `Model '...' has no rating for ..., which task profile(s) ... weigh: it counts as 0` | Add the missing ratings, or the model ranks lower than it should. |
 | `Model '...' has no api_key and no base_url` | It works only if the provider's own key variable (such as `OPENAI_API_KEY`) is set. Add `api_key` in `models.yaml` otherwise. |
 | `... (capability ...) comes after ... but is rated less capable` | Your explicit ladder climbs to a weaker model. Allowed, if that's what you meant. |
+| `.../models_list.yaml has the 'task_profiles:' section. Since 0.1.20 it belongs in its own file` (or `'escalation:'`) | Your `models_list.yaml` is from before 0.1.20. Cut the section, with its key, into `task_profiles.yaml` (or `escalation.yaml`) next to it. Nothing inside changes. See [Moving from one file](reference/models-yaml.md#moving-from-one-file-0119-and-earlier). |
+| `... still has the '...:' section; it is ignored` | You already have the new file, so the old section in `models_list.yaml` isn't read. Delete it. |
+| `Task profile '...': ... isn't enabled in models.yaml` | The profile's `model:` can't run, so the weights pick the model. Enable it, or remove `model:`. |
 
 ### `--escalate` refuses to start
 
 | You see | Fix |
 |---|---|
 | `No models_list.yaml found` / `No models.yaml found` | See [No `models_list.yaml` or `models.yaml` found](#no-models_listyaml-or-modelsyaml-found). |
-| `There is no escalation ladder named '...' in models_list.yaml. Ladders: ...` | Use one of the listed names, or leave the name out for the `default` (or derived) ladder. |
+| `There is no escalation ladder named '...' in escalation.yaml. Ladders: ...` | Use one of the listed names, or leave the name out for the `default` (or derived) ladder. |
 | `--escalate can't be combined with --auto-model or --model` | The ladder decides which models run. Drop the other flag. |
 | `--model can't be used while CERTO_MODEL_SELECTION=escalate` | Drop `--model`, or set `CERTO_MODEL_SELECTION=manual` for this run. |
 | `--resume can't be combined with escalation` | Resume without `--escalate`: it continues the last model's conversation. |

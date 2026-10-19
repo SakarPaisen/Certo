@@ -162,6 +162,35 @@ def test_the_model_files_are_found_in_the_project_folder(tmp_path, monkeypatch):
     assert cfg.models_list_file == str((tmp_path / "models_list.yaml").resolve())
 
 
+def test_an_escalation_file_can_be_named(tmp_path):
+    list_path, models_path = write_model_files(tmp_path, MODELS)
+    escalation = tmp_path / "escalation.yaml"
+    escalation.write_text("escalation:\n  max_rungs: 2\n")
+    path = tmp_path / "bench.yaml"
+    path.write_text(
+        f"models_file: {models_path}\nmodels_list_file: {list_path}\n"
+        f"escalation_file: {escalation}\n"
+        "arms:\n  - {name: a, strategy: single, model: cloud}\n"
+    )
+
+    cfg = load_bench_config(str(path))
+
+    assert cfg.escalation_file == str(escalation.resolve())
+    assert cfg.model_catalog.escalation.max_rungs == 2
+
+
+def test_a_missing_escalation_file_is_an_error(tmp_path):
+    list_path, models_path = write_model_files(tmp_path, MODELS)
+    path = tmp_path / "bench.yaml"
+    path.write_text(
+        f"models_file: {models_path}\nmodels_list_file: {list_path}\n"
+        "escalation_file: ./nope.yaml\narms:\n  - {name: a, strategy: single, model: cloud}\n"
+    )
+
+    with pytest.raises(BenchConfigError, match="'escalation_file' names './nope.yaml'"):
+        load_bench_config(str(path))
+
+
 def test_an_arm_naming_a_model_missing_from_models_yaml(tmp_path):
     list_path, models_path = write_model_files(tmp_path, MODELS)
     Path(models_path).write_text("models:\n  - name: cloud\n    api_key: k\n")

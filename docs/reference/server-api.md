@@ -27,7 +27,7 @@ before any task starts.
 | `reasoning_effort` | string | no | As `--reasoning-effort`, for this task only. |
 | `require_verification` | boolean | no | Default `false`. When `true`, an `inconclusive` or `unchanged` verdict counts as a failure (see below). |
 | `acceptance_checks` | list | no | A list of check objects, as `--acceptance-checks`, always inline JSON. See [Acceptance checks](../guides/acceptance-checks.md). |
-| `escalate` | boolean or string | no | As `--escalate`: `true` climbs the ladder named `default` (or one built from the ratings), a string names a ladder in `models_list.yaml`. Can't be combined with `model`. A missing model file or an unknown ladder is a `400`. |
+| `escalate` | boolean or string | no | As `--escalate`: `true` climbs the ladder named `default` (or one built from the ratings), a string names a ladder in `escalation.yaml`. Can't be combined with `model`. A missing model file or an unknown ladder is a `400`. |
 
 ## `GET /health`
 

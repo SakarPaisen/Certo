@@ -30,7 +30,15 @@ from .model_catalog import (
 from .model_files import example_path, find, missing_message
 
 DEFAULT_BENCH_FILE = "bench.yaml"
-_TOP_LEVEL_KEYS = {"tasks", "repeats", "arms", "models_file", "models_list_file", "tasks_dir"}
+_TOP_LEVEL_KEYS = {
+    "tasks",
+    "repeats",
+    "arms",
+    "models_file",
+    "models_list_file",
+    "escalation_file",
+    "tasks_dir",
+}
 # Arm names become file names in the results folder.
 _ARM_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
@@ -58,6 +66,9 @@ class BenchConfig:
     models_file: str
     catalog: dict[str, ModelCatalogEntry]
     models_list_file: str = ""
+    # escalation.yaml, when there is one: cost_axis and max_rungs for the
+    # derived ladders of `escalate` arms. Task profiles are never used.
+    escalation_file: str = ""
     # models.yaml warnings (catalog_check.py), printed with the plan.
     catalog_warnings: list[str] = field(default_factory=list)
     # The whole catalog (task profiles, escalation settings), for ladders.
@@ -168,10 +179,20 @@ def load_bench_config(path: str = DEFAULT_BENCH_FILE) -> BenchConfig:
                 f"{LIST_FILE}. {missing_message(name, repr(key) + ' in the benchmark file')}"
             )
         files[key] = found
+    escalation_file = raw.get("escalation_file") or ""
+    if not isinstance(escalation_file, str):
+        raise BenchConfigError(f"{where}: 'escalation_file' must be a path.")
+    if escalation_file and not Path(escalation_file).is_file():
+        raise BenchConfigError(
+            f"{where}: 'escalation_file' names {escalation_file!r}, which doesn't exist."
+        )
     catalog_warnings: list[str] = []
     try:
         loaded = load_checked_catalog(
-            files["models_file"], files["models_list_file"], on_warning=catalog_warnings.append
+            files["models_file"],
+            files["models_list_file"],
+            escalation_file=escalation_file,
+            on_warning=catalog_warnings.append,
         )
         catalog = {e.name: e for e in loaded.models}
     except ModelCatalogError as exc:
@@ -195,6 +216,7 @@ def load_bench_config(path: str = DEFAULT_BENCH_FILE) -> BenchConfig:
         arms=_arms(raw.get("arms"), catalog, where),
         models_file=str(Path(files["models_file"]).resolve()),
         models_list_file=str(Path(files["models_list_file"]).resolve()),
+        escalation_file=str(Path(escalation_file).resolve()) if escalation_file else "",
         catalog=catalog,
         catalog_warnings=catalog_warnings,
         model_catalog=loaded,

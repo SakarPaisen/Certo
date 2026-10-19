@@ -40,19 +40,27 @@ exactly as before. To compare it with `--auto-model`, see
 
 ## Set up a ladder
 
-Escalation uses the two model files (see
-[models.yaml and models_list.yaml](../reference/models-yaml.md)):
-`models_list.yaml` describes the models and holds the ladders;
-`models.yaml` holds your keys and says which models you use. Only models
-enabled in `models.yaml` are ever used; a rung whose model isn't enabled
-there is skipped.
+Escalation uses three model files (see
+[The model files](../reference/models-yaml.md)):
+`models_list.yaml` describes the models; `models.yaml` holds your keys and
+says which models you use; `escalation.yaml` holds your ladders. The last
+one is optional: without it, Certo builds a ladder from the ratings. Copy
+the example Certo ships to start one; `certo check` prints the command:
+
+```bash
+cp <examples>/escalation.yaml.example ~/.config/certo/escalation.yaml
+```
+
+Only models enabled in `models.yaml` are ever used; a rung whose model
+isn't enabled there is skipped.
 
 ### An explicit ladder
 
 Write the order yourself, under `escalation.ladders` in
-`models_list.yaml`:
+`escalation.yaml`:
 
 ```yaml
+# escalation.yaml
 escalation:
   ladders:
     default:
@@ -78,7 +86,7 @@ An explicit ladder always wins over a derived one.
 
 ### A derived ladder
 
-With no `escalation` section, or no ladder named `default`, Certo builds
+With no `escalation.yaml`, or no ladder named `default` in it, Certo builds
 the ladder from your ratings. It is the same for every task, and printed
 before the run starts.
 
@@ -307,7 +315,7 @@ Certo's own run of two ladders, with the numbers, is
 
 ## Related
 
-- [models.yaml and models_list.yaml](../reference/models-yaml.md#escalation)
+- [The model files](../reference/models-yaml.md#escalationyaml)
 - [Pick models automatically](pick-models-automatically.md)
 - [Auto-model or escalation](../concepts/auto-model-or-escalation.md):
   how the two differ, and when to use which

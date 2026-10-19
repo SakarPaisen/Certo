@@ -85,10 +85,12 @@ Per-run overrides: `--model`, `--api-key`, `--base-url`,
 | Variable | Default | Meaning |
 |---|---|---|
 | `CERTO_MODEL_SELECTION` | `manual` | `manual`, `auto` or `escalate`. `auto` is the same as `--auto-model`, `escalate` the same as `--escalate`. |
-| `CERTO_MODELS_FILE` | empty | Your personal `models.yaml` (keys, addresses, which models you use). Empty: `./models.yaml`, else `~/.config/certo/models.yaml`. Read when selection is `auto` or `escalate`, and by `certo check`. See [models.yaml and models_list.yaml](models-yaml.md). |
-| `CERTO_MODELS_LIST_FILE` | empty | The model catalog, `models_list.yaml` (models, ratings, task profiles, ladders). Empty: `./models_list.yaml`, else `~/.config/certo/models_list.yaml`. |
+| `CERTO_MODELS_FILE` | empty | Your personal `models.yaml` (keys, addresses, which models you use). Empty: `./models.yaml`, else `~/.config/certo/models.yaml`. Read when selection is `auto` or `escalate`, and by `certo check`. See [The model files](models-yaml.md). |
+| `CERTO_MODELS_LIST_FILE` | empty | The model catalog, `models_list.yaml` (the models and their ratings). Empty: `./models_list.yaml`, else `~/.config/certo/models_list.yaml`. |
+| `CERTO_TASK_PROFILES_FILE` | empty | The task profiles for `--auto-model`, `task_profiles.yaml`. Optional. Empty: `./task_profiles.yaml`, else `~/.config/certo/task_profiles.yaml`, else none. |
+| `CERTO_ESCALATION_FILE` | empty | The ladders for `--escalate` (and `certo bench`), `escalation.yaml`. Optional. Empty: `./escalation.yaml`, else `~/.config/certo/escalation.yaml`, else none, and `--escalate` derives a ladder from the ratings. |
 | `CERTO_MAX_TASK_COST` | empty | A cap, in US dollars, on an escalation run. Before each rung starts, Certo stops climbing if the cost recorded so far has reached it, and keeps the verdict it has. Models with no known price count as 0, and the note says so. Empty means no cap. Used only by escalation. |
-| `CERTO_ESCALATION_LADDER` | empty | With `escalate`: the ladder in `models_list.yaml` to climb. Empty uses the ladder named `default`, or one built from the ratings. |
+| `CERTO_ESCALATION_LADDER` | empty | With `escalate`: the ladder in `escalation.yaml` to climb. Empty uses the ladder named `default`, or one built from the ratings. |
 
 ## Skills
 

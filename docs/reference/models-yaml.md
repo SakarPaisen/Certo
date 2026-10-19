@@ -1,50 +1,61 @@
-# models.yaml and models_list.yaml
+# The model files
 
-The format of the two files behind automatic model selection
+The format of the files behind automatic model selection
 (`--auto-model`), escalation (`--escalate`) and the benchmark
 (`certo bench`). It is for looking things up; the guides are
 [Pick models automatically](../guides/pick-models-automatically.md),
 [Escalate between models](../guides/escalate-between-models.md) and
 [Benchmark models and strategies](../guides/benchmark.md).
 
-- **`models_list.yaml`** is the catalog: which models exist, their LiteLLM
-  ids, descriptions and ratings, the task profiles and the escalation
-  ladders. It holds no keys and no addresses.
-- **`models.yaml`** holds your personal settings: which models of the list
-  you use, each with its API key or server address, whether it is
-  activated, and any overrides. It holds keys: keep it out of git.
+| File | Holds | Needed |
+|---|---|---|
+| `models_list.yaml` | The catalog: which models exist, their LiteLLM ids, descriptions and ratings. No keys, no addresses. | Always |
+| `models.yaml` | Your personal settings: which models of the list you use, each with its API key or server address, whether it is activated, and any overrides. It holds keys: keep it out of git. | Always |
+| `task_profiles.yaml` | The task profiles `--auto-model` chooses with. | Optional |
+| `escalation.yaml` | The ladders `--escalate` climbs, and the settings for a derived ladder. Also read by `certo bench`. | Optional |
 
-Certo needs both. It reads them for `--auto-model` and `--escalate` (or
+Certo reads them for `--auto-model` and `--escalate` (or
 `CERTO_MODEL_SELECTION=auto` / `escalate`), for `certo check` and for
-`certo bench`. With the default (manual) selection, neither is read.
+`certo bench`. With the default (manual) selection, none is read.
+
+`task_profiles.yaml` and `escalation.yaml` each belong to one mode, so you
+only need the one for the mode you use. Without `task_profiles.yaml`,
+`--auto-model` ranks the enabled models with no weights, so the order of
+`models_list.yaml` decides. Without `escalation.yaml`, `--escalate` builds
+a ladder from the ratings.
 
 ## Start from the examples
 
-Certo ships both files only as examples, inside the package, and never
-reads an example. Copy each one and edit your copy:
+Certo ships all four files only as examples, inside the package, and never
+reads an example. Copy the ones you need and edit your copies:
 
 ```bash
 cp <examples>/models_list.yaml.example ~/.config/certo/models_list.yaml
 cp <examples>/models.yaml.example ~/.config/certo/models.yaml
+cp <examples>/task_profiles.yaml.example ~/.config/certo/task_profiles.yaml   # for --auto-model
+cp <examples>/escalation.yaml.example ~/.config/certo/escalation.yaml         # for --escalate
 ```
 
 `certo check` prints the exact `cp` command, with the examples folder of
-your installation, when a file is missing. In the repository the examples
-are [models_list.yaml.example](../../src/certo/examples/models_list.yaml.example)
-and [models.yaml.example](../../src/certo/examples/models.yaml.example). A
-new Certo release can update the examples; it never touches your copies,
-so add models and change ratings in your copy freely.
+your installation, when a required file is missing, and lists the two
+optional files it found. In the repository the examples are in
+[src/certo/examples/](../../src/certo/examples/models_list.yaml.example)
+(`models_list.yaml.example`, `models.yaml.example`,
+`task_profiles.yaml.example`, `escalation.yaml.example`). A new Certo
+release can update the examples; it never touches your copies, so add
+models, change ratings and write ladders in your copies freely.
 
 ## Where Certo looks
 
 Each file is looked up on its own, in this order, and the first one found
 is used whole:
 
-1. the path a setting names: `CERTO_MODELS_LIST_FILE` and
-   `CERTO_MODELS_FILE` (for `certo bench`: `models_list_file` and
-   `models_file` in its benchmark file);
+1. the path a setting names: `CERTO_MODELS_LIST_FILE`,
+   `CERTO_MODELS_FILE`, `CERTO_TASK_PROFILES_FILE` and
+   `CERTO_ESCALATION_FILE` (for `certo bench`: `models_list_file`,
+   `models_file` and `escalation_file` in its benchmark file);
 2. the current folder (the project folder): `./models_list.yaml`,
-   `./models.yaml`;
+   `./models.yaml`, `./task_profiles.yaml`, `./escalation.yaml`;
 3. the user settings folder, next to the user `.env`:
    `~/.config/certo/` (or `$XDG_CONFIG_HOME/certo/`).
 
@@ -60,20 +71,6 @@ models:          # required, a non-empty list
     timeout_seconds: 900
     description: ...
     ratings: {reasoning: 1, precision: 2, code: 1, cost: 5}
-
-task_profiles:   # optional
-  debugging:
-    triggers: [...]
-    weights: {...}
-  default:
-    weights: {...}
-
-escalation:      # optional
-  cost_axis: cost
-  max_rungs: 3
-  ladders:
-    default:
-      - model: ...
 ```
 
 | Model field | Required | Meaning |
@@ -123,7 +120,7 @@ Certo checks the normal settings first.
 
 Before version 0.1.10 everything was in `models.yaml`. An old-style file
 (with model ids, `task_profiles` or `escalation`) is an error that says
-what to move to `models_list.yaml`.
+what to move where.
 
 ## Ratings: higher is always better
 
@@ -135,9 +132,20 @@ this means **cost-effectiveness**: `cost: 5` is a cheap (or free, local)
 model, `cost: 1` an expensive one. The example list explains the scale
 behind its numbers in its comments.
 
-## `task_profiles`
+## `task_profiles.yaml`
 
 A profile says which axes matter for a kind of task, for `--auto-model`.
+The file has one top-level key, `task_profiles`:
+
+```yaml
+task_profiles:
+  debugging:
+    triggers: [fix, bug, crash]
+    model: claude-sonnet-5-5         # optional
+    weights: {reasoning: 3, precision: 2, code: 2, cost: 0.5}
+  default:
+    weights: {reasoning: 1, cost: 3, precision: 1, code: 1}
+```
 
 | Field | Meaning |
 |---|---|
@@ -161,13 +169,14 @@ highest first; equal scores keep the order of the list. If no profile
 matches and there is no `default`, every model scores 0 and the order of
 the list decides.
 
-## `escalation`
+## `escalation.yaml`
 
 Settings for escalation: running a task on the first model of a ladder,
 and moving to the next one only when Certo's verification shows the model
-couldn't finish, or its provider fails. The whole section is optional. The guide, with how a
-derived ladder is computed, is
-[Escalate between models](../guides/escalate-between-models.md).
+couldn't finish, or its provider fails. The file has one top-level key,
+`escalation`, and every field in it is optional. A file with only
+comments sets nothing. The guide, with how a derived ladder is computed,
+is [Escalate between models](../guides/escalate-between-models.md).
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -181,7 +190,7 @@ derived ladder is computed, is
 escalation:
   ladders:
     default:
-      - model: qwen-local      # a name from models:
+      - model: qwen-local      # a name from models_list.yaml
         retries: 1             # optional
         reasoning_effort: ""   # optional
       - model: gpt-luna
@@ -190,7 +199,7 @@ escalation:
 
 | Rung field | Required | Meaning |
 |---|---|---|
-| `model` | yes | The `name` of a model in `models`. |
+| `model` | yes | The `name` of a model in `models_list.yaml`. |
 | `retries` | no | Fix attempts on this rung after a failed check. Default: `CERTO_MAX_VERIFY_RETRIES`. |
 | `reasoning_effort` | no | Reasoning effort for this rung only, instead of the model's own. |
 
@@ -213,6 +222,25 @@ A ladder named `default` is the one used when no ladder name is given.
 With no ladder at all, Certo builds one from the enabled models' ratings.
 A rung whose model isn't enabled in `models.yaml` is skipped.
 
+## Moving from one file (0.1.19 and earlier)
+
+Up to 0.1.19, the task profiles and the ladders were sections of
+`models_list.yaml`. Certo still reads them there, and says so at every
+run and in `certo check`:
+
+```text
+  Task profiles: none (optional, for --auto-model)
+  Escalation: none (optional, for --escalate)
+  Warning: .../models_list.yaml has the 'task_profiles:' section. Since 0.1.20 it belongs in its own file, task_profiles.yaml, next to models_list.yaml: move the section there as it is. It is still read for now.
+  Warning: .../models_list.yaml has the 'escalation:' section. Since 0.1.20 it belongs in its own file, escalation.yaml, next to models_list.yaml: move the section there as it is. It is still read for now.
+```
+
+To move, cut the whole `task_profiles:` section, with its key, into a new
+`task_profiles.yaml`, and the `escalation:` section into `escalation.yaml`,
+next to your `models_list.yaml`. Nothing inside a section changes. When
+both are there, the new file is used, and a warning says the section left
+in `models_list.yaml` is ignored.
+
 ## Checks
 
 Every command that reads the files checks them the same way. Errors stop
@@ -220,7 +248,9 @@ the command; warnings are printed, and the command runs.
 
 Errors:
 
-- a file is missing or not valid YAML, `models` is missing or empty, an
+- a required file is missing, a file a setting names doesn't exist, a
+  file is not valid YAML, `task_profiles.yaml` or `escalation.yaml` holds
+  anything but its one key, `models` is missing or empty, an
   entry has no `name` (or, in the list, no `model`), a rating or weight is
   not a number, or a field has the wrong type or an unknown name;
 - `models_list.yaml` has an `api_key`, `base_url` or `activated`;
@@ -235,10 +265,15 @@ Errors:
   model with a different `reasoning_effort` is allowed);
 - a rung has a negative `retries`;
 - `escalation.cost_axis` is set, and no model has a rating with that name;
+- a task profile's `model` names a model that doesn't exist;
 - a ladder has no usable rung.
 
 Warnings:
 
+- `models_list.yaml` still has a `task_profiles:` or `escalation:`
+  section (see [Moving from one file](#moving-from-one-file-0119-and-earlier));
+- a task profile's `model` isn't enabled in `models.yaml`: the weights
+  pick the model instead;
 - a rung names a model that isn't in `models.yaml`, or has
   `activated: false`: the rung is skipped;
 - a ladder has a single usable rung, so it can't escalate;

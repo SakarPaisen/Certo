@@ -1701,7 +1701,7 @@ def test_the_escalate_setting_works_without_the_flag(monkeypatch, tmp_path):
         (["do it", "--escalate", "--model", "openai/x"], "can't be combined"),
         (
             ["do it", "--escalate", "fast"],
-            "no escalation ladder named 'fast' in models_list.yaml. Ladders: cloud-only, default.",
+            "no escalation ladder named 'fast' in escalation.yaml. Ladders: cloud-only, default.",
         ),
         (["--resume", "--escalate"], "--resume can't be combined with escalation"),
     ],

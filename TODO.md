@@ -164,14 +164,6 @@ first item is the suggested next one.
   ~124k in the baseline). Use the per-model average from earlier
   `cost.json` files in the same parent folder; guess only for models with
   no history.
-- **Move task profiles and escalation ladders out of `models_list.yaml`**
-  into an optional `model_policy.yaml` (user's idea, 2026-10-17). The list
-  keeps only shared catalog data; the policy holds `task_profiles:` and
-  `escalation:`. Same lookup as the other files; built-in defaults when
-  missing; read the old sections for a version or two with a warning;
-  `catalog_check` validates across both; `bench.yaml` gains
-  `model_policy_file`. Feature bump; docs: models-yaml reference, both
-  model guides, the auto-model/escalation concept page.
 - **A cost ceiling for single-model runs.** `CERTO_MAX_TASK_COST`
   applies to escalation only (checked before each rung), and bench has
   `--max-cost`; a plain run is bounded by time and iterations, not money.
@@ -244,7 +236,9 @@ first item is the suggested next one.
   the `check --models` call and deactivate failures, print the ladder. The
   first run must still need no model files.
 - **`certo models update`**: compare the shipped example catalog with the
-  user's `models_list.yaml` and offer to merge.
+  user's `models_list.yaml` and offer to merge. Since 0.1.20 the list holds
+  only model data, so a merge never touches the user's profiles or
+  ladders.
 - **MCP server**, so Claude Desktop, Cursor, Zed and others can call Certo
   as a tool and get the verdict back.
 - **Run report**: an HTML/Markdown summary per run (what changed, which
@@ -317,6 +311,10 @@ database).
 
 ## Smaller bugs
 
+- **Stop reading `task_profiles:` / `escalation:` in `models_list.yaml`.**
+  Since 0.1.20 they have their own files; the old sections are still read
+  with a warning. Remove that path (and the tests that use the old layout
+  through `write_model_files`) a version or two later.
 - **`--auto-model` refuses to run when a ladder has no usable rung.**
   `certo check`'s catalog errors include escalation ladders, which
   `--auto-model` never uses; with only two models enabled, two unusable

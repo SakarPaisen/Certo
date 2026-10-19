@@ -47,8 +47,10 @@ often go wrong.
 ## How the model files and `bench.yaml` relate
 
 - **`models_list.yaml`** describes the models and **`models.yaml`** holds
-  your keys and the models you use: the same two files `--auto-model`
-  uses. See [models.yaml and models_list.yaml](../reference/models-yaml.md).
+  your keys and the models you use: the same files `--auto-model` and
+  `--escalate` use. **`escalation.yaml`**, when you have one, sets
+  `cost_axis` and `max_rungs` for the ladder an `escalate` arm derives.
+  See [The model files](../reference/models-yaml.md).
 - **`bench.yaml`** says what to compare. Each arm names a strategy and
   models **by their `name`**. It holds no keys, so you can commit it.
 

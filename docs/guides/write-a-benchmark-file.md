@@ -10,17 +10,20 @@ benchmark measures, and how to read its results, is in
 ## 1. Make the models available
 
 A benchmark file names models; it never holds keys or addresses. Those
-come from the two model files, the same ones `--auto-model` and
-`--escalate` use:
+come from the model files, the same ones `--auto-model` and `--escalate`
+use:
 
 - **`models_list.yaml`**, the catalog: every model's id and ratings.
 - **`models.yaml`**, your settings: the models you use, with their key or
   server address.
+- **`escalation.yaml`**, optional: `cost_axis` and `max_rungs` for the
+  ladder an `escalate` arm derives. An arm's own `models:` list is its
+  ladder; the named ladders in this file aren't used.
 
 If you don't have them yet, copy the examples that ship with Certo: when
 a model file is missing, Certo's error message prints the `cp` command.
 See
-[models.yaml and models_list.yaml](../reference/models-yaml.md).
+[The model files](../reference/models-yaml.md).
 
 A benchmark can only use a model that `models.yaml` lists and doesn't
 mark `activated: false`. Before writing the benchmark file, check that

@@ -1,8 +1,9 @@
 # Auto-model or escalation: two ways to choose models
 
-Certo can choose the model for a task in two ways. Both use your model
-files (`models_list.yaml` and `models.yaml`), but they answer different
-questions:
+Certo can choose the model for a task in two ways. Both use your models
+(`models_list.yaml` and `models.yaml`), and each has its own file for your
+choices: `task_profiles.yaml` for `--auto-model`, `escalation.yaml` for
+`--escalate`. They answer different questions:
 
 - **`--auto-model`** asks: *which model fits this task?* It decides once,
   before the run, from the words in the task.
@@ -22,7 +23,7 @@ turn each on. The step-by-step setup is in two guides:
 |---|---|---|
 | **The question** | Which model fits this task? | Which model on my list can finish this task? |
 | **When it decides** | Once, before the run, from the task text | Step by step, after each run, from Certo's verdict |
-| **What it uses** | Task profiles: trigger words and weights | A ladder: one you write, or one derived from capability and cost |
+| **What it uses** | Task profiles (`task_profiles.yaml`): trigger words and weights | A ladder (`escalation.yaml`): one you write, or one derived from capability and cost |
 | **First model** | The best fit for the task's profile, often an expensive one | The first rung of the ladder: usually the cheapest |
 | **Changes model when** | The provider fails (rate limit, outage, bad key), or a fix attempt still fails Certo's checks | The model's whole run fails (checks still fail after all its fix attempts, a check timed out, the agent is stuck, or it changed no file), or its provider fails (outage, rate limit, rejected key). Not when the task's own time budget or cost cap runs out: that stops the climb |
 | **How it changes** | Inside the same conversation: the next model carries on from where the last one was | A new conversation in the same folder, with a note on what the previous model did |
@@ -36,7 +37,7 @@ The two modes can't be combined: `--escalate` with `--auto-model` or
 
 ## How `--auto-model` decides
 
-1. **It picks a task profile.** Each profile in `models_list.yaml` has
+1. **It picks a task profile.** Each profile in `task_profiles.yaml` has
    trigger words. Certo looks for them in the task's first line (a task
    file's title, or the whole task when it is one line), as whole words,
    profile by profile in the order of the file; the first profile with a
@@ -86,7 +87,7 @@ Two things follow from how it works:
 ## How `--escalate` decides
 
 1. **It takes a ladder.** `--escalate NAME` uses the ladder with that name
-   in `models_list.yaml`. Plain `--escalate` uses the ladder named
+   in `escalation.yaml`. Plain `--escalate` uses the ladder named
    `default`, and when there is none, a ladder Certo derives from the
    ratings.
 2. **It runs the first rung** as a normal Certo run, with its fix
@@ -201,10 +202,10 @@ each ladder and the ladder Certo would derive, with any problems found.
 ## Related
 
 - [Pick models automatically](../guides/pick-models-automatically.md):
-  set up `models_list.yaml`, `models.yaml` and task profiles.
+  set up `models_list.yaml`, `models.yaml` and `task_profiles.yaml`.
 - [Escalate between models](../guides/escalate-between-models.md):
   ladders, budgets and what makes Certo climb.
-- [`models_list.yaml` and `models.yaml`](../reference/models-yaml.md):
-  every field.
+- [The model files](../reference/models-yaml.md): every field of all
+  four files.
 - [How verification works](how-verification-works.md): where the verdict
   that escalation acts on comes from.

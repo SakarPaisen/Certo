@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-from model_file_helpers import write_model_files
+from model_file_helpers import write_model_files, write_split_model_files
 
 from certo.model_catalog import (
     ModelCatalog,
@@ -329,11 +329,17 @@ _BUNDLED_TASKS = Path(__file__).resolve().parent.parent / "src" / "certo"
 def test_shipped_profiles_classify_the_bundled_tasks(tmp_path, task_file, expected):
     # Until 2026-10-19, whole-text matching sent 12 of 14 real tasks to
     # `debugging` ("raise ValueError", "fix all failures" in the spec).
-    example = _BUNDLED_TASKS / "examples" / "models_list.yaml.example"
+    examples = _BUNDLED_TASKS / "examples"
+    example = examples / "models_list.yaml.example"
     names = [m["name"] for m in yaml.safe_load(example.read_text())["models"]]
     models = tmp_path / "models.yaml"
     models.write_text(yaml.safe_dump({"models": [{"name": n} for n in names]}))
-    catalog = load_model_catalog(str(example), str(models), strict=False)
+    catalog = load_model_catalog(
+        str(example),
+        str(models),
+        profiles_path=str(examples / "task_profiles.yaml.example"),
+        strict=False,
+    )
 
     task = (_BUNDLED_TASKS / task_file).read_text()
 
@@ -598,22 +604,31 @@ def test_escalation_section_shape_errors(tmp_path, section, message):
         load_model_catalog(*_write(tmp_path, _TWO_MODELS + section + "\n"))
 
 
-def test_the_commented_example_in_models_yaml_example_parses(tmp_path):
-    from pathlib import Path
-
-    text = (
-        Path(__file__).resolve().parent.parent / "src/certo/examples/models_list.yaml.example"
-    ).read_text()
-    block = text[text.index("# escalation:") :]
-    uncommented = "\n".join(line[2:] for line in block.splitlines() if line.startswith("# "))
-    models = text[
-        : text.index(
-            "# =============================================================================\n# DETERMINISTIC"
-        )
+def test_the_commented_ladders_in_the_escalation_example_parse(tmp_path):
+    # Uncommenting the example's ladders must give a valid escalation.yaml.
+    examples = Path(__file__).resolve().parent.parent / "src/certo/examples"
+    text = (examples / "escalation.yaml.example").read_text()
+    lines = []
+    for line in text[text.index("escalation:") :].splitlines():
+        if line.startswith("#   ") or line.startswith("#     "):
+            lines.append(line[2:])
+        elif not line.startswith("#"):
+            lines.append(line)
+    escalation = tmp_path / "escalation.yaml"
+    escalation.write_text("\n".join(lines) + "\n")
+    names = [
+        m["name"]
+        for m in yaml.safe_load((examples / "models_list.yaml.example").read_text())["models"]
     ]
-    catalog = load_model_catalog(*_write(tmp_path, models + "\n" + uncommented + "\n"))
+    models = tmp_path / "models.yaml"
+    models.write_text(yaml.safe_dump({"models": [{"name": n} for n in names]}))
+
+    catalog = load_model_catalog(
+        str(examples / "models_list.yaml.example"), str(models), escalation_path=str(escalation)
+    )
 
     assert list(catalog.escalation.ladders) == ["default", "local-only"]
+    assert catalog.escalation.max_rungs == 3
 
 
 # --- the two files: models_list.yaml and models.yaml ------------------------------
@@ -739,8 +754,92 @@ def test_the_shipped_examples_load_together():
 
     examples = Path(__file__).resolve().parent.parent / "src/certo/examples"
     catalog = load_model_catalog(
-        str(examples / "models_list.yaml.example"), str(examples / "models.yaml.example")
+        str(examples / "models_list.yaml.example"),
+        str(examples / "models.yaml.example"),
+        profiles_path=str(examples / "task_profiles.yaml.example"),
+        escalation_path=str(examples / "escalation.yaml.example"),
     )
-    assert check_catalog(catalog).errors == []
+    report = check_catalog(catalog)
+    assert report.errors == []
+    assert catalog.load_warnings == ()  # nothing left to move in the list
+    assert catalog.task_profiles
     assert any(m.activated for m in catalog.models)
     assert any(not m.configured for m in catalog.models)
+
+
+# --- task_profiles.yaml and escalation.yaml (0.1.20) -------------------------
+
+_LAYOUT_YAML = """
+models:
+  - name: cheap
+    model: openai/gpt-4o-mini
+    ratings: {reasoning: 2, cost: 5}
+  - name: strong
+    model: anthropic/claude-opus-4
+    ratings: {reasoning: 5, cost: 1}
+task_profiles:
+  debugging:
+    triggers: [fix]
+    weights: {reasoning: 3}
+escalation:
+  max_rungs: 2
+  ladders:
+    default:
+      - model: cheap
+      - model: strong
+"""
+
+
+def test_profiles_and_ladders_are_read_from_their_own_files(tmp_path):
+    files = write_split_model_files(tmp_path, _LAYOUT_YAML)
+    assert "task_profiles" not in Path(files["list_path"]).read_text()
+
+    catalog = load_model_catalog(**files)
+
+    assert [p.name for p in catalog.task_profiles] == ["debugging"]
+    assert catalog.escalation.max_rungs == 2
+    assert [r.model for r in catalog.escalation.ladders["default"].rungs] == ["cheap", "strong"]
+    assert catalog.load_warnings == ()
+
+
+def test_sections_left_in_the_list_still_work_with_a_warning(tmp_path):
+    # The layout before 0.1.20: everything in models_list.yaml.
+    catalog = load_model_catalog(*_write(tmp_path, _LAYOUT_YAML))
+
+    assert [p.name for p in catalog.task_profiles] == ["debugging"]
+    assert catalog.escalation.max_rungs == 2
+    assert len(catalog.load_warnings) == 2
+    assert (
+        "has the 'task_profiles:' section. Since 0.1.20 it belongs in its own file, "
+        "task_profiles.yaml" in catalog.load_warnings[0]
+    )
+    assert "escalation.yaml" in catalog.load_warnings[1]
+
+
+def test_the_own_file_wins_over_a_section_left_in_the_list(tmp_path):
+    list_path, models_path = _write(tmp_path, _LAYOUT_YAML)
+    profiles = tmp_path / "task_profiles.yaml"
+    profiles.write_text("task_profiles:\n  scaffolding:\n    triggers: [scaffold]\n")
+
+    catalog = load_model_catalog(list_path, models_path, profiles_path=str(profiles))
+
+    assert [p.name for p in catalog.task_profiles] == ["scaffolding"]
+    assert any(
+        "still has the 'task_profiles:' section; it is ignored" in w for w in catalog.load_warnings
+    )
+
+
+@pytest.mark.parametrize(
+    ("kwarg", "text"),
+    [
+        ("profiles_path", "task_profiles: {}\nmodels: []\n"),
+        ("escalation_path", "escalation: {}\ntask_profiles: {}\n"),
+    ],
+)
+def test_a_section_file_holds_only_its_section(tmp_path, kwarg, text):
+    list_path, models_path = _write(tmp_path, _MINIMAL_YAML)
+    extra = tmp_path / "extra.yaml"
+    extra.write_text(text)
+
+    with pytest.raises(ModelCatalogError, match="may only contain"):
+        load_model_catalog(list_path, models_path, **{kwarg: str(extra)})

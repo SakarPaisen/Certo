@@ -132,11 +132,13 @@ def test_wheel_ships_the_builtin_skill_catalog(built):
 
 
 def test_wheel_ships_the_model_file_examples(built):
-    # Certo ships the two model files only as examples, inside the package,
-    # so an installed Certo can tell users what to copy.
+    # Certo ships the model files only as examples, inside the package, so
+    # an installed Certo can tell users what to copy.
     names = set(_wheel_names(built["wheel"]))
     assert "certo/examples/models_list.yaml.example" in names
     assert "certo/examples/models.yaml.example" in names
+    assert "certo/examples/task_profiles.yaml.example" in names
+    assert "certo/examples/escalation.yaml.example" in names
     assert "certo/examples/bench.yaml.example" in names
 
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from model_file_helpers import write_model_files
+from model_file_helpers import write_model_files, write_split_model_files
 
 from certo.catalog_check import check_catalog, load_checked_catalog, usable_rungs
 from certo.model_catalog import ModelCatalogError, load_model_catalog
@@ -34,8 +34,9 @@ task_profiles:
 
 
 def _report(tmp_path, extra: str = "", models: str = _MODELS):
+    # The layout since 0.1.20: profiles and ladders in their own files.
     return check_catalog(
-        load_model_catalog(*write_model_files(tmp_path, models + extra), strict=False)
+        load_model_catalog(**write_split_model_files(tmp_path, models + extra), strict=False)
     )
 
 
@@ -227,12 +228,18 @@ def test_a_ladder_whose_capability_goes_down(tmp_path):
 
 
 def test_warnings_reach_the_callback(tmp_path):
-    list_path, models_path = write_model_files(
+    files = write_split_model_files(
         tmp_path,
         _MODELS + "escalation:\n  ladders:\n    x:\n      - model: strong\n      - model: local\n",
     )
     seen: list[str] = []
-    catalog = load_checked_catalog(models_path, list_path, on_warning=seen.append)
+    catalog = load_checked_catalog(
+        files["models_path"],
+        files["list_path"],
+        task_profiles_file=files["profiles_path"],
+        escalation_file=files["escalation_path"],
+        on_warning=seen.append,
+    )
     assert len(seen) == 1
     assert [r.model for r in usable_rungs(catalog.escalation.ladders["x"], catalog)] == [
         "strong",

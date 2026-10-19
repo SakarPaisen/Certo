@@ -199,9 +199,13 @@ class Config:
     # been. The model files (model_files.py) are read only for "auto" and
     # "escalate", and by `certo check`: CERTO_MODELS_FILE is the personal
     # models.yaml, CERTO_MODELS_LIST_FILE the catalog; blank looks them up.
+    # CERTO_TASK_PROFILES_FILE and CERTO_ESCALATION_FILE name the two
+    # optional files (since 0.1.20); blank looks them up too.
     model_selection: str = DEFAULT_MODEL_SELECTION  # one of MODEL_SELECTION_MODES
     models_file: str = DEFAULT_MODELS_FILE
     models_list_file: str = ""
+    task_profiles_file: str = ""
+    escalation_file: str = ""
     # CERTO_ESCALATION_LADDER: with model_selection "escalate", the ladder
     # from models_list.yaml to climb; blank: `default`, else a derived one
     # (see escalation.py).
@@ -618,6 +622,8 @@ def load_config(
     )
     models_file = _get(env, "MODELS_FILE") or DEFAULT_MODELS_FILE
     models_list_file = _get(env, "MODELS_LIST_FILE") or ""
+    task_profiles_file = _get(env, "TASK_PROFILES_FILE") or ""
+    escalation_file = _get(env, "ESCALATION_FILE") or ""
     escalation_ladder = _get(env, "ESCALATION_LADDER") or ""
     max_task_cost = _parse_optional_cost(env, "MAX_TASK_COST")
     artifacts_dir = _get(env, "ARTIFACTS_DIR") or ""
@@ -665,6 +671,8 @@ def load_config(
         model_selection=model_selection,
         models_file=models_file,
         models_list_file=models_list_file,
+        task_profiles_file=task_profiles_file,
+        escalation_file=escalation_file,
         escalation_ladder=escalation_ladder,
         max_task_cost=max_task_cost,
         artifacts_dir=artifacts_dir,

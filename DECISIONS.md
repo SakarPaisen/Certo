@@ -772,3 +772,13 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   enabled; the weights order the fallbacks, so a failure still has
   somewhere to go. A single name, not a list: an ordered list would be a
   second kind of ladder; add one only if someone needs it.
+- **Task profiles and ladders get their own files** (0.1.20), the Author's
+  call: `task_profiles.yaml` (`--auto-model`) and `escalation.yaml`
+  (`--escalate`, bench), each optional and found like the other two. One
+  file per mode, so `models_list.yaml` holds only model data that a
+  release can update without touching the user's choices. Supersedes the
+  TODO idea of a single `model_policy.yaml`. Same top-level key as the old
+  section, so moving is cut and paste. The old sections are still read,
+  with a warning, rather than an error or an automatic rewrite: nothing
+  breaks, and Certo never edits a user's file. When both exist, the file
+  wins.

@@ -76,8 +76,9 @@ Certo removes its own folder from the terminal's `PATH`.
   keeps it out of project repositories.
 - `certo "<task>" --api-key ...` does put the key in your shell history.
   Prefer a variable.
-- `models.yaml` holds keys too. Keep it out of git. `models_list.yaml`
-  holds no keys or addresses, so it can be shared.
+- `models.yaml` holds keys too. Keep it out of git. `models_list.yaml`,
+  `task_profiles.yaml` and `escalation.yaml` hold no keys or addresses, so
+  they can be shared.
 - Run records (`CERTO_ARTIFACTS_DIR`) contain the whole transcript: your
   task, the agent's commands and their output. They don't contain your API
   key, but they may contain anything the agent printed.

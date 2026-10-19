@@ -583,6 +583,15 @@ def test_models_file_defaults_and_override():
     assert cfg.models_file == "./custom-models.yaml"
 
 
+def test_task_profiles_and_escalation_files_default_to_lookup_and_can_be_set():
+    assert load_config(_base_env()).task_profiles_file == ""
+    assert load_config(_base_env()).escalation_file == ""
+    cfg = load_config(
+        _base_env(CERTO_TASK_PROFILES_FILE="./p.yaml", CERTO_ESCALATION_FILE="./e.yaml")
+    )
+    assert (cfg.task_profiles_file, cfg.escalation_file) == ("./p.yaml", "./e.yaml")
+
+
 # --- Per-run artifacts directory (CERTO_ARTIFACTS_DIR) --------------------
 
 

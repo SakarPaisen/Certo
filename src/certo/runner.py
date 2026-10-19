@@ -1217,6 +1217,8 @@ def stream_task(
             cfg.models_file,
             cfg.models_list_file,
             cfg.escalation_ladder or None,
+            escalation_file=cfg.escalation_file,
+            task_profiles_file=cfg.task_profiles_file,
             on_warning=lambda w: _emit_notice(emit, f"Certo: models.yaml: {w}"),
         )
     if ladder is not None:
@@ -1254,6 +1256,8 @@ def stream_task(
         catalog = load_checked_catalog(
             cfg.models_file,
             cfg.models_list_file,
+            task_profiles_file=cfg.task_profiles_file,
+            escalation_file=cfg.escalation_file,
             on_warning=lambda w: _emit_notice(emit, f"Certo: models.yaml: {w}"),
         )
         profile = classify_task(task, catalog)

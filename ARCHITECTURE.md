@@ -165,7 +165,14 @@ given design was chosen.
   found (0.1.10): an explicit setting (`CERTO_MODELS_LIST_FILE` /
   `CERTO_MODELS_FILE`, or `models_list_file` / `models_file` in a bench
   file), else the current folder, else the user settings folder; first
-  found wins, per file. `missing_message()` prints the `cp` command for
+  found wins, per file. Since 0.1.20, `resolve_optional()` finds the two
+  optional files the same way (`task_profiles.yaml`,
+  `CERTO_TASK_PROFILES_FILE`; `escalation.yaml`, `CERTO_ESCALATION_FILE` or
+  a bench file's `escalation_file`), returning None for one that isn't
+  there. `load_model_catalog()` takes them as `profiles_path` /
+  `escalation_path`; a section left in the list is still parsed when its
+  file is absent (and ignored when present), with a `load_warnings` entry
+  that `check_catalog()` passes on. `missing_message()` prints the `cp` command for
   the shipped example in `certo/examples/`; `bench_config` does the same
   for a missing `bench.yaml` with `example_path("bench.yaml")` (0.1.17). `model_catalog.load_model_catalog
   (list_path, models_path)` merges the two into the same `ModelCatalog`
