@@ -42,8 +42,9 @@ tokens.
 
 - **The first command is slow.** The first `certo --version` took 18.6s:
   Python compiles Certo and its libraries the first time they load. Later
-  runs took about 3s. `uv tool install --compile-bytecode certo` moves
-  that work into the install.
+  runs took about 3s. With `uv tool install --compile-bytecode certo`,
+  in another empty home folder, the install took 13.6s and the first
+  `certo --version` 9.3s: about 7s less in total.
 - **The output is long.** After the banner, the run prints the agent's
   full instructions (about 500 lines) and the first message with the
   task (about 500 more) before the agent's first step. The verdict and
