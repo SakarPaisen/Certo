@@ -148,9 +148,10 @@ Each fallback adds a section of its own, with the reason for the switch.
 ## Automatic choice or escalation?
 
 `--auto-model` picks the best fit for each task up front and switches only
-on errors or failed fix attempts, inside one conversation. To start cheap
-and pay for a stronger model only when the cheap one's work fails
-verification, use [escalation](escalate-between-models.md) instead:
+on errors or failed fix attempts, inside one conversation. To run a task
+on a list of models in order, moving to the next only when a model's work
+fails verification or its provider fails (for example a cheap model
+first), use [escalation](escalate-between-models.md) instead:
 `--escalate`. The two can't be combined. How they differ, with use cases:
 [Auto-model or escalation](../concepts/auto-model-or-escalation.md).
 

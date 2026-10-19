@@ -79,7 +79,7 @@ takes you from install to your first verified project.
 | Let the agent work on a project I already have | [Work on an existing project](guides/work-on-an-existing-project.md) |
 | Answer the agent's questions, or approve each action | [Interactive and confirm mode](guides/interactive-mode.md) |
 | Let Certo choose the model for each task | [Pick models automatically](guides/pick-models-automatically.md) |
-| Start cheap, and pay for a stronger model only when needed | [Escalate between models](guides/escalate-between-models.md) |
+| Hand a task to the next model when one can't finish, or its provider fails | [Escalate between models](guides/escalate-between-models.md) |
 | Decide between automatic model choice and escalation | [Auto-model or escalation](concepts/auto-model-or-escalation.md) |
 | Set up my project so Certo can check it | [Make your project checkable](guides/make-a-project-checkable.md) |
 | Check projects in CI | [Verify in CI](guides/verify-in-ci.md) |

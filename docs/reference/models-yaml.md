@@ -162,9 +162,9 @@ the list decides.
 
 ## `escalation`
 
-Settings for escalation: running a task on a cheap model first, and moving
-to a stronger one only when Certo's verification shows the cheap one
-couldn't finish. The whole section is optional. The guide, with how a
+Settings for escalation: running a task on the first model of a ladder,
+and moving to the next one only when Certo's verification shows the model
+couldn't finish, or its provider fails. The whole section is optional. The guide, with how a
 derived ladder is computed, is
 [Escalate between models](../guides/escalate-between-models.md).
 

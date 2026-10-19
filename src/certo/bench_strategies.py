@@ -165,9 +165,9 @@ class SingleStrategy:
 
 
 class EscalateStrategy:
-    """Start on the cheapest model, climb to a stronger one only when
-    Certo's verdict shows the model couldn't finish: what `certo --escalate`
-    does. `models: [a, b, ...]` is an explicit ladder; without it, the
+    """Start on the first model, climb to the next only when Certo's
+    verdict shows the model couldn't finish or its provider failed: what
+    `certo --escalate` does. `models: [a, b, ...]` is an explicit ladder; without it, the
     ladder derived from the active models' ratings."""
 
     name = "escalate"

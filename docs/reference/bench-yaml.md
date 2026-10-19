@@ -60,8 +60,8 @@ One model, the normal Certo run: exactly what `certo "<task>"` does.
 ### `strategy: escalate`
 
 Escalation, as `certo --escalate` does it: start on the first model, and
-move to the next, stronger one only when Certo's verdict shows the model
-couldn't finish.
+move to the next one only when Certo's verdict shows the model couldn't
+finish, or its provider fails.
 
 | Key | Meaning |
 |---|---|
