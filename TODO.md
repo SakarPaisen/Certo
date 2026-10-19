@@ -14,7 +14,6 @@ first item is the suggested next one.
 
 ## Before the next release
 
-- **Run `scripts/release_check.sh`** against the built wheel.
 - **Publish** (the Author does it): `main` is ahead of origin; PyPI has
   0.1.10.
 
