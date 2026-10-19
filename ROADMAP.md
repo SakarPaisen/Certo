@@ -11,15 +11,23 @@ in `ARCHITECTURE.md`. User documentation is in `docs/`.
 
 ## Vision
 
-**Certo checks the work.** A coding agent says "done"; Certo doesn't take
-its word for it. It runs the project's own checks with no AI involved,
-gives one bounded verdict, and exits with a code a script can use.
+**Certo doesn't depend on one model or one provider.** It runs coding
+tasks on any model, local or cloud, picks the best one for each task, and
+hands a task to the next model when one can't finish or its provider
+fails.
+
+It can switch because it checks the work. A coding agent says "done";
+Certo doesn't take its word for it. It runs the project's own checks with
+no AI involved, gives one bounded verdict, and exits with a code a script
+can use. That verdict is what tells Certo when a model's work is good
+enough, and when to hand over.
 
 The name means "certain", and the plan is to earn it with numbers. Certo
 can say how often it would have been fooled: the benchmark grades every
 run with hidden tests the agent never saw, and counts the runs where
 Certo said `verified` and the hidden tests failed. No other harness
-reports that number. It is the headline of the project.
+reports that number. It is the proof behind every claim the project
+makes.
 
 The goal: people use Certo for real, multi-language applications, and
 trust its verdicts, whether the model runs on their own machine or in the
@@ -30,32 +38,37 @@ cloud.
 These shape every theme below. The full rules are the golden rules and
 working agreements in `CLAUDE.md`.
 
+- **Model-agnostic.** Switching model or provider is one setting, never
+  a code change, and no feature may tie Certo to one model or one
+  provider.
 - **Never trust "done".** A verdict comes from checks Certo runs itself.
   Where a rule can only be a prompt instruction, the docs say so.
 - **Measure before claiming.** A quality change counts when the benchmark
   shows it, on a local and a cloud model, not after a good single run.
-- **Local first, cloud never worse.** Better results from local models,
-  without making mainstream cloud models worse. Strategies for weaker
-  models are opt-in or gated by tier.
+- **Better on local models, never worse on cloud ones.** Better results
+  from local models, without making mainstream cloud models worse.
+  Strategies for weaker models are opt-in or gated by tier.
 - **Build on the OpenHands SDK.** The agent loop, tools and providers are
   the SDK's job. Certo adds configuration, verification, policy and an
   interface.
-- **Model-agnostic.** Switching provider is one setting, never a code
-  change.
 - **Honest output.** A verdict never claims more than its checks prove;
   docs never show output that wasn't produced by a real run.
 
 ## Where we are (October 2026)
 
-- Every milestone of the original build plan is done except the live
-  provider-swap proof, which only needs to be run.
+- Every milestone of the original build plan is done, including the live
+  provider-swap proof: one task, verified on an OpenAI and an Anthropic
+  model with only the model id changed.
 - Certo verifies Python, Node, Go, Rust and Java projects, with
   escalation between models, automatic model choice, resume, Docker and
-  server modes, and a benchmark. 0.1.15 is on `main`; 0.1.10 is on PyPI.
-- The first complete benchmark (0.1.13): a local 27B model and a cloud
-  model both solved all 9 tasks; Certo was fooled once, which led to the
-  `unchanged` verdict. The tasks are too small to separate the models, and
-  escalation never had to climb.
+  server modes, and a benchmark. 0.1.19 is on PyPI.
+- Published runs: baselines for 0.1.13 and 0.1.15 (135 runs, Certo fooled
+  3 times), escalation in 0.1.17 (a local-then-cloud ladder solved all 9
+  tasks, 7 of them on the local model), and a local baseline for 0.1.18
+  that chose the default local model. The tasks are too small to separate
+  a good local model from a cloud one; escalation has only climbed past a
+  model that did no work, and automatic model choice has never been
+  measured.
 
 The main risk: Certo is broader than it is proven. Several features have
 never run outside unit tests, and "verified" mostly means "passes the
