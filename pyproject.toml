@@ -1,7 +1,7 @@
 [project]
 name = "certo"
 version = "0.1.19"
-description = "Model-agnostic coding agent that verifies its own work. Picks the best model per task and re-runs your tests before it says done."
+description = "A coding agent that isn't tied to one model or provider: it picks a model per task, switches when one fails, and checks the work with your own tests."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"

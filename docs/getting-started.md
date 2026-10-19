@@ -11,9 +11,9 @@ steps in order.
   machine, or an API key for a cloud provider (OpenAI, Anthropic or
   Google Gemini). A local model keeps your code on your machine and costs
   nothing per run; a cloud model is faster and costs money per run, and
-  Certo prints the cost at the end. Later you can use both: local first,
-  and the cloud only for the tasks the local model couldn't finish (see
-  [Next steps](#next-steps)).
+  Certo prints the cost at the end. Later you can use more than one: for
+  example a local model first, and a cloud model only for the tasks it
+  couldn't finish (see [Next steps](#next-steps)).
 - **Node 18 or newer**, only for the browser sample task. The Python sample
   needs nothing else.
 
@@ -260,9 +260,12 @@ export CERTO_LLM_API_KEY=sk-...
 
 ## Next steps
 
-- Start every task on a local model, and let Certo hand only the tasks it
-  couldn't finish to a cloud model: [Escalate between models](guides/escalate-between-models.md).
-  Which local model to start with: [Choose a local model](guides/choose-a-local-model.md).
+- Use more than one model: let Certo pick one per task
+  ([Pick models automatically](guides/pick-models-automatically.md)), or
+  hand a task to the next model when one can't finish or its provider
+  fails ([Escalate between models](guides/escalate-between-models.md)).
+  For example a local model first, then a cloud one; which local model to
+  start with: [Choose a local model](guides/choose-a-local-model.md).
 - Write tasks Certo can check: [Write a task Certo can check](guides/write-a-good-task.md).
 - What to do after each verdict: [What to do after each verdict](guides/after-the-verdict.md).
 - Use a different provider: [OpenAI, Claude and Gemini](guides/openai-claude-gemini.md)

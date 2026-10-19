@@ -1,13 +1,15 @@
 # Certo
 
-**Run coding tasks on a local model. Certo checks the work with your project's own tests, and calls in a cloud model only when the local one couldn't finish.**
+**Your coding agent shouldn't depend on one model, or one provider.**
 
 [![PyPI](https://img.shields.io/pypi/v/certo.svg)](https://pypi.org/project/certo/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/alessioricco/certo/blob/main/LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://github.com/alessioricco/certo/blob/main/pyproject.toml)
 [![Built on OpenHands SDK](https://img.shields.io/badge/built%20on-OpenHands%20SDK-6f42c1.svg)](https://docs.openhands.dev/sdk)
 
-Local first, with a safety net. That is only safe if the check can be trusted, so Certo is the coding agent that doesn't take its own word for it: when the agent says it's done, Certo runs your real tests and build itself, with no AI involved, and ends with one verdict and an exit code a script can rely on. *Certo* is Italian for "sure".
+Certo runs coding tasks on any model, local or cloud. It can pick the best model for each task. When a model can't finish, or its provider goes down, it hands the task to the next one, with a note on where things stand.
+
+It knows when to switch because it doesn't take the agent's word for it: when the agent says it's done, Certo runs your real tests and build itself, with no AI involved, and ends with one verdict and an exit code a script can rely on. *Certo* is Italian for "sure".
 
 ```bash
 pip install certo
