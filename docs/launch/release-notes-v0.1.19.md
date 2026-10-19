@@ -1,8 +1,8 @@
 # Certo v0.1.19
 
-Each project now remembers which models built it. This release also
-contains [v0.1.18](release-notes-v0.1.18.md), which was not published on
-its own.
+The local default is now `qwen3.8:27b`, chosen by benchmark, and each
+project now remembers which models built it. This release also contains
+[v0.1.18](release-notes-v0.1.18.md), which was not published on its own.
 
 ## Changed: the local default is `qwen3.8:27b`
 
