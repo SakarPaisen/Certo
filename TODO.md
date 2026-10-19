@@ -46,9 +46,6 @@ first item is the suggested next one.
   nothing could be checked and haiku was never asked. Decide whether a
   rung whose last message is a tool call written as text should climb.
   Done when decided (DECISIONS.md) and, if yes, tested.
-- **Milestone 3: the live provider-swap proof.** One task with two
-  `CERTO_LLM_MODEL` values (a local and a cloud model exist since
-  2026-10-17). Not blocked any more, just not run.
 - **Re-verify the "confident but wrong" fixes live**: #1, #2, #4, #5, #6
   and #10 in `ARCHITECTURE.md` say "not re-verified live". At least the
   ones a benchmark task can reach.

@@ -131,9 +131,9 @@ version was deleted. A bump updates three places, which
 
 - Implement one milestone at a time (spec section 11). After each: run tests,
   then briefly report what changed and what's next. Use `/next-milestone`.
-- Milestone 3 remains blocked until a second provider key or local model
-  endpoint is available. When one is available, run the same task with two
-  different `CERTO_LLM_MODEL` values to prove the model-agnostic invariant.
+- Milestone 3 (the provider-swap proof) was run on 2026-10-19:
+  `docs/benchmark/provider-swap-0.1.19.md`. Re-run it the same way after a
+  change to config or LLM building.
 - Ask before adding heavy optional pieces (Docker execution, server mode) — they
   are section 9 / "optional", not part of the core.
 
