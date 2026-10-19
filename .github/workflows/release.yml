@@ -12,14 +12,19 @@ on:
 permissions:
   contents: read
 
+# Every action runs on Node.js 24. setup-uv publishes no major tags any more,
+# so it is pinned to an exact release. The runner is pinned to ubuntu-24.04
+# until a release has passed on the Ubuntu 26 image behind ubuntu-latest
+# (TODO.md).
+
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v10.3.0
         with:
           python-version: "3.12"
       - name: Tag must match pyproject.toml version
@@ -38,12 +43,12 @@ jobs:
 
   build:
     needs: verify
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v10.3.0
         with:
           python-version: "3.12"
       - run: uv build
@@ -53,7 +58,7 @@ jobs:
       # Catches "works in the dev venv only" bugs before anything is published.
       - name: Release check (installed wheel, no LLM)
         run: scripts/release_check.sh --wheel dist/*.whl
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
@@ -61,12 +66,12 @@ jobs:
 
   publish:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: pypi
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/

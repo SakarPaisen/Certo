@@ -14,14 +14,11 @@ first item is the suggested next one.
 
 ## Before the next release
 
-- **Move `release.yml` off Node.js 20 actions.** The v0.1.17 run warned
-  that `actions/checkout@v4`, `astral-sh/setup-uv@v6` and
-  `actions/upload-artifact@v4` target the deprecated Node.js 20 and are
-  forced onto Node.js 24. Done when the release run shows no Node.js 20
-  warning.
-- **Check the release run on Ubuntu 26.** `ubuntu-latest` moves to
-  Ubuntu 26 from 2026-10-19, so the next tag runs on a new image. Watch
-  that run, or pin `ubuntu-24.04` until it has passed once.
+- **Unpin the release runner from `ubuntu-24.04`.** Pinned for 0.1.18
+  because `ubuntu-latest` moved to Ubuntu 26 on 2026-10-19. Switch the
+  three jobs back once a run on `ubuntu-latest` has passed (the
+  pull-request CI below, when it exists, is the cheapest place to try).
+  While there, check the 0.1.18 release run showed no Node.js 20 warning.
 
 ## 1. Prove it
 
