@@ -307,6 +307,15 @@ database).
 
 ## Smaller bugs
 
+- **The server tests leak into the current folder and read its `.env`.**
+  Run from any folder, `tests/test_server.py` creates
+  `projects/acme-website`, `delete-me` and `keep-me` there (found
+  2026-10-19 in the repo's own `projects/`). And 4 tests (`test_health`,
+  the two unknown-id 404s, `delete_tasks_by_project_unknown_project`)
+  fail without a `CERTO_LLM_MODEL` in `./.env`. CI skips them (no
+  `server` extra), so only a developer with the extra and no `.env` sees
+  it. Give the server fixture its own config and a `tmp_path` projects
+  dir.
 - **Third-party skills: narrow license detection, `SKILL.md` only.** Eight
   permissive licenses are recognised; anything else is `unknown` and needs
   acknowledgement. Legacy single-file upstream skills can't be installed.
