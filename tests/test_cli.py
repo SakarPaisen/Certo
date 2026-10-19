@@ -1835,3 +1835,35 @@ def test_a_history_write_that_fails_never_fails_the_run(monkeypatch, capsys):
 
     assert cli.main(["do something"]) == 0
     assert "couldn't add this run to .certo/RUNS.md" in capsys.readouterr().err
+
+
+def _builds_a_readme(cfg_holder):
+    def _fake_run_task(task, cfg=None, **_):
+        Path(cfg.workspace, "README.md").write_text("# App\n")
+        cfg_holder.append(cfg)
+        summary = RunSummary(duration_seconds=1.0, models=(ModelUsage(model="openai/gpt-4o"),))
+        return TaskResult([], replace(_fake_result().outcome, run_summary=summary))
+
+    return _fake_run_task
+
+
+def test_a_project_certo_created_gets_the_model_note_in_its_readme(monkeypatch, tmp_path):
+    cfgs = []
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg(projects_dir=str(tmp_path)))
+    monkeypatch.setattr(cli, "run_task", _builds_a_readme(cfgs))
+
+    assert cli.main(["build an app", "--project", "app"]) == 0
+
+    text = (tmp_path / "app" / "README.md").read_text()
+    assert "<!-- certo:models -->" in text
+    assert "using `openai/gpt-4o`." in text
+
+
+def test_a_folder_certo_did_not_create_keeps_its_readme(monkeypatch, tmp_path):
+    (tmp_path / "mine").mkdir()
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg(projects_dir=str(tmp_path)))
+    monkeypatch.setattr(cli, "run_task", _builds_a_readme([]))
+
+    assert cli.main(["build an app", "--project", "mine"]) == 0
+
+    assert (tmp_path / "mine" / "README.md").read_text() == "# App\n"

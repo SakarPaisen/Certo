@@ -6,7 +6,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from certo import __version__
-from certo.run_history import RunEntry, append_run, render_entry, runs_path
+from certo.run_history import (
+    RunEntry,
+    append_run,
+    note_models_in_readme,
+    render_entry,
+    runs_path,
+)
 from certo.run_summary import ModelUsage, RunSummary
 
 _WHEN = datetime(2026, 10, 19, 8, 5, tzinfo=UTC)
@@ -60,3 +66,44 @@ def test_entries_accumulate_and_the_folder_ignores_itself(tmp_path):
     assert text.count("# Certo runs in this folder") == 1
     assert text.index("· retry_exhausted") < text.index("· verified")
     assert (tmp_path / ".certo" / ".gitignore").read_text().strip().endswith("*")
+
+
+def test_the_readme_note_is_added_once_and_grows_with_new_models(tmp_path):
+    readme = tmp_path / "README.md"
+    readme.write_text("# Wordle\n\nRun it with `python wordle.py`.\n")
+
+    assert note_models_in_readme(str(tmp_path), ["ollama/qwen3.8:27b"])
+    assert note_models_in_readme(
+        str(tmp_path), ["anthropic/claude-haiku-5-5", "ollama/qwen3.8:27b"]
+    )
+    assert not note_models_in_readme(str(tmp_path), ["ollama/qwen3.8:27b"])
+
+    text = readme.read_text()
+    assert text == (
+        "# Wordle\n\nRun it with `python wordle.py`.\n\n"
+        "<!-- certo:models -->\n"
+        "*Generated with [Certo](https://github.com/alessioricco/certo), using "
+        "`ollama/qwen3.8:27b`, `anthropic/claude-haiku-5-5`.*\n"
+        "<!-- /certo:models -->\n"
+    )
+
+
+def test_text_after_the_note_is_kept(tmp_path):
+    readme = tmp_path / "README.md"
+    readme.write_text(
+        "# App\n\n<!-- certo:models -->\n*old*\n<!-- /certo:models -->\n\n## License\n\nMIT\n"
+    )
+
+    note_models_in_readme(str(tmp_path), ["openai/gpt-5.6-luna"])
+
+    text = readme.read_text()
+    assert text.count("<!-- certo:models -->") == 1
+    assert "`openai/gpt-5.6-luna`" in text
+    assert text.endswith("<!-- /certo:models -->\n\n## License\n\nMIT\n")
+
+
+def test_no_readme_or_no_model_means_no_note(tmp_path):
+    assert not note_models_in_readme(str(tmp_path), ["m"])
+    (tmp_path / "README.md").write_text("# App\n")
+    assert not note_models_in_readme(str(tmp_path), [])
+    assert (tmp_path / "README.md").read_text() == "# App\n"

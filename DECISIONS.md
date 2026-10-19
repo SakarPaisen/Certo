@@ -737,3 +737,6 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   adds no file to the user's project, and nothing new can look like an
   agent change. Written by `cli.py`, which alone knows the run was a CLI
   run with state saving on; server and bench never write it.
+  The one exception to "no file in the user's project": a marked note in
+  `README.md` naming the models, the Author's request, written only in a
+  folder Certo created, so it never edits a README the user brought.

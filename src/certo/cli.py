@@ -24,7 +24,7 @@ from .escalation import format_rung_lines, load_ladder
 from .init_cmd import check_main, init_main
 from .model_catalog import ModelCatalogEntry
 from .project_state import load_record, status_path
-from .run_history import RunEntry, append_run
+from .run_history import RunEntry, append_run, note_models_in_readme
 from .runner import UNPROVEN_STATES, _build_completion_contract, run_task
 from .skills import write_project_context
 from .worktree import record_created_project, was_created_by_certo, worktree_warning
@@ -630,6 +630,13 @@ def main(argv: list[str] | None = None) -> int:
     # flip — see DECISIONS.md).
     outcome = messages.outcome
     record_run(outcome.verification_state, outcome)
+    # Only in a project folder Certo created: it never edits the README of
+    # a project you brought.
+    if certo_made:
+        try:
+            note_models_in_readme(cfg.workspace, _models_that_ran(cfg, outcome))
+        except OSError as exc:
+            print(f"Warning: couldn't add the model note to README.md ({exc}).", file=sys.stderr)
     if outcome.model_decisions:
         final = outcome.model_decisions[-1]
         print(f"\nModel used: {final.chosen} (see MODEL_DECISIONS.md for the full history)")
@@ -650,6 +657,14 @@ def main(argv: list[str] | None = None) -> int:
         status = os.path.relpath(status_path(cfg.workspace))
         print(f"\nWhere it stopped: {status}. Continue with: {resume_hint}")
     return 1 if failing else 0
+
+
+def _models_that_ran(cfg, outcome) -> list[str]:
+    if outcome.rungs:
+        # A rung that changed no file wrote none of the code.
+        return [r.model for r in outcome.rungs if not r.did_no_work]
+    summary = outcome.run_summary
+    return [m.model for m in summary.models] if summary and summary.models else [cfg.model]
 
 
 def _run_entry(cfg, ladder, task: str, ended: str, started_at: datetime, outcome) -> RunEntry:

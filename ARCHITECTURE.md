@@ -207,7 +207,10 @@ given design was chosen.
   from `outcome.rungs`, else `run_summary.models` (what really made
   calls), else the settings. A failed write is a stderr warning, never a
   failed run. `tests/test_cli.py` stubs `append_run` (its workspace is the
-  checkout).
+  checkout). `note_models_in_readme()` keeps one marked
+  `<!-- certo:models -->` block at the end of `README.md`, merging model
+  ids; the CLI calls it after a finished run only when
+  `was_created_by_certo` (rungs that `did_no_work` are left out).
 - **`run_summary.py`** — pure: `summarize_run(duration, {usage_id:
   Metrics.get()})` → `RunSummary` (wall-clock time, models that actually
   made calls, tokens, cost; zero cost with nonzero tokens = "unknown",

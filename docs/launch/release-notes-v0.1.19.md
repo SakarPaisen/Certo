@@ -25,3 +25,16 @@ too. Certo writes the file, never the agent, and it names models, never
 keys. Like the rest of `.certo/`, it is ignored by git, and
 `CERTO_SAVE_STATE=false` turns it off. See
 [Run records and costs](../guides/run-records-and-costs.md#which-model-built-this-project).
+
+## New: the project's README names its models
+
+In a project folder Certo created (`--project` with a new name), Certo now
+adds one line at the end of the project's `README.md` after each finished
+run:
+
+```text
+*Generated with [Certo](https://github.com/alessioricco/certo), using `ollama/qwen3.8:27b`, `anthropic/claude-haiku-5-5`.*
+```
+
+It names every model that wrote code there, and a later run updates the
+same line. Certo never edits the README of a folder you brought.

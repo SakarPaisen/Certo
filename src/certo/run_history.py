@@ -10,6 +10,7 @@ by the agent; model names only, never a key. Stdlib only.
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -81,3 +82,46 @@ def append_run(workspace: str, entry: RunEntry) -> None:
         if new:
             f.write(_HEADER)
         f.write("\n" + render_entry(entry))
+
+
+# The note Certo keeps at the end of a project's README.md, between these
+# markers, so a later run can update it instead of adding another one.
+README_NOTE_START = "<!-- certo:models -->"
+README_NOTE_END = "<!-- /certo:models -->"
+_NOTE_MODELS = re.compile(r"`([^`]+)`")
+
+
+def note_models_in_readme(workspace: str, models: Sequence[str]) -> bool:
+    """Add or update the one-line "generated with" note in the project's
+    README.md, naming every model that has worked on it, oldest first.
+    Does nothing when there is no README.md or no model. Returns whether
+    the file changed. Raises OSError."""
+    path = os.path.join(workspace, "README.md")
+    if not models or not os.path.isfile(path):
+        return False
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    start, end = text.find(README_NOTE_START), text.find(README_NOTE_END)
+    known: list[str] = []
+    if 0 <= start < end:
+        known = _NOTE_MODELS.findall(text[start:end])
+        before, after = text[:start], text[end + len(README_NOTE_END) :]
+    else:
+        before, after = text, ""
+    for model in models:
+        if model not in known:
+            known.append(model)
+    names = ", ".join(f"`{m}`" for m in known)
+    note = (
+        f"{README_NOTE_START}\n"
+        f"*Generated with [Certo](https://github.com/alessioricco/certo), using {names}.*\n"
+        f"{README_NOTE_END}"
+    )
+    # Anything a later edit put after the note stays after it.
+    rest = after.strip("\n")
+    new_text = f"{before.rstrip()}\n\n{note}\n" + (f"\n{rest}\n" if rest else "")
+    if new_text == text:
+        return False
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(new_text)
+    return True
