@@ -244,9 +244,14 @@ class RunTestsExecutor(ToolExecutor[RunTestsAction, RunTestsObservation]):
         plan = discover_verification_plan(detection)
         primary = next((spec for spec in plan if spec.primary), plan[0])
         outcome = execute_check(primary)
+        # A timed-out check has no exit code; report it as nonzero so the
+        # agent is shown the output and doesn't read it as a pass.
+        exit_code = outcome.exit_code
+        if exit_code is None:
+            exit_code = 1 if outcome.status == "timed_out" else 0
         return RunTestsObservation(
             check_kind=detection.language,
-            exit_code=outcome.exit_code or 0,
+            exit_code=exit_code,
             summary=outcome.summary,
             output=outcome.output,
         )

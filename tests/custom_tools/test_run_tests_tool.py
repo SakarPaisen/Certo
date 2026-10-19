@@ -35,7 +35,7 @@ from certo.custom_tools.run_tests_tool import (
     execute_check,
     run_full_verification,
 )
-from certo.project_env import ProjectEnv, _base_python
+from certo.project_env import LocalRunner, ProjectEnv, RunResult, _base_python
 
 _FIXTURE = """
 def test_ok():
@@ -177,6 +177,71 @@ def test_run_tests_tool_generic_path_covers_ambiguous_monorepo(tmp_path):
 
     assert observation.check_kind == "ambiguous"
     assert "ambiguous" in observation.summary
+
+
+def _runner_failing(monkeypatch, match, result):
+    """Make LocalRunner.run return `result` for commands containing `match`;
+    every other command (project setup) runs for real."""
+    real = LocalRunner.run
+
+    def run(self, command, **kwargs):
+        if match in " ".join(command):
+            return result
+        return real(self, command, **kwargs)
+
+    monkeypatch.setattr(LocalRunner, "run", run)
+
+
+_TIMED_OUT = RunResult(returncode=None, output="still waiting...", timed_out=True)
+_CANT_START = RunResult(returncode=None, output="", error="No such file or directory")
+
+
+@pytest.mark.parametrize(
+    ("result", "expected"),
+    [(_TIMED_OUT, "pytest timed out after 300s"), (_CANT_START, "pytest could not be run")],
+)
+def test_run_tests_tool_reports_a_pytest_timeout_or_start_failure(
+    tmp_path, project_venv, monkeypatch, result, expected
+):
+    project_venv(tmp_path)
+    _write_fixture(tmp_path)
+    _runner_failing(monkeypatch, "-m pytest", result)
+
+    observation = RunTestsExecutor(str(tmp_path))(RunTestsAction())
+
+    assert observation.check_kind == "none"
+    assert expected in observation.summary
+
+
+@pytest.mark.parametrize(
+    ("result", "expected"),
+    [(_TIMED_OUT, "npm run build timed out"), (_CANT_START, "npm could not run")],
+)
+def test_run_tests_tool_reports_an_npm_timeout_or_start_failure(
+    tmp_path, monkeypatch, result, expected
+):
+    _write_package_json(tmp_path, {"build": "vite build"})
+    monkeypatch.setattr(LocalRunner, "which", lambda self, name: "/usr/bin/npm")
+    _runner_failing(monkeypatch, "run build", result)
+
+    observation = RunTestsExecutor(str(tmp_path))(RunTestsAction())
+
+    assert observation.exit_code == 1
+    assert expected in observation.summary
+
+
+def test_run_tests_tool_shows_a_go_timeout_as_a_failure_with_its_output(tmp_path, monkeypatch):
+    # The generic path used to report exit code 0 for a timeout, which
+    # hid the output from the agent.
+    (tmp_path / "go.mod").write_text("module example.com/thing\n\ngo 1.21\n")
+    monkeypatch.setattr("shutil.which", lambda _name: "/usr/bin/go")
+    _runner_failing(monkeypatch, "go test", _TIMED_OUT)
+
+    observation = RunTestsExecutor(str(tmp_path))(RunTestsAction())
+
+    assert observation.exit_code == 1
+    assert "timeout" in observation.summary
+    assert "still waiting..." in observation.to_llm_content[0].text
 
 
 # --- Stage 1: project detection ---------------------------------------------

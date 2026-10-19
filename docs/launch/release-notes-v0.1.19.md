@@ -84,3 +84,11 @@ component wasn't installed, the check failed (exit 101), so the project
 was `failed` or `retry_exhausted` although its tests passed. The check is
 now `unavailable`, with a note saying how to install clippy, and the
 verdict comes from `cargo test`.
+
+## Fixed: the agent sees a Go, Rust or Java check that timed out
+
+The agent can run the project's checks itself while it works. For Go,
+Rust and Java, a check that ran past its 5-minute limit came back with
+exit code 0 and no output, so the agent couldn't tell it apart from a
+pass. It now comes back as a failure, with the output so far. Certo's own
+verification after the run was not affected.

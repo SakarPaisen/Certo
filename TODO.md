@@ -107,10 +107,6 @@ first item is the suggested next one.
   environment. Java is detection-only in both today.
 - **New ecosystems**, in order: C#/.NET, PHP (Composer), Ruby, Kotlin/
   Android (Gradle), C/C++ (CMake), Swift.
-- **Check that the agent-facing `run_tests` tool is timeout-safe.** An old
-  item said its pytest/npm paths used bare `subprocess.run`; they now go
-  through `runner.run(..., timeout=300)`. Confirm timeouts and a missing
-  executable return an observation instead of raising, add tests, close.
 - **Interactive programs can't be driven** (menus, `SOLVE`-style choices).
   Deliberately not built: no safe general way to guess input. Would need
   the agent to declare an interaction script. Keep as a known gap unless
