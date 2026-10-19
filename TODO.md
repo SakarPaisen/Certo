@@ -119,11 +119,10 @@ first item is the suggested next one.
 
 ## 4. Models and strategies
 
-- **Live check of the auto-model fallback.** The in-conversation model
-  switch (`switch_llm`) has only run against a fake. A provider failure
-  (a deliberately wrong key on the top-ranked model, in a scratch
-  `models.yaml`) should switch and end `verified` on the next model;
-  `MODEL_DECISIONS.md` should show both steps.
+- **Live check of the auto-model quality fallback.** The provider-failure
+  switch ran live on 2026-10-19 (ARCHITECTURE.md). The other path, a fix
+  attempt that still fails the checks, has only run against a fake; it
+  needs a model that fails on purpose, so it may take a few tries.
 - **A `certo bench` strategy for `--auto-model`.** Only `single` and
   `escalate` exist (`bench_strategies.py`), so the README can say auto-model
   is unmeasured but not show a number. Add an `auto` strategy (task
@@ -240,7 +239,8 @@ first item is the suggested next one.
 - **`certo init models`**: a setup helper for `models_list.yaml`/
   `models.yaml`. Find provider keys and Ollama models, copy the example
   list, offer only entries the user can run (never invent ratings), write
-  keys as `${VAR}` (verify `models.yaml` expands it first), test each with
+  keys as `${VAR}` (`models.yaml` doesn't expand it today: an
+  `api_key: ${VAR}` is sent as written, checked 2026-10-19), test each with
   the `check --models` call and deactivate failures, print the ladder. The
   first run must still need no model files.
 - **`certo models update`**: compare the shipped example catalog with the
@@ -317,6 +317,15 @@ database).
 
 ## Smaller bugs
 
+- **`--auto-model` refuses to run when a ladder has no usable rung.**
+  `certo check`'s catalog errors include escalation ladders, which
+  `--auto-model` never uses; with only two models enabled, two unusable
+  ladders stopped an auto-model run (2026-10-19). Treat ladder problems as
+  warnings outside `--escalate`.
+- **A configuration error prints a resume hint, then the banner.** The
+  same run printed the model-file error, then "Continue with: certo
+  --resume --project leap" (there was nothing to resume), then the banner.
+  Print the error alone, after the banner or instead of it.
 - **Using all the steps ends in `stuck`, unchecked.** When the agent
   reaches `CERTO_MAX_ITERATIONS`, the SDK ends in an error state, Certo
   says `stuck` ("stuck or errored") and runs no check. Seen 2026-10-19:

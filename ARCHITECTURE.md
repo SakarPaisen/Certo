@@ -74,7 +74,11 @@ given design was chosen.
   supplies a terminal handler, `server.py` doesn't); the deadline is paused,
   not spent, while waiting on a human reply. `CERTO_MODEL_SELECTION=auto`
   wires a `ModelChain` (see `model_selection.py`) with automatic fallback on
-  a `ConversationRunError` wrapping the SDK's own `LLMError` hierarchy;
+  a `ConversationRunError` wrapping the SDK's own `LLMError` hierarchy
+  (the provider-failure path, through the real `switch_llm`, confirmed
+  live 2026-10-19: a wrong OpenAI key on the first pick switched to
+  `claude-haiku-5-5`, `verified`, $0.0054; the quality-failure path is
+  still fake-tested only);
   `write_model_decisions()`/artifact-writing both run in a `finally` block
   around the whole task so they still fire when every candidate fails.
   `CERTO_ARTIFACTS_DIR` mints a `run_id` (or uses the caller's, e.g.
