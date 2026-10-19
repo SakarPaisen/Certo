@@ -64,11 +64,6 @@ first item is the suggested next one.
   [#4](https://github.com/alessioricco/certo/issues/4).
 - **Docker verification has never run against a real container**, and
   neither has escalation under Docker. Fake-workspace tests only.
-- **`tests/test_bench_tasks.py` fixes the task-set size** (8–10 tasks,
-  2–3 in Node), so any contributed task fails it. Loosen it, or make it
-  check per-task rules only. `docs/guides/contribute-a-benchmark-task.md`
-  tells contributors to update it until then. Starter issue:
-  [#1](https://github.com/alessioricco/certo/issues/1).
 
 ## 2. Complex tasks
 

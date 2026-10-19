@@ -32,11 +32,9 @@ def _workspace(tmp_path: Path, task, make_venv, *, solved: bool) -> Path:
 
 
 def test_bundled_task_set_shape():
-    languages = [t.language for t in TASKS]
-    assert 8 <= len(TASKS) <= 10
-    assert languages.count("node") in (2, 3)
-    assert languages.count("python") == len(TASKS) - languages.count("node")
+    assert TASKS
     for task in TASKS:
+        assert task.language in {"python", "node"}, task.name
         assert task.prompt.strip(), task.name
         assert task.reference_dir.is_dir(), task.name
 
