@@ -172,9 +172,7 @@ From a checkout (see [CONTRIBUTING.md](../../CONTRIBUTING.md)):
    uv run pytest -q tests/test_bench_tasks.py
    ```
 
-   They check every bundled task as `--check-tasks` does. One test also
-   checks the size of the set (how many tasks, how many in Node); update
-   it if your task changes those numbers.
+   They check every bundled task as `--check-tasks` does.
 4. Open a pull request that says what the task measures, why models get
    it wrong, and how the models you tried did (step 6), ideally at least
    one local and one cloud model.
