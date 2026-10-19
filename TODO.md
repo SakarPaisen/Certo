@@ -14,8 +14,14 @@ first item is the suggested next one.
 
 ## Before the next release
 
-- **Publish** (the Author does it): `main` is ahead of origin; PyPI has
-  0.1.10.
+- **Move `release.yml` off Node.js 20 actions.** The v0.1.17 run warned
+  that `actions/checkout@v4`, `astral-sh/setup-uv@v6` and
+  `actions/upload-artifact@v4` target the deprecated Node.js 20 and are
+  forced onto Node.js 24. Done when the release run shows no Node.js 20
+  warning.
+- **Check the release run on Ubuntu 26.** `ubuntu-latest` moves to
+  Ubuntu 26 from 2026-10-19, so the next tag runs on a new image. Watch
+  that run, or pin `ubuntu-24.04` until it has passed once.
 
 ## 1. Prove it
 
