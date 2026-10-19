@@ -153,7 +153,7 @@ prompt written for this project must follow them.
    below). Prompts list the docs update as an explicit numbered item, not
    an afterthought. `MANUAL.md` is superseded by `docs/`.
 2. **Local first, cloud never worse.** The quality goal is better results
-   from local models (e.g. `qwen3-coder:30b` via Ollama) without degrading
+   from local models (e.g. `qwen3.8:27b` via Ollama) without degrading
    results from mainstream cloud models (Claude, GPT, Gemini). Strategies
    aimed at weaker models are opt-in or gated by model tier, and every such
    change is checked with the benchmark on both a local and a cloud model

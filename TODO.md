@@ -24,7 +24,9 @@ first item is the suggested next one.
 
 - **A baseline per release.** `docs/benchmark/baseline-<version>.md` for
   every release (local vs cloud, fooled rate, cost per solved task), and
-  a README badge. 0.1.13 and 0.1.15 exist; no badge yet.
+  a README badge. 0.1.13, 0.1.15 and 0.1.18 (local only) exist; no badge
+  yet. A `qwen2.5-coder:7b` arm would replace "unmeasured" for the
+  small-machine suggestion.
 - **Bench task set v2: app-scale tasks.** Multi-file, multi-language: Go
   REST API with a database, React frontend + API, Rust CLI with
   subcommands, a fix inside an existing mid-size repo. Grading supports

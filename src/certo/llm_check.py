@@ -262,7 +262,7 @@ def explain(result: LLMCheckResult, provider: str | None = None) -> str:
             f"{who} rejected the API key. Check CERTO_LLM_API_KEY in your settings: it must "
             f"be a valid key for {who}, pasted with no spaces."
         )
-    suggestion = " Coder models such as qwen3-coder support it." if ollama else ""
+    suggestion = " Models such as qwen3.8:27b support it." if ollama else ""
     if any(s in text for s in _TOOLS_UNSUPPORTED):
         return (
             f"The model {result.model} doesn't support tool calling, which Certo's "

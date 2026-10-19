@@ -274,9 +274,18 @@ def _ask_ollama(
         model = prompter.ask("Model", provider.model) if ask else provider.model
         return Settings(provider, _with_prefix(provider, model or ""), base_url=base_url)
 
-    coder = next((i for i, name in enumerate(installed) if "coder" in name.lower()), 0)
-    index = prompter.choose("Which installed model?", installed, coder) if ask else coder
+    preferred = _preferred_installed(provider, installed)
+    index = prompter.choose("Which installed model?", installed, preferred) if ask else preferred
     return Settings(provider, f"ollama/{installed[index]}", base_url=base_url)
+
+
+def _preferred_installed(provider: Provider, installed: list[str]) -> int:
+    """The installed model to offer first: the recommended one, then the
+    smaller one, then any coder model, else the first."""
+    for wanted in (provider.model, provider.small_model):
+        if wanted and _ollama_name(wanted) in installed:
+            return installed.index(_ollama_name(wanted))
+    return next((i for i, name in enumerate(installed) if "coder" in name.lower()), 0)
 
 
 def gather_settings(

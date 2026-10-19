@@ -4,6 +4,26 @@ Each project now remembers which models built it. This release also
 contains [v0.1.18](release-notes-v0.1.18.md), which was not published on
 its own.
 
+## Changed: the local default is `qwen3.8:27b`
+
+`certo init` now suggests `ollama/qwen3.8:27b` for Ollama, instead of
+`qwen3-coder:30b`. This time the choice is measured: in a benchmark of
+27 runs each on the same Ollama server, `qwen3.8:27b` passed the hidden
+tests in all 27, and Certo was never fooled; `qwen3-coder:30b` passed 18,
+and 3 of its wrong answers were `verified`. When both are installed,
+`certo init` now preselects the recommended one. Both need about 20 GB of
+GPU or unified memory. See
+[Baseline 0.1.18, local](../benchmark/baseline-0.1.18-local.md).
+
+If you already use `qwen3-coder:30b`, nothing changes until you edit
+`CERTO_LLM_MODEL`:
+
+```bash
+ollama pull qwen3.8:27b
+```
+
+then set `CERTO_LLM_MODEL=ollama/qwen3.8:27b`.
+
 ## New: `.certo/RUNS.md`, one entry per run
 
 `.certo/STATUS.md` holds only the last run, so a few runs later there was

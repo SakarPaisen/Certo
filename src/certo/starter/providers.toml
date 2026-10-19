@@ -37,12 +37,15 @@ checked = "2026-10-15"
 [[provider]]
 id = "ollama"
 label = "Ollama (local models, no API key)"
-model = "ollama/qwen3-coder:30b"
-# For machines with less than about 20 GB of GPU or unified memory.
+# Measured: 27/27 hidden tests in docs/benchmark/baseline-0.1.18-local.md,
+# against 18/27 for qwen3-coder:30b, the default before 0.1.19.
+model = "ollama/qwen3.8:27b"
+# For machines with less than about 20 GB of GPU or unified memory. Never
+# benchmarked; expect it to be weaker than the default on multi-step tasks.
 small_model = "ollama/qwen2.5-coder:7b"
 base_url = "http://localhost:11434"
-source = "https://ollama.com/library/qwen3-coder"
-checked = "2026-10-15"
+source = "https://ollama.com/library/qwen3.8"
+checked = "2026-10-19"
 
 [[provider]]
 id = "other"

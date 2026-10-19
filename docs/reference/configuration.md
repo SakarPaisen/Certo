@@ -43,7 +43,7 @@ missing, the error message names it.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `CERTO_LLM_MODEL` | **required** | The model, as a [LiteLLM model id](https://docs.litellm.ai/docs/providers): `provider/model`, e.g. `anthropic/claude-sonnet-5-5`, `openai/gpt-6.1-sol`, `ollama/qwen3-coder:30b`. Changing this is the only thing needed to switch provider. |
+| `CERTO_LLM_MODEL` | **required** | The model, as a [LiteLLM model id](https://docs.litellm.ai/docs/providers): `provider/model`, e.g. `anthropic/claude-sonnet-5-5`, `openai/gpt-6.1-sol`, `ollama/qwen3.8:27b`. Changing this is the only thing needed to switch provider. |
 | `CERTO_LLM_API_KEY` | required, unless `CERTO_LLM_BASE_URL` is set | The key for the provider in `CERTO_LLM_MODEL`. |
 | `CERTO_LLM_BASE_URL` | empty | The server address, for a local or self-hosted model, e.g. `http://localhost:11434`. In a `.env` file, leave the line with nothing after `=` when unused: `python-dotenv` keeps a trailing `# comment` on an otherwise empty value as the value itself. |
 | `CERTO_LLM_REASONING_EFFORT` | empty | How much the model should think: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, or any value your provider accepts (not checked by Certo). `none` or `off` sends no reasoning setting. Empty means `high`, except for `ollama/` and `ollama_chat/` models, where empty means none. |

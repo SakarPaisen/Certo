@@ -748,3 +748,13 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   needs it. Instead `agent._CERTO_STATE_SUFFIX` tells every model to
   leave `.certo/` alone and scaffold into a subfolder. Not gated by tier:
   it is a fact about the folder, not a strategy for weaker models.
+- **The local default is `ollama/qwen3.8:27b`, not `qwen3-coder:30b`**
+  (0.1.19). Measured, not assumed: in `baseline-0.1.18-local.md` (27 runs
+  each, same Ollama server) qwen3.8 passed 27/27 hidden tests and fooled
+  Certo 0 times; qwen3-coder 18/27 and 3. Supersedes the earlier choice of
+  qwen3-coder, which had never been benchmarked. `certo init` also offers
+  the recommended model first when it is installed, before any "coder"
+  model. `qwen2.5-coder:7b` stays the small-machine suggestion, marked
+  unmeasured. Catalog ratings were left unchanged: they drive
+  `--auto-model` and derived ladders, so changing them needs its own
+  benchmark.

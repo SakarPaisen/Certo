@@ -81,7 +81,7 @@ environment, as in [Getting started](getting-started.md#1-install).
 **You see:**
 
 ```text
-Configuration error: CERTO_LLM_MODEL is required (e.g. 'anthropic/claude-sonnet-5-5' or 'ollama/qwen3-coder:30b'), and it isn't set in any of the three places Certo looks, in this order: 1. the environment (export CERTO_LLM_MODEL=...); 2. .env in the current folder (/home/me/project/.env); 3. the user settings file (/home/me/.config/certo/.env). Run certo init to write it, or set it in one of these. Switching provider = changing only this value.
+Configuration error: CERTO_LLM_MODEL is required (e.g. 'anthropic/claude-sonnet-5-5' or 'ollama/qwen3.8:27b'), and it isn't set in any of the three places Certo looks, in this order: 1. the environment (export CERTO_LLM_MODEL=...); 2. .env in the current folder (/home/me/project/.env); 3. the user settings file (/home/me/.config/certo/.env). Run certo init to write it, or set it in one of these. Switching provider = changing only this value.
 ```
 
 **Cause:** `CERTO_LLM_MODEL` isn't set in your shell, in `.env` in this
@@ -201,7 +201,7 @@ or `... answered, but without calling a tool.`
 editing files), and this model can't make them, or didn't.
 
 **Fix:** choose a model with tool (function) calling support. For Ollama,
-coder models such as `qwen3-coder` support it.
+`qwen3.8:27b`, the model `certo init` suggests, supports it.
 
 ### Can't reach the provider
 
@@ -234,7 +234,7 @@ normal. The tokens are still counted.
 **You see:**
 
 ```text
-Checking the model ollama/qwen3-coder:30b (a local model may take a minute to load)... Couldn't reach the server at http://localhost:11434. Check CERTO_LLM_BASE_URL in your settings and that the server is running. If Ollama runs on another machine, start it there with OLLAMA_HOST=0.0.0.0.
+Checking the model ollama/qwen3.8:27b (a local model may take a minute to load)... Couldn't reach the server at http://localhost:11434. Check CERTO_LLM_BASE_URL in your settings and that the server is running. If Ollama runs on another machine, start it there with OLLAMA_HOST=0.0.0.0.
 ```
 
 **Cause:** Ollama isn't started, or listens on another address.
@@ -324,7 +324,7 @@ runs part of it on the CPU.
 
 **Fix:** check `ollama ps` while the model is loaded. If the `PROCESSOR`
 column shows a CPU share, use a smaller model (for example
-`qwen2.5-coder:7b` instead of `qwen3-coder:30b`) or a smaller quantization.
+`qwen2.5-coder:7b` instead of `qwen3.8:27b`) or a smaller quantization.
 
 If one step takes more than 5 minutes, the call to the model hits its
 timeout and starts over, so the step never finishes. Raise
