@@ -5,6 +5,7 @@ Result is captured via an event callback — there is no `conversation.result`.
 
 from __future__ import annotations
 
+import errno
 import logging
 import os
 import re
@@ -87,6 +88,26 @@ from .run_summary import RunSummary, summarize_run
 from .workspace import build_workspace
 
 logger = logging.getLogger(__name__)
+
+
+class _ClosedTerminalReadFilter(logging.Filter):
+    """Drops the SDK's "PTY reader thread error: [Errno 9] Bad file
+    descriptor". Closing a terminal closes its file descriptor while the
+    reader thread may still be waiting on it; the thread then logs that
+    error, with a traceback, although nothing went wrong. It shows at the
+    end of `certo bench`, where users read it as a crash. Any other reader
+    error still logs."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if not str(record.msg).startswith("PTY reader thread error"):
+            return True
+        exc = record.exc_info[1] if record.exc_info else None
+        return not (isinstance(exc, OSError) and exc.errno == errno.EBADF)
+
+
+logging.getLogger("openhands.tools.terminal.terminal.subprocess_terminal").addFilter(
+    _ClosedTerminalReadFilter()
+)
 
 # The twelve terminal states a task run can end in. Exactly these because
 # they're the ones a caller needs to tell apart to know whether to trust a

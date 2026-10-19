@@ -8,6 +8,7 @@ else exercised via constructed `CheckSpec`s or monkeypatched `shutil.which`.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import shutil
@@ -34,7 +35,7 @@ from certo.custom_tools.run_tests_tool import (
     execute_check,
     run_full_verification,
 )
-from certo.project_env import ProjectEnv, _base_python
+from certo.project_env import LocalRunner, ProjectEnv, RunResult, _base_python
 
 _FIXTURE = """
 def test_ok():
@@ -176,6 +177,71 @@ def test_run_tests_tool_generic_path_covers_ambiguous_monorepo(tmp_path):
 
     assert observation.check_kind == "ambiguous"
     assert "ambiguous" in observation.summary
+
+
+def _runner_failing(monkeypatch, match, result):
+    """Make LocalRunner.run return `result` for commands containing `match`;
+    every other command (project setup) runs for real."""
+    real = LocalRunner.run
+
+    def run(self, command, **kwargs):
+        if match in " ".join(command):
+            return result
+        return real(self, command, **kwargs)
+
+    monkeypatch.setattr(LocalRunner, "run", run)
+
+
+_TIMED_OUT = RunResult(returncode=None, output="still waiting...", timed_out=True)
+_CANT_START = RunResult(returncode=None, output="", error="No such file or directory")
+
+
+@pytest.mark.parametrize(
+    ("result", "expected"),
+    [(_TIMED_OUT, "pytest timed out after 300s"), (_CANT_START, "pytest could not be run")],
+)
+def test_run_tests_tool_reports_a_pytest_timeout_or_start_failure(
+    tmp_path, project_venv, monkeypatch, result, expected
+):
+    project_venv(tmp_path)
+    _write_fixture(tmp_path)
+    _runner_failing(monkeypatch, "-m pytest", result)
+
+    observation = RunTestsExecutor(str(tmp_path))(RunTestsAction())
+
+    assert observation.check_kind == "none"
+    assert expected in observation.summary
+
+
+@pytest.mark.parametrize(
+    ("result", "expected"),
+    [(_TIMED_OUT, "npm run build timed out"), (_CANT_START, "npm could not run")],
+)
+def test_run_tests_tool_reports_an_npm_timeout_or_start_failure(
+    tmp_path, monkeypatch, result, expected
+):
+    _write_package_json(tmp_path, {"build": "vite build"})
+    monkeypatch.setattr(LocalRunner, "which", lambda self, name: "/usr/bin/npm")
+    _runner_failing(monkeypatch, "run build", result)
+
+    observation = RunTestsExecutor(str(tmp_path))(RunTestsAction())
+
+    assert observation.exit_code == 1
+    assert expected in observation.summary
+
+
+def test_run_tests_tool_shows_a_go_timeout_as_a_failure_with_its_output(tmp_path, monkeypatch):
+    # The generic path used to report exit code 0 for a timeout, which
+    # hid the output from the agent.
+    (tmp_path / "go.mod").write_text("module example.com/thing\n\ngo 1.21\n")
+    monkeypatch.setattr("shutil.which", lambda _name: "/usr/bin/go")
+    _runner_failing(monkeypatch, "go test", _TIMED_OUT)
+
+    observation = RunTestsExecutor(str(tmp_path))(RunTestsAction())
+
+    assert observation.exit_code == 1
+    assert "timeout" in observation.summary
+    assert "still waiting..." in observation.to_llm_content[0].text
 
 
 # --- Stage 1: project detection ---------------------------------------------
@@ -755,6 +821,46 @@ def test_execute_check_reports_unavailable_when_the_binary_does_not_exist(tmp_pa
 
     assert outcome.status == "unavailable"
     assert "could not be run" in outcome.summary
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "error: no such command: `clippy`",
+        "error: 'cargo-clippy' is not installed for the toolchain 'stable-aarch64-apple-darwin'",
+    ],
+)
+def test_a_missing_clippy_is_unavailable_not_failed(tmp_path, monkeypatch, message):
+    # cargo exits 101 when the clippy component is missing; that's a gap in
+    # the toolchain, not a lint failure in the project.
+    clippy = next(
+        s
+        for s in discover_verification_plan(ProjectDetection(language="rust", root=str(tmp_path)))
+        if s.name == "cargo clippy"
+    )
+    script = f"import sys; print({message!r}, file=sys.stderr); sys.exit(101)"
+    spec = dataclasses.replace(clippy, command=[sys.executable, "-c", script])
+
+    outcome = execute_check(spec)
+
+    assert outcome.status == "unavailable"
+    assert outcome.exit_code is None
+    assert "rustup component add clippy" in outcome.summary
+    run = VerificationRun(checks=[outcome])
+    assert run.state != "failed"
+    assert run.limitation_notes == [f"cargo clippy: {outcome.summary}"]
+
+
+def test_a_real_clippy_finding_still_fails(tmp_path):
+    clippy = next(
+        s
+        for s in discover_verification_plan(ProjectDetection(language="rust", root=str(tmp_path)))
+        if s.name == "cargo clippy"
+    )
+    script = "import sys; print('error: this looks like a bug', file=sys.stderr); sys.exit(101)"
+    spec = dataclasses.replace(clippy, command=[sys.executable, "-c", script])
+
+    assert execute_check(spec).status == "failed"
 
 
 def test_execute_check_reports_timed_out(tmp_path, monkeypatch):

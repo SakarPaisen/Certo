@@ -38,7 +38,7 @@ current folder, the file is read instead.
 |---|---|---|
 | `--version` | | Print the version, e.g. `certo 0.1.5`, and exit. |
 | `--project NAME` | none | Work in `CERTO_PROJECTS_DIR/NAME`, created if missing. Without it, Certo works in `CERTO_WORKSPACE` (default: the current folder). `NAME` must be a relative path with no `..`, and must stay inside `CERTO_PROJECTS_DIR`. |
-| `--execution {local,docker}` | `CERTO_EXECUTION` | Where the agent's tools run, for this run. See [Run in Docker](../guides/run-in-docker.md). |
+| `--execution {local,docker}` | `CERTO_EXECUTION` | Where the agent's tools run, for this run. `docker` is [experimental](../README.md#experimental-features). See [Run in Docker](../guides/run-in-docker.md). |
 | `--model MODEL` | `CERTO_LLM_MODEL` | Model for this run only. |
 | `--api-key KEY` | `CERTO_LLM_API_KEY` | API key for this run only. It ends up in your shell history. |
 | `--base-url URL` | `CERTO_LLM_BASE_URL` | Server address for this run only. |
@@ -51,9 +51,18 @@ current folder, the file is read instead.
 | `--escalate [LADDER]` | off (`CERTO_MODEL_SELECTION`) | Start on the first rung of a ladder of models from `models_list.yaml`, and move to the next, stronger model only when Certo's verdict shows the model couldn't finish. `LADDER` names a ladder; without it, the ladder named `default` is used, else one built from the ratings. Can't be combined with `--auto-model`, `--model` or `--resume`. A missing model file (the error says which example to copy) or an unknown ladder is a configuration error that lists the ladders found. See [Escalate between models](../guides/escalate-between-models.md). |
 | `--resume` | off | Continue the last run in this folder (or in `--project NAME`) from the state in its `.certo/` folder. `TASK` is optional and is sent as an extra instruction. Errors when there is no saved state; does nothing (exit 0) when the last run ended `verified` and no `TASK` is given. See [Resume an interrupted run](../guides/resume-a-run.md). |
 
-**Output.** With `--project`, the first line is
-`Project workspace: <path>`. A warning about uncommitted changes may
-follow (see [Work on an existing project](../guides/work-on-an-existing-project.md)).
+**Output.** A run starts with a banner: the Certo version, then one
+line each for the model (with `--auto-model` or `--escalate`, how it is
+chosen, or the ladder), the project folder, where the commands run
+(`this computer` or Docker and its image), the checks (`on`, with
+`CERTO_MAX_VERIFY_RETRIES`, or `off`) and the limits
+(`CERTO_MAX_TASK_SECONDS`, `CERTO_MAX_ITERATIONS`, and
+`CERTO_MAX_TASK_COST` with `--escalate`). A `Mode` line appears with
+`--interactive` or `CERTO_CONFIRM_MODE=always`. For a local server, the
+model line shows its host and port; the API key is never shown. A run
+refused because of a wrong flag or setting prints only the error, no
+banner. With `--resume`, a `Resuming:` line follows. A warning about
+uncommitted changes may follow (see [Work on an existing project](../guides/work-on-an-existing-project.md)).
 At the end: the agent's last message (or Certo's last note), the
 `Model used:` line with `--auto-model`, then `Verification: <verdict>`,
 any limitations as `-` lines, and the run summary. After a failing
@@ -225,7 +234,9 @@ plan wasn't confirmed; 130 when interrupted (finished runs are kept).
 
 ## `certo-server`
 
-Run Certo as an HTTP and WebSocket server. Needs the `server` extra.
+Run Certo as an HTTP and WebSocket server. Needs the `server` extra. Its
+`/v1/chat/completions` endpoint and every task store except `memory` are
+[experimental](../README.md#experimental-features).
 
 ```text
 certo-server [--host HOST] [--port PORT]
@@ -308,7 +319,7 @@ removed from any error text. Exit 0 on success, 1 otherwise.
 
 ### `certo-admin skills`
 
-Manage third-party skills. Guide:
+Manage third-party skills ([experimental](../README.md#experimental-features)). Guide:
 [Add skills and tools](../guides/add-skills-and-tools.md#third-party-skills).
 
 #### `certo-admin skills install`

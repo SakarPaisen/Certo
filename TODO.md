@@ -14,26 +14,26 @@ first item is the suggested next one.
 
 ## Before the next release
 
-- **Move `release.yml` off Node.js 20 actions.** The v0.1.17 run warned
-  that `actions/checkout@v4`, `astral-sh/setup-uv@v6` and
-  `actions/upload-artifact@v4` target the deprecated Node.js 20 and are
-  forced onto Node.js 24. Done when the release run shows no Node.js 20
-  warning.
-- **Check the release run on Ubuntu 26.** `ubuntu-latest` moves to
-  Ubuntu 26 from 2026-10-19, so the next tag runs on a new image. Watch
-  that run, or pin `ubuntu-24.04` until it has passed once.
+- **Unpin the release runner from `ubuntu-24.04`.** Pinned for 0.1.18
+  because `ubuntu-latest` moved to Ubuntu 26 on 2026-10-19. Switch the
+  three jobs back once a run on `ubuntu-latest` has passed (the
+  pull-request CI below, when it exists, is the cheapest place to try).
+  While there, check the 0.1.18 release run showed no Node.js 20 warning.
 
 ## 1. Prove it
 
 - **A baseline per release.** `docs/benchmark/baseline-<version>.md` for
   every release (local vs cloud, fooled rate, cost per solved task), and
-  a README badge. 0.1.13 and 0.1.15 exist; no badge yet.
+  a README badge. 0.1.13, 0.1.15 and 0.1.18 (local only) exist; no badge
+  yet. A `qwen2.5-coder:7b` arm would replace "unmeasured" for the
+  small-machine suggestion.
 - **Bench task set v2: app-scale tasks.** Multi-file, multi-language: Go
   REST API with a database, React frontend + API, Rust CLI with
   subcommands, a fix inside an existing mid-size repo. Grading supports
   only Python and Node, with no packages, so Go/Rust tasks need grading
   support first. Bump the task-set `VERSION`. Today's 9 tasks don't
-  separate a local 27B model from a cloud one.
+  separate a local 27B model from a cloud one. Contributed tasks in the
+  current format help meanwhile: [#3](https://github.com/alessioricco/certo/issues/3).
 - **Escalation after a `failed` rung is unmeasured.** The 0.1.17
   escalation run climbed 10 times, all past a model that did no work.
   Climbing after a failed verification, the handoff of half-done work and
@@ -47,16 +47,21 @@ first item is the suggested next one.
   qwen3.6 wrote the module, then its test file as a text tool call, so
   nothing could be checked and haiku was never asked. Decide whether a
   rung whose last message is a tool call written as text should climb.
-  Done when decided (DECISIONS.md) and, if yes, tested.
-- **Milestone 3: the live provider-swap proof.** One task with two
-  `CERTO_LLM_MODEL` values (a local and a cloud model exist since
-  2026-10-17). Not blocked any more, just not run.
-- **Re-verify the "confident but wrong" fixes live**: #1, #2, #4, #5, #6
-  and #10 in `ARCHITECTURE.md` say "not re-verified live". At least the
-  ones a benchmark task can reach.
+  Two options to discuss (2026-10-19): just climb, or climb and ask the
+  next rung to write the missing tests first. Done when decided
+  (DECISIONS.md) and, if yes, tested.
+- **Re-verify the "confident but wrong" fixes live**: #1, #3, #5, #10
+  and #6 for Java in `ARCHITECTURE.md` say "not re-verified live" (#2, #4
+  and #6 for Go/Rust were, 2026-10-19). #1 and #5 are hard to trigger on
+  purpose; #10 is reachable from a benchmark task.
 - **Pull-request CI with tests and a ruff gate.** Only `release.yml`
   exists, and `main` has lint/format findings (`server.py`, tests) to
-  clear first. Add `release_check.sh` to it too.
+  clear first ([#2](https://github.com/alessioricco/certo/issues/2), a starter issue). Add `release_check.sh` to it
+  too.
+- **Move the historical planning docs into `docs/history/`**
+  (`docs/KICKOFF.md`, `docs/SPEC.md`, `docs/ROADMAP.txt`), so readers
+  don't take them for current docs; fix every reference. Starter issue:
+  [#4](https://github.com/alessioricco/certo/issues/4).
 - **Docker verification has never run against a real container**, and
   neither has escalation under Docker. Fake-workspace tests only.
 
@@ -91,9 +96,6 @@ first item is the suggested next one.
 - **Node: "no tests" counts as verified.** `node --test` exits 0 with no
   test files, so `npm test` passes. Found by the first bench integration
   run (2026-10-16). Documented, not fixed.
-- **Rust: missing clippy fails the project.** `cargo clippy` is planned
-  whenever `cargo` exists; without the component it is `failed` (exit
-  101) instead of `unavailable`. Workaround in `docs/troubleshooting.md`.
 - **Node: detect jest/vitest/mocha.** Today `build`/`test` scripts run as
   opaque commands; the runner and its results aren't parsed.
 - **Node: infer ESLint/`tsc` from config**, as `_ruff_configured()` does
@@ -102,10 +104,6 @@ first item is the suggested next one.
   environment. Java is detection-only in both today.
 - **New ecosystems**, in order: C#/.NET, PHP (Composer), Ruby, Kotlin/
   Android (Gradle), C/C++ (CMake), Swift.
-- **Check that the agent-facing `run_tests` tool is timeout-safe.** An old
-  item said its pytest/npm paths used bare `subprocess.run`; they now go
-  through `runner.run(..., timeout=300)`. Confirm timeouts and a missing
-  executable return an observation instead of raising, add tests, close.
 - **Interactive programs can't be driven** (menus, `SOLVE`-style choices).
   Deliberately not built: no safe general way to guess input. Would need
   the agent to declare an interaction script. Keep as a known gap unless
@@ -113,6 +111,11 @@ first item is the suggested next one.
 
 ## 4. Models and strategies
 
+- **A `certo bench` strategy for `--auto-model`.** Only `single` and
+  `escalate` exist (`bench_strategies.py`), so the README can say auto-model
+  is unmeasured but not show a number. Add an `auto` strategy (task
+  profiles plus fallback, as the CLI runs it) and bench it next to the
+  single models and a ladder.
 - **Tool calls written as text.** In the 0.1.15 local benchmark, every
   failed `qwen3.6` and `qwen3.8` run and 18 of 22 failed `devstral` runs
   ended because the model wrote its tool call as JSON in a text answer;
@@ -124,11 +127,26 @@ first item is the suggested next one.
 - **Record the Ollama setup in bench results.** `meta.json` has no Ollama
   version or context length, so a local result can't be traced to the
   setup (`/api/version`, `/api/ps`). Done when the report shows both.
+  Starter issue: [#5](https://github.com/alessioricco/certo/issues/5).
 - **Slow local models lose correct work to the time budget.** Three runs
   in the 0.1.15 local benchmark passed the hidden tests but ended
-  `budget_exhausted`. Consider a per-arm budget in `bench.yaml`. Also: a
-  `devstral` run (`token-bucket` r3) ran 57 minutes under the 30-minute
-  budget; find why the budget overran (a single long model call?).
+  `budget_exhausted`. Two causes, found 2026-10-19 (documented in
+  configuration and troubleshooting, not fixed):
+  - **Certo doesn't check the work once the budget is gone**
+    (`_verify_and_report` returns `budget_exhausted` first). The checks
+    need no model; running them would turn these into `verified` or a
+    real failure. Decide whether the verdict should then be `verified`
+    or stay `budget_exhausted` with the check results shown.
+  - **The budget can't stop a run in progress.** It is checked only
+    before each `.run()`; one run makes up to 50 model calls, each up to
+    `CERTO_LLM_TIMEOUT_SECONDS` × 6 attempts (the SDK retries timeouts 5
+    times). `devstral` `token-bucket` r3 (timeout 1200s) wrote its files
+    in the first 6 minutes, then spent ~50 on 4 calls: 57 minutes in all.
+    Unproven, since bench transcripts carry no timestamps; add them.
+    Fix by pausing the conversation at the deadline (SDK
+    `conversation.pause()`, verify first) and capping the per-call
+    timeout at the time left.
+  Also consider a per-arm budget in `bench.yaml`.
 - **Bench estimates from recorded cost.** The plan prices every run at a
   fixed ~500k input / ~20k output tokens (far too high: a cloud run used
   ~124k in the baseline). Use the per-model average from earlier
@@ -181,12 +199,20 @@ first item is the suggested next one.
 
 - **A first run in minutes, with one model.** No catalog, no ladders:
   `certo init`, then a first verified project. Getting started shows only
-  that path. Measure it: time from `pip install` to the first `verified`,
-  on a clean machine.
-- **Mark the less central parts as experimental in the docs**: the
-  server's SQL and Redis stores, the OpenAI-compatible endpoint,
-  third-party skills, Docker execution. They stay, but stop setting the
-  pace.
+  that path. Measured 2026-10-19 in an empty home folder: 88.5s from
+  `uv tool install` to `verified` (`docs/benchmark/first-run-0.1.19.md`).
+  Still to do: a truly clean machine (no Python, no uv), and the two
+  items below.
+- **A quieter run.** The SDK's default console output prints the whole
+  system prompt (~500 lines) and the first user message with the skills
+  (~500 more) before the first action. Certo doesn't configure it. Show
+  the banner, the agent's actions and the verdict; keep the full text
+  behind a flag. Feature bump; measure that nothing the user needs is
+  lost.
+- **Fast start-up.** `certo --version` takes ~3s (18.6s on the very first
+  run, compiling bytecode): `certo.cli` imports the SDK at the top
+  (~2.6s). Import it only for the commands that run an agent, so
+  `--version`, `verify` and `check` start at once.
 - **GitHub Action**: an issue labelled `certo` becomes a pull request with
   the verdict and checks in its description.
 - **Docs articles still to write** (ideas from 2026-10-18): build an
@@ -223,10 +249,6 @@ first item is the suggested next one.
   `api_key`/`base_url` with no validation. Minimal fix: a shared-secret
   header (e.g. `CERTO_SERVER_API_KEY`) checked on every task route, and a
   loud docs warning against a public `--host` without it.
-- **WS and `/v1/chat/completions` file artifacts under `_unscoped`.** They
-  call `stream_task` without `run_id`/`project`, so with
-  `CERTO_ARTIFACTS_DIR` set their records land in `_unscoped/<uuid>` even
-  when a `project` was sent. Only `POST /tasks` files them correctly.
 - **`/v1/chat/completions` has no verdict.** Its wire format has no field
   for `verification_state`, so a caller gets the agent's own claim only.
   Needs a deliberate wire-format choice (a custom field, or a trailing
@@ -267,7 +289,7 @@ Today there are 12 (eight `lifecycle/`, `git/commit-conventions`,
   `lifecycle/testing-and-verification` instead.
 
 **Languages** (path-triggered, one per verified ecosystem): Go (`go.mod`),
-Rust (`Cargo.toml`, with the clippy gotcha), Java (commit the wrapper),
+Rust (`Cargo.toml`), Java (commit the wrapper),
 TypeScript (`tsc --noEmit` as a `typecheck` script), Python (extend
 `pytest-conventions` with ruff/mypy setup); new ecosystems get one when
 their verification lands.
@@ -282,14 +304,15 @@ database).
 
 ## Smaller bugs
 
-- **Traceback when a benchmark ends.** After the results are written,
-  the SDK's terminal reader thread logs `PTY reader thread error: [Errno
-  9] Bad file descriptor` (`subprocess_terminal.py`): it reads a terminal
-  that was already closed. Harmless but alarming; users read it as a
-  crash. Close the conversations' terminals before exit, or silence it.
-- **`llm_check.explain()` always says "in .env"** ("Check
-  CERTO_LLM_API_KEY in .env"), although since 0.1.5 the value usually
-  comes from the user settings file or the environment.
+- **The server tests leak into the current folder and read its `.env`.**
+  Run from any folder, `tests/test_server.py` creates
+  `projects/acme-website`, `delete-me` and `keep-me` there (found
+  2026-10-19 in the repo's own `projects/`). And 4 tests (`test_health`,
+  the two unknown-id 404s, `delete_tasks_by_project_unknown_project`)
+  fail without a `CERTO_LLM_MODEL` in `./.env`. CI skips them (no
+  `server` extra), so only a developer with the extra and no `.env` sees
+  it. Give the server fixture its own config and a `tmp_path` projects
+  dir.
 - **Third-party skills: narrow license detection, `SKILL.md` only.** Eight
   permissive licenses are recognised; anything else is `unknown` and needs
   acknowledgement. Legacy single-file upstream skills can't be installed.

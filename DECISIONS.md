@@ -730,3 +730,31 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   it. The examples (and the example `models.yaml`) name
   `qwen3.8-27b-local` instead of `qwen3.6-35b-local`, which scored 0/27 in
   the 0.1.15 local benchmark.
+- **Run history goes in `.certo/RUNS.md`, appended by the CLI** (0.1.19).
+  `STATUS.md` keeps only the last run, so "which model built this?" had no
+  answer a few runs later (a user's `asteroids.2`). The history stays
+  inside the self-ignoring `.certo/` rather than at the project root: Certo
+  adds no file to the user's project, and nothing new can look like an
+  agent change. Written by `cli.py`, which alone knows the run was a CLI
+  run with state saving on; server and bench never write it.
+  The one exception to "no file in the user's project": a marked note in
+  `README.md` naming the models, the Author's request, written only in a
+  folder Certo created, so it never edits a README the user brought.
+- **`.certo/` stays created at the start; the agent is told to keep it**
+  (0.1.19). It makes a new project folder non-empty, which broke
+  `npm create vite .` live (cancelled, exit 0) and whose `--overwrite`
+  deletes it. Creating it later was rejected: the SDK saves the
+  conversation there from the first step, and `--resume` after a Ctrl-C
+  needs it. Instead `agent._CERTO_STATE_SUFFIX` tells every model to
+  leave `.certo/` alone and scaffold into a subfolder. Not gated by tier:
+  it is a fact about the folder, not a strategy for weaker models.
+- **The local default is `ollama/qwen3.8:27b`, not `qwen3-coder:30b`**
+  (0.1.19). Measured, not assumed: in `baseline-0.1.18-local.md` (27 runs
+  each, same Ollama server) qwen3.8 passed 27/27 hidden tests and fooled
+  Certo 0 times; qwen3-coder 18/27 and 3. Supersedes the earlier choice of
+  qwen3-coder, which had never been benchmarked. `certo init` also offers
+  the recommended model first when it is installed, before any "coder"
+  model. `qwen2.5-coder:7b` stays the small-machine suggestion, marked
+  unmeasured. Catalog ratings were left unchanged: they drive
+  `--auto-model` and derived ladders, so changing them needs its own
+  benchmark.

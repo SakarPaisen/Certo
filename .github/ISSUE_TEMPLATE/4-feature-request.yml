@@ -1,0 +1,28 @@
+name: Feature request
+description: Something Certo should do, or do differently.
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the [roadmap](https://github.com/alessioricco/certo/blob/main/ROADMAP.md)
+        and [TODO.md](https://github.com/alessioricco/certo/blob/main/TODO.md)
+        first: it may be planned already.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you were trying to do, and what got in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you'd like Certo to do
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do today instead

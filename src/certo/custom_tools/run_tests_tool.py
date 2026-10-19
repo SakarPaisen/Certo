@@ -244,9 +244,14 @@ class RunTestsExecutor(ToolExecutor[RunTestsAction, RunTestsObservation]):
         plan = discover_verification_plan(detection)
         primary = next((spec for spec in plan if spec.primary), plan[0])
         outcome = execute_check(primary)
+        # A timed-out check has no exit code; report it as nonzero so the
+        # agent is shown the output and doesn't read it as a pass.
+        exit_code = outcome.exit_code
+        if exit_code is None:
+            exit_code = 1 if outcome.status == "timed_out" else 0
         return RunTestsObservation(
             check_kind=detection.language,
-            exit_code=outcome.exit_code or 0,
+            exit_code=exit_code,
             summary=outcome.summary,
             output=outcome.output,
         )
@@ -473,6 +478,11 @@ class CheckSpec:
     skip_exit_codes: tuple[int, ...] = ()
     skip_reason: str | None = None
     unavailable_reason: str | None = None
+    # Text that, in the output of a nonzero exit, means the tool itself is
+    # missing rather than that the project failed it, e.g. cargo's "no such
+    # command: `clippy`". The check is then "unavailable", not "failed".
+    missing_tool_markers: tuple[str, ...] = ()
+    missing_tool_reason: str | None = None
     # A check whose result is already known at planning time — a pure
     # static check (e.g. an AST-based structural check) needs no subprocess
     # at all. `execute_check` returns this directly when set; `command`
@@ -553,6 +563,17 @@ def execute_check(
             output="",
         )
     passed = result.returncode == 0
+    if not passed and any(m in output for m in spec.missing_tool_markers):
+        return CheckOutcome(
+            name=spec.name,
+            command=command_str,
+            primary=spec.primary,
+            status="unavailable",
+            exit_code=None,
+            project_root=spec.cwd,
+            summary=spec.missing_tool_reason or f"{spec.name} is not installed",
+            output=output[-4000:],
+        )
     summary = f"{spec.name} {'passed' if passed else f'failed (exit {result.returncode})'}"
     return CheckOutcome(
         name=spec.name,
@@ -1031,7 +1052,21 @@ def _rust_plan(root: str, runner: CommandRunner) -> list[CheckSpec]:
     return [
         CheckSpec(name="cargo test", primary=True, command=[cargo, "test"], cwd=root),
         CheckSpec(name="cargo check", primary=False, command=[cargo, "check"], cwd=root),
-        CheckSpec(name="cargo clippy", primary=False, command=[cargo, "clippy"], cwd=root),
+        CheckSpec(
+            name="cargo clippy",
+            primary=False,
+            command=[cargo, "clippy"],
+            cwd=root,
+            # Without rustup, cargo has no clippy subcommand; with rustup but
+            # without the component, its cargo-clippy proxy says so.
+            missing_tool_markers=(
+                "no such command: `clippy`",
+                "is not installed for the toolchain",
+            ),
+            missing_tool_reason=(
+                "clippy is not installed (with rustup: rustup component add clippy)"
+            ),
+        ),
     ]
 
 

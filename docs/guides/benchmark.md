@@ -241,7 +241,13 @@ bundled set: [Write or contribute a benchmark task](contribute-a-benchmark-task.
   results
 - [Baseline 0.1.15](../benchmark/baseline-0.1.15.md): four local and
   three cloud models compared
+- [Baseline 0.1.18, local](../benchmark/baseline-0.1.18-local.md):
+  `qwen3.8:27b` against `qwen3-coder:30b`, which set the local default
 - [Escalation in 0.1.17](../benchmark/escalation-0.1.17.md): two
   local-then-cloud ladders
+- [Provider swap in 0.1.19](../benchmark/provider-swap-0.1.19.md): one
+  task with an OpenAI and an Anthropic model, only the model id changed
+- [First run in 0.1.19](../benchmark/first-run-0.1.19.md): 88.5s from
+  install to the first `verified` project
 - [Commands: certo bench](../reference/commands.md#certo-bench)
 - [How verification works](../concepts/how-verification-works.md)

@@ -1,0 +1,51 @@
+name: Benchmark results
+description: Share a `certo bench` results.md from your own hardware and models.
+title: "[benchmark] "
+labels: ["benchmark"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Results from other machines and models show what Certo's own
+        benchmark can't. How to run one:
+        [Benchmark models and strategies](https://github.com/alessioricco/certo/blob/main/docs/guides/benchmark.md).
+        The results folder holds every run's code and conversation; share
+        only `results.md` and your benchmark file unless you've checked the rest.
+  - type: input
+    id: version
+    attributes:
+      label: Certo version
+      placeholder: certo 0.1.18
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware and model server
+      description: |
+        The machine that served the models, and for local models the server,
+        its version and the context length (`ollama ps` shows it).
+      placeholder: "RTX 4090 24 GB, Ollama 0.40.6, context 32768"
+    validations:
+      required: true
+  - type: textarea
+    id: bench-file
+    attributes:
+      label: The benchmark file
+      description: Your `bench.yaml`, so others can run the same arms.
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: results.md
+      description: Paste the whole file.
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything you noticed
+      description: Fooled runs, odd failures, a model that did better or worse than expected.

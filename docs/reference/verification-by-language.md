@@ -45,6 +45,10 @@ into a failure, never a failure into a pass.
 | Java (Maven) | `./mvnw test` if the wrapper exists, else `mvn test` | none |
 | Java (Gradle) | `./gradlew test` if the wrapper exists, else `gradle test` | none |
 
+A missing optional tool makes its check `unavailable`, never `failed`:
+for example `cargo clippy` without the clippy component. The note under the
+verdict names it.
+
 Every check runs with no input (standard input closed) and a 300-second
 time limit. A command that waits for input fails at once instead of
 hanging.

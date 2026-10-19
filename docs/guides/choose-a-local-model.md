@@ -25,29 +25,40 @@ Three things matter, in this order:
 
 ## What Certo's benchmark found
 
-Certo's [0.1.15 benchmark](../benchmark/baseline-0.1.15.md) ran
-each model 27 times on 9 small tasks, graded by hidden tests the agent
-never saw. All four ran on the same Ollama server.
+Certo's benchmarks run each model 27 times on 9 small tasks, graded by
+hidden tests the agent never saw. Two runs so far:
+[0.1.15](../benchmark/baseline-0.1.15.md) with four models and
+[0.1.18](../benchmark/baseline-0.1.18-local.md) with two. Each run used
+one Ollama server, but not the same setup, so compare times only within
+a run.
 
-| Model | Correct | Median time per task | In short |
-|---|---|---|---|
-| `gemma4:31b-it-qat` | 26/27 | 12m 40s | The most accurate, but slow. |
-| `qwen3.8:27b` | 24/27 | 4m 37s | Almost as accurate, nearly three times faster. |
-| `devstral-small-2:24b` | 5/27 | 51s | Mostly wrote its tool calls as text. |
-| `qwen3.6:35b-a3b` | 0/27 | 19s | Wrote its tool calls as text in every run. |
+| Model | Correct | Fooled | Median time per task | Run | In short |
+|---|---|---|---|---|---|
+| `qwen3.8:27b` | 27/27 | 0 | 7m 37s | 0.1.18 | The best result so far: the default in `certo init`. |
+| `qwen3.8:27b` | 24/27 | 0 | 4m 37s | 0.1.15 | Its 3 failures were tool calls written as text. |
+| `gemma4:31b-it-qat` | 26/27 | 1 | 12m 40s | 0.1.15 | Accurate, but slow. |
+| `qwen3-coder:30b` | 18/27 | 3 | 8m 20s | 0.1.18 | Wrote wrong code more often; the default before 0.1.19. |
+| `devstral-small-2:24b` | 5/27 | 1 | 51s | 0.1.15 | Mostly wrote its tool calls as text. |
+| `qwen3.6:35b-a3b` | 0/27 | 0 | 19s | 0.1.15 | Wrote its tool calls as text in every run. |
+
+"Fooled" counts the runs where Certo said `verified` but the hidden
+tests failed.
 
 How to read it:
 
-- **Start with `qwen3.8:27b`** if your machine can hold it: the best
-  balance of accuracy and speed in this run.
+- **Start with `qwen3.8:27b`** if your machine can hold it: it passed
+  every task in the 0.1.18 run, and Certo was never fooled by it.
 - **Try `gemma4:31b-it-qat`** when correctness matters more than time, and
   raise `CERTO_MAX_TASK_SECONDS` for bigger tasks.
 - **Don't rule out `qwen3.6` or `devstral` from this table alone.** Their
   failures were tool calls written as text, which can come from the
   Ollama setup rather than the model. Check your own setup with the steps
   below.
-- **`qwen3-coder:30b`**, the default in `certo init`, wasn't in this
-  benchmark.
+- **Prefer `qwen3.8:27b` to `qwen3-coder:30b`.** In the same run,
+  `qwen3-coder` passed 18 of 27, and 3 of its wrong answers were
+  `verified`: its own tests missed rules the task stated.
+- **`qwen2.5-coder:7b`**, the suggestion for smaller machines, hasn't
+  been benchmarked. Expect it to be weaker.
 - The tasks are small, single-file ones. On bigger work, differences
   between models are likely to grow.
 
@@ -108,6 +119,8 @@ sooner, list only a few tasks and use one repeat.
 
 - [Ollama and local models](ollama-and-local-models.md): install, memory,
   context window
-- [Baseline 0.1.15](../benchmark/baseline-0.1.15.md): the full results,
-  with three cloud models for comparison
+- [Baseline 0.1.18, local](../benchmark/baseline-0.1.18-local.md):
+  `qwen3.8:27b` against `qwen3-coder:30b`
+- [Baseline 0.1.15](../benchmark/baseline-0.1.15.md): four local and
+  three cloud models
 - [Benchmark models and strategies](benchmark.md)

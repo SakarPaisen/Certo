@@ -72,6 +72,51 @@ rung and the rung that produced the final result:
   Final result from rung 2 (mid).
 ```
 
+## Which model built this project
+
+Every `certo` run also adds an entry to `.certo/RUNS.md` in the project
+folder. `STATUS.md` holds only the last run; `RUNS.md` keeps every run,
+oldest first, so you can still tell which model built a project many runs
+later:
+
+```text
+## 2026-10-19 08:05 UTC · verified
+
+- Task: Build a terminal Wordle game in Python, with pytest tests.
+- Certo: 0.1.19
+- Model: openai/gpt-5.6-luna
+- Time: 4m 03s · Tokens: 801,191 · Cost: $0.0593
+```
+
+- The heading is when the run started, and how it ended: the verdict,
+  `interrupted`, or `error:` with the error.
+- With `--escalate`, there is one line per rung that ran, with its model
+  and verdict. With `--auto-model`, the line says so.
+- Certo writes the entry after the run, never the agent. It names models,
+  never keys.
+- `.certo/` is ignored by git (it has its own `.gitignore`), so the file
+  stays on your machine. It moves with the folder when you rename or copy
+  it.
+- `CERTO_SAVE_STATE=false` turns it off, with the rest of `.certo/`.
+  Server mode and `certo bench` never write it.
+
+In a project folder Certo created (`--project` with a new name), Certo
+also keeps a one-line note at the end of the project's `README.md`, so
+the information travels with the code:
+
+```text
+<!-- certo:models -->
+*Generated with [Certo](https://github.com/alessioricco/certo), using `ollama/qwen3.8:27b`, `anthropic/claude-haiku-5-5`.*
+<!-- /certo:models -->
+```
+
+It names every model that wrote code in the project, oldest first; an
+escalation rung that changed no file isn't named. A later run updates the
+same note instead of adding another. Certo adds it only after a run that
+finished, and only when the agent wrote a `README.md`. It never edits the
+README of a folder you brought. If you delete the note, the next run in
+that folder adds it again.
+
 ## Model decisions
 
 With automatic model selection, `MODEL_DECISIONS.md` in the project folder

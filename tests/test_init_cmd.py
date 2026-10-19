@@ -175,9 +175,8 @@ def test_cloud_provider_env(tmp_path, monkeypatch, checks, choice, model, other_
     # The chosen provider's preset isn't repeated below.
     assert text.count(model) == 1
     # Every preset is two lines a user uncomments.
-    assert (
-        "# CERTO_LLM_MODEL=ollama/qwen3-coder:30b\n# CERTO_LLM_BASE_URL=http://localhost:11434"
-        in (text)
+    assert "# CERTO_LLM_MODEL=ollama/qwen3.8:27b\n# CERTO_LLM_BASE_URL=http://localhost:11434" in (
+        text
     )
 
 
@@ -205,6 +204,17 @@ def test_ollama_lists_installed_models_and_preselects_a_coder(tmp_path, monkeypa
     assert "Anthropic (Claude)" in (tmp_path / "w" / ".env").read_text()
 
 
+def test_ollama_preselects_the_recommended_model_over_a_coder(tmp_path, monkeypatch, checks):
+    # qwen3.8:27b beat qwen3-coder:30b in the 0.1.18 local benchmark, so
+    # when both are installed the recommended one is offered first.
+    script = Script(answers=["4", "", ""])
+
+    _run(tmp_path, monkeypatch, ["w"], script, models=["qwen3-coder:30b", "qwen3.8:27b"])
+
+    assert script.prompts[-1] == "Choice [2]: "
+    assert _active(tmp_path / "w")[0] == "CERTO_LLM_MODEL=ollama/qwen3.8:27b"
+
+
 def test_ollama_unreachable_says_so_and_still_writes(tmp_path, monkeypatch, no_check):
     script = Script(answers=["4", "", ""])
 
@@ -213,7 +223,7 @@ def test_ollama_unreachable_says_so_and_still_writes(tmp_path, monkeypatch, no_c
     assert "Couldn't reach Ollama at http://localhost:11434" in script.text
     assert "OLLAMA_HOST=0.0.0.0" in script.text
     assert _active(tmp_path / "w") == [
-        "CERTO_LLM_MODEL=ollama/qwen3-coder:30b",
+        "CERTO_LLM_MODEL=ollama/qwen3.8:27b",
         "CERTO_LLM_BASE_URL=http://localhost:11434",
     ]
 
@@ -223,7 +233,7 @@ def test_ollama_without_models_prints_the_pull_commands(tmp_path, monkeypatch, n
 
     _run(tmp_path, monkeypatch, ["w", "--no-check"], script, models=[])
 
-    assert "ollama pull qwen3-coder:30b" in script.text
+    assert "ollama pull qwen3.8:27b" in script.text
     assert "ollama pull qwen2.5-coder:7b" in script.text
 
 
@@ -459,7 +469,7 @@ def test_global_with_a_used_sample_folder_saves_settings_and_skips_samples(
     )  # fmt: skip
 
     assert code == 0
-    assert _active_lines(_user_file(tmp_path))[0] == "CERTO_LLM_MODEL=ollama/qwen3-coder:30b"
+    assert _active_lines(_user_file(tmp_path))[0] == "CERTO_LLM_MODEL=ollama/qwen3.8:27b"
     assert sorted(os.listdir(tmp_path / "w")) == ["notes.txt"]
     assert "Skipped the sample folder" in script.text
 
@@ -1169,3 +1179,20 @@ def test_certo_check_with_only_the_list_says_to_create_models_yaml(tmp_path, mon
 
     assert init_cmd.check_main([], out=out) == 1
     assert "Error: No models.yaml found" in out.getvalue()
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        _result("authentication", "invalid x-api-key"),
+        _result("model_not_found", "no such model"),
+        _result("no_tool_call", "no tool call"),
+        _result("unavailable", "Connection refused", base_url="http://h:11434"),
+    ],
+)
+def test_explain_does_not_claim_the_setting_is_in_dot_env(result):
+    # The value usually comes from the user settings file or the shell,
+    # and certo check prints where; the message mustn't say ".env".
+    text = explain(result, "Anthropic")
+    assert ".env" not in text
+    assert "in your settings" in text

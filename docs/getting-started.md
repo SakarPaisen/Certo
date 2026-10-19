@@ -7,10 +7,13 @@ steps in order.
 ## What you need
 
 - **Python 3.12 or newer.**
-- **A model.** Either an API key for a cloud provider (OpenAI, Anthropic or
-  Google Gemini), or [Ollama](https://ollama.com) running on your own
-  machine. A cloud model costs money per run; Certo prints the cost at the
-  end of every run.
+- **A model.** Either [Ollama](https://ollama.com) running on your own
+  machine, or an API key for a cloud provider (OpenAI, Anthropic or
+  Google Gemini). A local model keeps your code on your machine and costs
+  nothing per run; a cloud model is faster and costs money per run, and
+  Certo prints the cost at the end. Later you can use both: local first,
+  and the cloud only for the tasks the local model couldn't finish (see
+  [Next steps](#next-steps)).
 - **Node 18 or newer**, only for the browser sample task. The Python sample
   needs nothing else.
 
@@ -35,10 +38,10 @@ Check that it works:
 
 ```console
 $ certo --version
-certo 0.1.5
+certo 0.1.19
 ```
 
-This page needs version 0.1.5 or newer. If you see an older version, run
+This page needs version 0.1.19 or newer. If you see an older version, run
 `uv tool upgrade certo` (or `pip install -U certo`).
 
 ## 2. Save your settings: `certo init`
@@ -128,6 +131,19 @@ certo tasks/wordle.md --project wordle
   game in Python. A task can be a file, a URL, or text in quotes.
 - `--project wordle` puts the result in its own folder,
   `projects/wordle/`.
+
+Certo first prints a banner with its version and the settings for this
+run, so you can stop it (Ctrl-C) if the model or the folder is wrong:
+
+```text
+── Certo 0.1.19 ────────────────────────────────────────────
+  Model    openai/gpt-5.6-luna
+  Folder   /home/you/certo-workspace/projects/wordle (project wordle)
+  Runs on  this computer
+  Checks   on, up to 2 fix attempts
+  Limits   30 min · 50 steps
+────────────────────────────────────────────────────────────
+```
 
 The agent now works for a few minutes. It writes files, runs commands and
 runs the tests. When it says it is done, Certo checks the result itself.
@@ -232,7 +248,7 @@ Nothing is created. With no settings at all:
 
 ```console
 $ certo "Build a CLI todo app" --project todo
-Configuration error: CERTO_LLM_MODEL is required (e.g. 'anthropic/claude-sonnet-5-5' or 'ollama/qwen3-coder:30b'), and it isn't set in any of the three places Certo looks, in this order: 1. the environment (export CERTO_LLM_MODEL=...); 2. .env in the current folder (/home/me/.env); 3. the user settings file (/home/me/.config/certo/.env). Run certo init to write it, or set it in one of these. Switching provider = changing only this value.
+Configuration error: CERTO_LLM_MODEL is required (e.g. 'anthropic/claude-sonnet-5-5' or 'ollama/qwen3.8:27b'), and it isn't set in any of the three places Certo looks, in this order: 1. the environment (export CERTO_LLM_MODEL=...); 2. .env in the current folder (/home/me/.env); 3. the user settings file (/home/me/.config/certo/.env). Run certo init to write it, or set it in one of these. Switching provider = changing only this value.
 ```
 
 Run `certo init`, or set the two variables yourself:
@@ -244,6 +260,9 @@ export CERTO_LLM_API_KEY=sk-...
 
 ## Next steps
 
+- Start every task on a local model, and let Certo hand only the tasks it
+  couldn't finish to a cloud model: [Escalate between models](guides/escalate-between-models.md).
+  Which local model to start with: [Choose a local model](guides/choose-a-local-model.md).
 - Write tasks Certo can check: [Write a task Certo can check](guides/write-a-good-task.md).
 - What to do after each verdict: [What to do after each verdict](guides/after-the-verdict.md).
 - Use a different provider: [OpenAI, Claude and Gemini](guides/openai-claude-gemini.md)

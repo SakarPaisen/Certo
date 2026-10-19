@@ -157,7 +157,9 @@ models:
       published runs that used 128K context and 100+ turns; at 32K and Q4
       it will do worse on long agent loops. Non-thinking model, no GPQA
       score found. Fast thanks to 3.3B active params. Superseded by
-      qwen3.6-35b-local on every published coding benchmark.
+      qwen3.6-35b-local on every published coding benchmark. Measured in
+      Certo's 0.1.18 local benchmark: 18/27 hidden tests, fooled Certo 3
+      times; qwen3.8-27b-local did better in the same run.
     ratings: {reasoning: 1, precision: 2, code: 1, cost: 5}
 
   - name: gemma4-31b-local           # was `gemma3-local` (pointed at the 4B Gemma 3) — rename references in your ladders
@@ -227,7 +229,9 @@ models:
       (official model card, full precision). Those numbers would earn code
       3; it is rated 2 because at 4-bit with a 32K window its long thinking
       traces leave little room for the task. Give it a bigger window if your
-      machine allows, and measure with `certo bench`.
+      machine allows, and measure with `certo bench`. Measured in Certo's
+      0.1.18 local benchmark, with a 131K window: 27/27 hidden tests, never
+      fooled Certo, median 7m 37s per task. The `certo init` default.
     ratings: {reasoning: 3, precision: 3, code: 2, cost: 5}
 
   # ===========================================================================

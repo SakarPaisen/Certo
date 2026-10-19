@@ -115,7 +115,9 @@ given design was chosen.
   makes an `inconclusive` result exit nonzero too (default behavior
   unchanged otherwise). `--auto-model` sets `cfg.model_selection="auto"`;
   prompts for a choice only when `--interactive` is also set. Before
-  `run_task` it prints `worktree.worktree_warning()` to stderr, unless
+  `run_task` it prints `banner.format_banner()` (version and run
+  settings; after every check that can refuse the run, never the key or a
+  URL's userinfo), then `worktree.worktree_warning()` to stderr, unless
   silenced or the `--project` folder is one Certo created.
 - **`worktree.py`** — stdlib only. `worktree_warning(path)`: None for an
   empty folder or a clean repository, a warning for uncommitted changes
@@ -199,6 +201,16 @@ given design was chosen.
   verification. When the conversation can't be reopened (Docker, folder
   gone, SDK refuses), a fresh conversation gets the task and `STATUS.md`
   instead. Server and bench never pass `save_state`.
+- **`run_history.py`** — stdlib only. `.certo/RUNS.md`, appended by
+  `cli.py` (not the runner) once per run when state saving is on: after
+  the outcome, or from the `KeyboardInterrupt`/error branches. Models come
+  from `outcome.rungs`, else `run_summary.models` (what really made
+  calls), else the settings. A failed write is a stderr warning, never a
+  failed run. `tests/test_cli.py` stubs `append_run` (its workspace is the
+  checkout). `note_models_in_readme()` keeps one marked
+  `<!-- certo:models -->` block at the end of `README.md`, merging model
+  ids; the CLI calls it after a finished run only when
+  `was_created_by_certo` (rungs that `did_no_work` are left out).
 - **`run_summary.py`** — pure: `summarize_run(duration, {usage_id:
   Metrics.get()})` → `RunSummary` (wall-clock time, models that actually
   made calls, tokens, cost; zero cost with nonzero tokens = "unknown",
@@ -307,6 +319,10 @@ rule 2):
   `SKILL.md` directory's `.mcp.json` becomes MCP server config unless it is
   loaded with `skip_mcp=True`. `third_party_skills.py` neutralizes both for
   third-party skills. First-party skills are trusted and left as-is.
+- `SubprocessTerminal.close()` closes the PTY master fd while the reader
+  thread may sit in `select()` on it; the thread then logs `PTY reader
+  thread error: [Errno 9]` with a traceback (v1.47.0). Harmless. runner.py
+  filters exactly that record (EBADF only) on the SDK terminal's logger.
 - `find_skill_md_directories()` only checks direct children of a skills dir
   (`SKILL.md` one level deep), while `find_regular_md_files()` `rglob`s.
   So any `.md` under `CERTO_SKILLS_DIR` loads as a legacy skill.
@@ -364,7 +380,12 @@ for full transcripts if a fix needs revisiting:
    with no TTY, agent doesn't notice and re-runs the identical command** —
    confirmed live (`npm create vite` interactive prompt, 200K+ tokens
    burned re-running it). Fix: `_NONINTERACTIVE_TOOLING_SUFFIX`. **Status:
-   applied, not re-verified live.**
+   re-verified live 2026-10-19 (0.1.19, claude-sonnet-4-5, a Vite React
+   task): `npm create vite@latest . -- --template react` auto-cancelled
+   twice (the second time piped through `yes`, a changed command, not a
+   repeat); the agent then named the cause and wrote the files by hand.
+   `verified` in 6m27s, $0.54. The cause it named was Certo's own `.certo/`
+   making the folder non-empty (see TODO).**
 3. **Agent called `finish` admitting known failures, with an invented wrong
    diagnosis** — confirmed live (Hanoi: blamed "sequence handling," the file
    actually had a literal `IndentationError` and never parsed). Fix (two,
@@ -375,8 +396,12 @@ for full transcripts if a fix needs revisiting:
 4. **Same pattern, non-Python project, pytest-based verification blind to
    it** — a Vite/React JSX parse error; pytest reported "no tests
    collected" as a false pass. Fix: generalized to run `npm run build` for
-   a detected Node project. **Status: applied, unit-tested against real
-   npm/node subprocesses; not re-verified against the original repro.**
+   a detected Node project. **Status: re-verified 2026-10-19 against the
+   original repro's shape: a live-built Vite React app (`npm run build` +
+   `npm test`, `verified`), then one closing `</div>` removed from
+   `App.jsx` — `npm test` still passed, `npm run build` failed with
+   esbuild's "Unexpected end of file before a closing \"div\" tag", and
+   `certo verify` said `failed`, exit 1.**
 5. **The verification loop couldn't tell "confirmed working" from "found
    nothing to check," and had no visibility into a `STUCK`/`ERROR` run** —
    fixed with the five-state model (`verified`/`failed`/`inconclusive`/
@@ -387,8 +412,12 @@ for full transcripts if a fix needs revisiting:
    around the four named stages and the five-value `CheckOutcome.status`
    enum described above, covering Go/Rust/Java. **Status: applied,
    unit-tested per stage plus real-subprocess runs for every toolchain
-   installed in this dev environment; not re-verified against a live
-   Go/Rust/Java build task end to end.**
+   installed in this dev environment. Go and Rust re-verified live end to
+   end 2026-10-19 (claude-sonnet-4-5): a `wordfreq` CLI ran `go test ./...`
+   + `go vet ./...`, a `tempconv` CLI ran `cargo test`/`check`/`clippy`,
+   both `verified` (2m33s $0.37, 2m37s $0.39), and both programs behaved
+   as asked when run by hand. Java still not run end to end (no Maven or
+   Gradle installed here).**
 7. **Agent repeatedly re-edited already-correct code chasing a wrong test**
    (Hanoi: the test's own state assumption was wrong, not the
    implementation) **and its diagnostic prose degraded into fluent but

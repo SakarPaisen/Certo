@@ -34,7 +34,7 @@ setting comes from and makes one small call to the model.
   [`no_progress`](#no_progress), [`retry_exhausted`](#retry_exhausted),
   [`budget_exhausted`](#budget_exhausted),
   [nothing to resume](#nothing-to-resume),
-  [Rust fails on `cargo clippy`](#a-rust-project-fails-on-cargo-clippy)
+  [Rust: `cargo clippy` unavailable](#rust-cargo-clippy-is-unavailable)
 - Model files and escalation: [files not found](#no-models_listyaml-or-modelsyaml-found),
   [old format](#modelsyaml-is-in-the-old-format),
   [problems](#the-model-files-have-problems),
@@ -81,7 +81,7 @@ environment, as in [Getting started](getting-started.md#1-install).
 **You see:**
 
 ```text
-Configuration error: CERTO_LLM_MODEL is required (e.g. 'anthropic/claude-sonnet-5-5' or 'ollama/qwen3-coder:30b'), and it isn't set in any of the three places Certo looks, in this order: 1. the environment (export CERTO_LLM_MODEL=...); 2. .env in the current folder (/home/me/project/.env); 3. the user settings file (/home/me/.config/certo/.env). Run certo init to write it, or set it in one of these. Switching provider = changing only this value.
+Configuration error: CERTO_LLM_MODEL is required (e.g. 'anthropic/claude-sonnet-5-5' or 'ollama/qwen3.8:27b'), and it isn't set in any of the three places Certo looks, in this order: 1. the environment (export CERTO_LLM_MODEL=...); 2. .env in the current folder (/home/me/project/.env); 3. the user settings file (/home/me/.config/certo/.env). Run certo init to write it, or set it in one of these. Switching provider = changing only this value.
 ```
 
 **Cause:** `CERTO_LLM_MODEL` isn't set in your shell, in `.env` in this
@@ -147,7 +147,7 @@ that `certo check` names, or export it. Then run `certo check`.
 **You see**, from `certo check`:
 
 ```text
-Checking the model openai/gpt-6.1-sol... OpenAI rejected the API key. Check CERTO_LLM_API_KEY in .env: it must be a valid key for OpenAI, pasted with no spaces.
+Checking the model openai/gpt-6.1-sol... OpenAI rejected the API key. Check CERTO_LLM_API_KEY in your settings: it must be a valid key for OpenAI, pasted with no spaces.
 ```
 
 **Cause:** the key is wrong, expired, or belongs to another provider than
@@ -192,7 +192,7 @@ to it; for Ollama, the model isn't pulled.
 **You see**, from `certo check`:
 
 ```text
-The model ... doesn't support tool calling, which Certo's agent needs. Choose another model in CERTO_LLM_MODEL in .env.
+The model ... doesn't support tool calling, which Certo's agent needs. Choose another model in CERTO_LLM_MODEL in your settings.
 ```
 
 or `... answered, but without calling a tool.`
@@ -201,7 +201,7 @@ or `... answered, but without calling a tool.`
 editing files), and this model can't make them, or didn't.
 
 **Fix:** choose a model with tool (function) calling support. For Ollama,
-coder models such as `qwen3-coder` support it.
+`qwen3.8:27b`, the model `certo init` suggests, supports it.
 
 ### Can't reach the provider
 
@@ -234,7 +234,7 @@ normal. The tokens are still counted.
 **You see:**
 
 ```text
-Checking the model ollama/qwen3-coder:30b (a local model may take a minute to load)... Couldn't reach the server at http://localhost:11434. Check CERTO_LLM_BASE_URL in .env and that the server is running. If Ollama runs on another machine, start it there with OLLAMA_HOST=0.0.0.0.
+Checking the model ollama/qwen3.8:27b (a local model may take a minute to load)... Couldn't reach the server at http://localhost:11434. Check CERTO_LLM_BASE_URL in your settings and that the server is running. If Ollama runs on another machine, start it there with OLLAMA_HOST=0.0.0.0.
 ```
 
 **Cause:** Ollama isn't started, or listens on another address.
@@ -324,7 +324,7 @@ runs part of it on the CPU.
 
 **Fix:** check `ollama ps` while the model is loaded. If the `PROCESSOR`
 column shows a CPU share, use a smaller model (for example
-`qwen2.5-coder:7b` instead of `qwen3-coder:30b`) or a smaller quantization.
+`qwen2.5-coder:7b` instead of `qwen3.8:27b`) or a smaller quantization.
 
 If one step takes more than 5 minutes, the call to the model hits its
 timeout and starts over, so the step never finishes. Raise
@@ -451,9 +451,14 @@ failed after the allowed attempts.
 **You see:** `Verification: budget_exhausted`.
 
 **Cause:** the whole task took longer than `CERTO_MAX_TASK_SECONDS` (30
-minutes by default).
+minutes by default). Certo checks the budget only between runs of the
+agent, so a task can end well past it: one model call can wait up to
+`CERTO_LLM_TIMEOUT_SECONDS` and be tried again up to 5 times. When the
+budget is gone, Certo doesn't run the project's checks either, so the work
+may be fine.
 
-**Fix:** if the model is slow, see [very slow steps](#every-step-is-very-slow).
+**Fix:** run `certo verify` on the folder to check the work without a
+model. If the model is slow, see [very slow steps](#every-step-is-very-slow).
 Otherwise split the task into smaller ones, or raise
 `CERTO_MAX_TASK_SECONDS`. The work done so far stays in the folder, and
 `certo --resume` continues it with a fresh time budget.
@@ -471,14 +476,22 @@ different folder or `--project` name than the task used, a run made with
 state is gone, start a new task; the files the agent wrote are still
 there.
 
-### A Rust project fails on `cargo clippy`
+### Rust: `cargo clippy` is unavailable
 
-**You see:** `failed      cargo clippy` with `error: no such command:
-clippy`, and `Verification: failed` or `retry_exhausted`.
+**You see:**
 
-**Cause:** Certo always runs `cargo clippy` for a Rust project, and treats
-the missing clippy component as a failure (a known bug: it should be a
-limitation).
+```text
+  passed      cargo test  (/usr/local/bin/cargo test)
+  passed      cargo check  (/usr/local/bin/cargo check)
+  unavailable cargo clippy  (/usr/local/bin/cargo clippy)
+
+Verification: verified
+  - cargo clippy: clippy is not installed (with rustup: rustup component add clippy)
+```
+
+**Cause:** Certo runs `cargo clippy` for every Rust project, and clippy
+isn't installed. The verdict still comes from `cargo test`; the lint
+check is just missing. Before 0.1.19, this made the project `failed`.
 
 **Fix:** install the component: `rustup component add clippy`.
 
@@ -742,7 +755,8 @@ framework was still reading from it, as the benchmark shut down.
 
 **Fix:** none needed. The benchmark finished: the results are complete,
 and the `runs recorded` count at the top of `results.md` says how many
-runs were saved.
+runs were saved. Since 0.1.19, Certo hides this message; it appears only
+with older versions.
 
 ## Other problems
 

@@ -107,6 +107,22 @@ _NONINTERACTIVE_TOOLING_SUFFIX = (
     "missing flag) or take a different approach instead."
 )
 
+# Certo keeps the run state in the project's `.certo/` from the first step
+# (the SDK saves the conversation there, which `--resume` needs), so a new
+# project folder is never empty. Tested 2026-10-19 with create-vite 9.3.0:
+# `npm create vite .` then prints "Operation cancelled" and exits 0, and
+# `--overwrite` deletes `.certo/`. Scaffolding into a subfolder works.
+_CERTO_STATE_SUFFIX = (
+    "If the project folder contains a `.certo/` folder, it is Certo's own "
+    "run state: never delete, move or edit it, and ignore it otherwise. "
+    "Because of it the folder is not empty, so a scaffolding tool that "
+    "wants an empty folder (e.g. `npm create vite .`) will refuse or "
+    "cancel, and its overwrite option (`--overwrite`, `--force`) would "
+    "delete `.certo/`. Instead, scaffold into a new subfolder, then move "
+    "its files (including hidden ones such as `.gitignore`) up into the "
+    "project folder and remove the empty subfolder."
+)
+
 # A stronger, more direct completion gate than _AUTONOMOUS_SUFFIX's general
 # "don't declare early completion" rule above — confirmed live that wasn't
 # enough on its own. Asked to build a Tower of Hanoi game, the agent called
@@ -183,12 +199,14 @@ def build_agent(
     # runner.py's stream_task interactive checkpoint, not anything here.
     # Every other suffix stays unconditional: none of them are about "is a
     # human present," they're independent policies (README requirement,
-    # non-interactive tool flags, verify-before-finish, lifecycle skills).
+    # non-interactive tool flags, keeping .certo/, verify-before-finish,
+    # lifecycle skills).
     suffixes = [_AUTONOMOUS_SUFFIX] if not cfg.interactive else []
     suffixes.extend(
         [
             _README_SUFFIX,
             _NONINTERACTIVE_TOOLING_SUFFIX,
+            _CERTO_STATE_SUFFIX,
             _VERIFY_BEFORE_FINISH_SUFFIX,
             _LIFECYCLE_SKILLS_SUFFIX,
         ]

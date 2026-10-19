@@ -18,6 +18,15 @@ from certo.run_summary import ModelUsage, RunSummary
 from certo.runner import CompletionContract, TaskOutcome, TaskResult
 
 
+@pytest.fixture(autouse=True)
+def recorded_runs(monkeypatch):
+    """Most tests here use workspace ".", the checkout itself: catch the
+    .certo/RUNS.md entries instead of writing them there."""
+    entries = []
+    monkeypatch.setattr(cli, "append_run", lambda workspace, entry: entries.append(entry))
+    return entries
+
+
 def _fake_result(messages=(), verification_state="verified", limitations=()):
     """Build the same `TaskResult` shape `run_task` now returns, for tests
     that monkeypatch `run_task` — `messages[-1]`/`if messages:` behave
@@ -240,6 +249,25 @@ def test_project_flag_creates_subfolder_and_overrides_workspace(monkeypatch, tmp
     assert calls["cfg"].workspace == expected
     assert calls["project"] == "myapp"
     assert (tmp_path / "myapp").is_dir()
+
+
+def test_a_run_starts_with_the_banner(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg(projects_dir=str(tmp_path)))
+    monkeypatch.setattr(cli, "run_task", lambda *a, **k: _fake_result())
+
+    assert cli.main(["do something", "--project", "myapp"]) == 0
+
+    out = capsys.readouterr().out
+    assert out.startswith(f"── Certo {cli.__version__} ")
+    assert f"Folder   {tmp_path / 'myapp'} (project myapp)" in out
+
+
+def test_a_refused_run_prints_no_banner(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg(projects_dir=str(tmp_path)))
+
+    assert cli.main(["do something", "--project", "../escaped"]) == 1
+
+    assert "Certo" not in capsys.readouterr().out
 
 
 def test_project_flag_rejects_a_path_escape_attempt(monkeypatch, tmp_path, capsys):
@@ -1762,3 +1790,80 @@ def test_unchanged_exits_like_inconclusive(monkeypatch, capsys, flag, expected):
 
     assert cli.main(["do something", *flag]) == expected
     assert "Verification: unchanged" in capsys.readouterr().out
+
+
+def test_a_finished_run_is_recorded_with_its_model_and_verdict(monkeypatch, recorded_runs):
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg())
+    monkeypatch.setattr(
+        cli, "run_task", lambda *a, **k: _fake_result(verification_state="verified")
+    )
+
+    assert cli.main(["Build a CLI todo app\nwith tests"]) == 0
+
+    (entry,) = recorded_runs
+    assert entry.ended == "verified"
+    assert entry.models == ["openai/gpt-4o"]
+    assert entry.task.startswith("Build a CLI todo app")
+
+
+def test_an_interrupted_run_is_recorded_too(monkeypatch, recorded_runs):
+    def _interrupt(*a, **k):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg())
+    monkeypatch.setattr(cli, "run_task", _interrupt)
+
+    assert cli.main(["do something"]) == 130
+    assert [e.ended for e in recorded_runs] == ["interrupted"]
+
+
+def test_no_run_is_recorded_when_saving_state_is_off(monkeypatch, recorded_runs):
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg(save_state=False))
+    monkeypatch.setattr(cli, "run_task", lambda *a, **k: _fake_result())
+
+    assert cli.main(["do something"]) == 0
+    assert recorded_runs == []
+
+
+def test_a_history_write_that_fails_never_fails_the_run(monkeypatch, capsys):
+    def _fail(workspace, entry):
+        raise OSError("read-only file system")
+
+    monkeypatch.setattr(cli, "append_run", _fail)
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg())
+    monkeypatch.setattr(cli, "run_task", lambda *a, **k: _fake_result())
+
+    assert cli.main(["do something"]) == 0
+    assert "couldn't add this run to .certo/RUNS.md" in capsys.readouterr().err
+
+
+def _builds_a_readme(cfg_holder):
+    def _fake_run_task(task, cfg=None, **_):
+        Path(cfg.workspace, "README.md").write_text("# App\n")
+        cfg_holder.append(cfg)
+        summary = RunSummary(duration_seconds=1.0, models=(ModelUsage(model="openai/gpt-4o"),))
+        return TaskResult([], replace(_fake_result().outcome, run_summary=summary))
+
+    return _fake_run_task
+
+
+def test_a_project_certo_created_gets_the_model_note_in_its_readme(monkeypatch, tmp_path):
+    cfgs = []
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg(projects_dir=str(tmp_path)))
+    monkeypatch.setattr(cli, "run_task", _builds_a_readme(cfgs))
+
+    assert cli.main(["build an app", "--project", "app"]) == 0
+
+    text = (tmp_path / "app" / "README.md").read_text()
+    assert "<!-- certo:models -->" in text
+    assert "using `openai/gpt-4o`." in text
+
+
+def test_a_folder_certo_did_not_create_keeps_its_readme(monkeypatch, tmp_path):
+    (tmp_path / "mine").mkdir()
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg(projects_dir=str(tmp_path)))
+    monkeypatch.setattr(cli, "run_task", _builds_a_readme([]))
+
+    assert cli.main(["build an app", "--project", "mine"]) == 0
+
+    assert (tmp_path / "mine" / "README.md").read_text() == "# App\n"

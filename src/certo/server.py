@@ -395,6 +395,7 @@ def create_app():
                     cfg=cfg,
                     on_message=on_message,
                     acceptance_checks=acceptance_checks,
+                    project=request.project,
                     ladder=ladder,
                 )
                 if request.require_verification and outcome.verification_state in UNPROVEN_STATES:
@@ -488,7 +489,7 @@ def create_app():
 
         if not request.stream:
             try:
-                messages = run_task(task, cfg=cfg)
+                messages = run_task(task, cfg=cfg, project=request.project)
             except Exception as exc:  # noqa: BLE001 - surfaced as a clean HTTP error
                 raise HTTPException(status_code=500, detail=str(exc)) from exc
             content = "\n\n".join(_narrative_texts(messages))

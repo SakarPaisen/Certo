@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from certo.agent import (
     _AUTONOMOUS_SUFFIX,
+    _CERTO_STATE_SUFFIX,
     _LIFECYCLE_SKILLS_SUFFIX,
     _NONINTERACTIVE_TOOLING_SUFFIX,
     _README_SUFFIX,
@@ -37,6 +38,7 @@ def test_agent_context_carries_all_system_message_suffix_policies():
     assert _AUTONOMOUS_SUFFIX in suffix
     assert _README_SUFFIX in suffix
     assert _NONINTERACTIVE_TOOLING_SUFFIX in suffix
+    assert _CERTO_STATE_SUFFIX in suffix
     assert _VERIFY_BEFORE_FINISH_SUFFIX in suffix
     assert _LIFECYCLE_SKILLS_SUFFIX in suffix
 
@@ -151,8 +153,20 @@ def test_interactive_mode_keeps_every_other_suffix():
     suffix = agent.agent_context.system_message_suffix
     assert _README_SUFFIX in suffix
     assert _NONINTERACTIVE_TOOLING_SUFFIX in suffix
+    assert _CERTO_STATE_SUFFIX in suffix
     assert _VERIFY_BEFORE_FINISH_SUFFIX in suffix
     assert _LIFECYCLE_SKILLS_SUFFIX in suffix
+
+
+def test_certo_state_suffix_protects_dot_certo_from_scaffolders():
+    # create-vite 9.3.0 in a folder holding .certo/: "Operation cancelled"
+    # with exit 0, and --overwrite deletes .certo/. The agent must keep it
+    # and scaffold into a subfolder instead.
+    text = _CERTO_STATE_SUFFIX
+    assert "never delete" in text
+    assert "--overwrite" in text
+    assert "subfolder" in text
+    assert "hidden" in text
 
 
 # --- usage_id passthrough (auto model selection) ----------------------------

@@ -10,7 +10,9 @@ provider-agnostic: this test never hardcodes a model).
 
 from __future__ import annotations
 
+import errno
 import json
+import logging
 import os
 from contextlib import nullcontext
 from types import SimpleNamespace
@@ -2602,3 +2604,36 @@ def test_stream_task_turns_off_the_change_check_only_on_resume(monkeypatch, tmp_
     first = load_record(str(tmp_path))
     runner.stream_task(first.task, cfg=_cfg(workspace=str(tmp_path)), resume_from=first)
     assert seen == [True, False]
+
+
+def _pty_reader_records(exc: Exception) -> list[logging.LogRecord]:
+    """What the SDK terminal's logger lets through when its reader thread
+    logs `exc` the way the SDK does."""
+    import certo.runner  # noqa: F401 - installs the filter
+
+    sdk_logger = logging.getLogger("openhands.tools.terminal.terminal.subprocess_terminal")
+    seen: list[logging.LogRecord] = []
+
+    class _Keep(logging.Handler):
+        def emit(self, record):
+            seen.append(record)
+
+    handler = _Keep()
+    sdk_logger.addHandler(handler)
+    try:
+        try:
+            raise exc
+        except Exception as e:
+            sdk_logger.error(f"PTY reader thread error: {e}", exc_info=True)  # noqa: G201 - as the SDK logs it
+    finally:
+        sdk_logger.removeHandler(handler)
+    return seen
+
+
+def test_closed_terminal_read_error_is_not_logged():
+    assert _pty_reader_records(OSError(errno.EBADF, "Bad file descriptor")) == []
+
+
+def test_other_terminal_reader_errors_still_log():
+    assert len(_pty_reader_records(OSError(errno.EIO, "Input/output error"))) == 1
+    assert len(_pty_reader_records(ValueError("boom"))) == 1

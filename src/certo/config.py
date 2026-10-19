@@ -438,7 +438,7 @@ def load_settings_files(
 def _missing_model_message(env: Mapping[str, str], dotenv_path: str, user_path: str) -> str:
     return (
         "CERTO_LLM_MODEL is required (e.g. 'anthropic/claude-sonnet-5-5' or "
-        "'ollama/qwen3-coder:30b'), and it isn't set in any of the three places "
+        "'ollama/qwen3.8:27b'), and it isn't set in any of the three places "
         "Certo looks, in this order: 1. the environment (export CERTO_LLM_MODEL=...); "
         f"2. .env in the current folder ({os.path.abspath(dotenv_path)}); "
         f"3. the user settings file ({user_path}). Run certo init to write it, "

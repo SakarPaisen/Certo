@@ -10,18 +10,21 @@ import urllib.error
 import urllib.request
 from collections.abc import Sequence
 from dataclasses import replace
+from datetime import UTC, datetime
 from urllib.parse import urlparse
 
 from openhands.sdk.event import ActionEvent
 
 from . import __version__
 from .acceptance import AcceptanceCheck, AcceptanceCheckError, parse_acceptance_checks
+from .banner import format_banner
 from .config import ConfigError, load_config, override_llm, resolve_project_dir
 from .custom_tools.run_tests_tool import detect_project, run_full_verification
 from .escalation import format_rung_lines, load_ladder
 from .init_cmd import check_main, init_main
 from .model_catalog import ModelCatalogEntry
 from .project_state import load_record, status_path
+from .run_history import RunEntry, append_run, note_models_in_readme
 from .runner import UNPROVEN_STATES, _build_completion_contract, run_task
 from .skills import write_project_context
 from .worktree import record_created_project, was_created_by_certo, worktree_warning
@@ -500,7 +503,6 @@ def main(argv: list[str] | None = None) -> int:
         if created:
             record_created_project(cfg.projects_dir, args.project)
         cfg = replace(cfg, workspace=project_dir)
-        print(f"Project workspace: {cfg.workspace}")
 
     resume_from = None
     if args.resume:
@@ -519,7 +521,6 @@ def main(argv: list[str] | None = None) -> int:
                 'say what to do next: certo --resume "..."'
             )
             return 0
-        print(f"Resuming: {_first_line(resume_from.task)}")
 
     ladder = None
     if cfg.model_selection == "escalate":
@@ -534,6 +535,21 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Configuration error: {exc}", file=sys.stderr)
             return 1
 
+    acceptance_checks: list[AcceptanceCheck] | None = None
+    if args.acceptance_checks is not None:
+        try:
+            acceptance_checks = resolve_acceptance_checks(args.acceptance_checks)
+        except ValueError as exc:
+            print(f"Configuration error: {exc}", file=sys.stderr)
+            return 1
+
+    # After every check that can refuse the run, so it only shows for a run
+    # that starts.
+    for line in format_banner(cfg, ladder=ladder, project=args.project):
+        print(line)
+    if resume_from is not None:
+        print(f"Resuming: {_first_line(resume_from.task)}")
+
     certo_made = args.project is not None and was_created_by_certo(cfg.projects_dir, args.project)
     if not cfg.no_worktree_warning and not certo_made:
         warning = worktree_warning(cfg.workspace)
@@ -543,14 +559,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.agents_md is not None:
         write_project_context(cfg.workspace, args.agents_md)
 
-    acceptance_checks: list[AcceptanceCheck] | None = None
-    if args.acceptance_checks is not None:
-        try:
-            acceptance_checks = resolve_acceptance_checks(args.acceptance_checks)
-        except ValueError as exc:
-            print(f"Configuration error: {exc}", file=sys.stderr)
-            return 1
-
     on_confirm = _confirm_pending_actions if cfg.confirm_mode == "always" else None
     on_awaiting_input = _prompt_for_continuation if cfg.interactive else None
     on_model_choice = (
@@ -558,6 +566,19 @@ def main(argv: list[str] | None = None) -> int:
     )
     save_state = cfg.save_state or resume_from is not None
     resume_hint = "certo --resume" + (f" --project {args.project}" if args.project else "")
+    started_at = datetime.now(UTC)
+    history_task = resume_from.task if resume_from is not None else (task or "")
+
+    def record_run(ended: str, outcome=None) -> None:
+        if not save_state:
+            return
+        entry = _run_entry(cfg, ladder, history_task, ended, started_at, outcome)
+        entry = replace(entry, resumed=resume_from is not None)
+        try:
+            append_run(cfg.workspace, entry)
+        except OSError as exc:
+            print(f"Warning: couldn't add this run to .certo/RUNS.md ({exc}).", file=sys.stderr)
+
     try:
         messages = run_task(
             resume_from.task if resume_from is not None else task,
@@ -575,11 +596,13 @@ def main(argv: list[str] | None = None) -> int:
             on_progress=_print_progress if ladder is not None else None,
         )
     except KeyboardInterrupt:
+        record_run("interrupted")
         print("\nInterrupted.", file=sys.stderr)
         if save_state:
             print(f"Continue with: {resume_hint}", file=sys.stderr)
         return 130
     except Exception as exc:  # noqa: BLE001 - surfaced as a clean CLI error, not a traceback
+        record_run(f"error: {_first_line(str(exc) or type(exc).__name__)}")
         print(f"Error: {exc}", file=sys.stderr)
         if save_state:
             print(f"Continue with: {resume_hint}", file=sys.stderr)
@@ -606,6 +629,14 @@ def main(argv: list[str] | None = None) -> int:
     # is a real behavior change a caller must ask for, not a silent default
     # flip — see DECISIONS.md).
     outcome = messages.outcome
+    record_run(outcome.verification_state, outcome)
+    # Only in a project folder Certo created: it never edits the README of
+    # a project you brought.
+    if certo_made:
+        try:
+            note_models_in_readme(cfg.workspace, _models_that_ran(cfg, outcome))
+        except OSError as exc:
+            print(f"Warning: couldn't add the model note to README.md ({exc}).", file=sys.stderr)
     if outcome.model_decisions:
         final = outcome.model_decisions[-1]
         print(f"\nModel used: {final.chosen} (see MODEL_DECISIONS.md for the full history)")
@@ -626,6 +657,34 @@ def main(argv: list[str] | None = None) -> int:
         status = os.path.relpath(status_path(cfg.workspace))
         print(f"\nWhere it stopped: {status}. Continue with: {resume_hint}")
     return 1 if failing else 0
+
+
+def _models_that_ran(cfg, outcome) -> list[str]:
+    if outcome.rungs:
+        # A rung that changed no file wrote none of the code.
+        return [r.model for r in outcome.rungs if not r.did_no_work]
+    summary = outcome.run_summary
+    return [m.model for m in summary.models] if summary and summary.models else [cfg.model]
+
+
+def _run_entry(cfg, ladder, task: str, ended: str, started_at: datetime, outcome) -> RunEntry:
+    """What `.certo/RUNS.md` records about this run: the models that really
+    ran when the outcome says so, else the ones the settings name."""
+    summary = outcome.run_summary if outcome is not None else None
+    if outcome is not None and outcome.rungs:
+        models = [f"{r.number}. {r.name} ({r.model}): {r.ended}" for r in outcome.rungs]
+        note = "escalation" + (
+            f", final result from rung {outcome.final_rung}" if outcome.final_rung else ""
+        )
+    elif ladder is not None:
+        models = [f"{i}. {rung.name}" for i, rung in enumerate(ladder.rungs, 1)]
+        note = "escalation ladder"
+    else:
+        models = [m.model for m in summary.models] if summary and summary.models else [cfg.model]
+        note = "picked by --auto-model" if cfg.model_selection == "auto" else ""
+    return RunEntry(
+        task=task, ended=ended, started_at=started_at, models=models, summary=summary, note=note
+    )
 
 
 def _first_line(text: str, limit: int = 100) -> str:

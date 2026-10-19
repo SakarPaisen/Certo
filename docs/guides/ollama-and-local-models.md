@@ -9,15 +9,14 @@ cloud provider.
 ## Choose a model
 
 The agent needs a model that is good at code and supports tool calling.
-Coder models work best.
 
 | Model | Memory needed | Notes |
 |---|---|---|
-| `qwen3-coder:30b` | about 20 GB of GPU or unified memory | The default in `certo init`. |
-| `qwen2.5-coder:7b` | much less | For smaller machines. Weaker on multi-step tasks. |
+| `qwen3.8:27b` | about 20 GB of GPU or unified memory | The default in `certo init`. Passed 27 of 27 tasks in Certo's [0.1.18 benchmark](../benchmark/baseline-0.1.18-local.md). |
+| `qwen2.5-coder:7b` | much less | For smaller machines. Never benchmarked by Certo; expect it to be weaker on multi-step tasks. |
 
 ```bash
-ollama pull qwen3-coder:30b
+ollama pull qwen3.8:27b
 ```
 
 Small local models often struggle with long, multi-step tasks. Expect
@@ -29,13 +28,13 @@ own benchmark, and how to test one on your setup:
 
 With `certo init`, choose **Ollama**. It asks for the server address
 (default `http://localhost:11434`) and lists the models installed there,
-with a coder model preselected. If the server can't be reached, or has no
+with the recommended model preselected when it is installed. If the server can't be reached, or has no
 models yet, it says so and prints the `ollama pull` command to run.
 
 By hand:
 
 ```bash
-CERTO_LLM_MODEL=ollama/qwen3-coder:30b
+CERTO_LLM_MODEL=ollama/qwen3.8:27b
 CERTO_LLM_BASE_URL=http://localhost:11434
 ```
 
@@ -104,7 +103,7 @@ OLLAMA_HOST=0.0.0.0 ollama serve
 On the machine that runs Certo, point to it:
 
 ```bash
-CERTO_LLM_MODEL=ollama/qwen3-coder:30b
+CERTO_LLM_MODEL=ollama/qwen3.8:27b
 CERTO_LLM_BASE_URL=http://192.168.1.50:11434
 ```
 

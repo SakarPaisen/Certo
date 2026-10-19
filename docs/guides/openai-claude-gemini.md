@@ -65,7 +65,8 @@ model list and LiteLLM's documentation.
 ## Switch provider
 
 Change only `CERTO_LLM_MODEL` (and the key, if the provider is different).
-No code change is ever needed.
+No code change is ever needed. [Provider swap in 0.1.19](../benchmark/provider-swap-0.1.19.md)
+shows one task run this way with an OpenAI and an Anthropic model.
 
 The settings file `certo init` writes has your active lines first, then
 every other provider's two lines commented out with `#`. To switch, comment

@@ -43,7 +43,7 @@ missing, the error message names it.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `CERTO_LLM_MODEL` | **required** | The model, as a [LiteLLM model id](https://docs.litellm.ai/docs/providers): `provider/model`, e.g. `anthropic/claude-sonnet-5-5`, `openai/gpt-6.1-sol`, `ollama/qwen3-coder:30b`. Changing this is the only thing needed to switch provider. |
+| `CERTO_LLM_MODEL` | **required** | The model, as a [LiteLLM model id](https://docs.litellm.ai/docs/providers): `provider/model`, e.g. `anthropic/claude-sonnet-5-5`, `openai/gpt-6.1-sol`, `ollama/qwen3.8:27b`. Changing this is the only thing needed to switch provider. |
 | `CERTO_LLM_API_KEY` | required, unless `CERTO_LLM_BASE_URL` is set | The key for the provider in `CERTO_LLM_MODEL`. |
 | `CERTO_LLM_BASE_URL` | empty | The server address, for a local or self-hosted model, e.g. `http://localhost:11434`. In a `.env` file, leave the line with nothing after `=` when unused: `python-dotenv` keeps a trailing `# comment` on an otherwise empty value as the value itself. |
 | `CERTO_LLM_REASONING_EFFORT` | empty | How much the model should think: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, or any value your provider accepts (not checked by Certo). `none` or `off` sends no reasoning setting. Empty means `high`, except for `ollama/` and `ollama_chat/` models, where empty means none. |
@@ -59,14 +59,14 @@ Per-run overrides: `--model`, `--api-key`, `--base-url`,
 | `CERTO_WORKSPACE` | `.` | The folder the agent works in when `--project` is not given. |
 | `CERTO_PROJECTS_DIR` | `./projects` | The parent folder for `--project NAME`, which becomes `CERTO_PROJECTS_DIR/NAME`. |
 | `CERTO_NO_WORKTREE_WARNING` | `false` | `true` turns off the warning printed before the agent edits a folder with uncommitted changes, or a folder outside git. |
-| `CERTO_SAVE_STATE` | `true` | The `certo` command keeps the last run's state in the project's `.certo/` folder, for `certo --resume`. `false` turns this off (`--resume` still saves). Server mode and `certo bench` never write it. See [Resume an interrupted run](../guides/resume-a-run.md). |
+| `CERTO_SAVE_STATE` | `true` | The `certo` command keeps the last run's state in the project's `.certo/` folder, for `certo --resume`, and adds the run to `.certo/RUNS.md`. `false` turns both off (`--resume` still saves). Server mode and `certo bench` never write it. See [Resume an interrupted run](../guides/resume-a-run.md). |
 
 ## Limits and verification
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `CERTO_MAX_ITERATIONS` | `50` | The most steps the agent may take in one run. Each retry after a failed check is a new run with the same limit. |
-| `CERTO_MAX_TASK_SECONDS` | `1800` | The time budget for the whole task, in seconds: the first run plus every retry. When it runs out, the verdict is `budget_exhausted`. Checked between runs, so a single slow step can go a little past it. |
+| `CERTO_MAX_TASK_SECONDS` | `1800` | The time budget for the whole task, in seconds: the first run plus every retry. When it runs out, the verdict is `budget_exhausted`, and the project's checks don't run. Checked only between runs, not during one: a run can make many model calls, each up to `CERTO_LLM_TIMEOUT_SECONDS` and retried up to 5 times on a timeout, so with a slow local model a task can end far past its budget. |
 | `CERTO_VERIFY_TESTS` | `always` | `always` or `never`. With `never`, Certo doesn't check the result, and the verdict is always `inconclusive`. |
 | `CERTO_MAX_VERIFY_RETRIES` | `2` | How many times a failure is sent back to the agent to fix. Must be at least 1. Also used for unfinished to-do items. |
 | `CERTO_CONFIRM_MODE` | `never` | `never` or `always`. `always` asks you to approve every action. See [Interactive and confirm mode](../guides/interactive-mode.md). |
@@ -76,7 +76,7 @@ Per-run overrides: `--model`, `--api-key`, `--base-url`,
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `CERTO_EXECUTION` | `local` | `local` or `docker`: where the agent's tools run. See [Run in Docker](../guides/run-in-docker.md). |
+| `CERTO_EXECUTION` | `local` | `local` or `docker`: where the agent's tools run. `docker` is [experimental](../README.md#experimental-features). See [Run in Docker](../guides/run-in-docker.md). |
 | `CERTO_DOCKER_IMAGE` | `certo/agent-server:local` | The image for Docker mode. Built on first use from a source checkout. |
 | `CERTO_DOCKER_PLATFORM` | `linux/arm64` on ARM machines, `linux/amd64` otherwise | `linux/amd64` or `linux/arm64`. Leave empty to detect. |
 
@@ -95,7 +95,7 @@ Per-run overrides: `--model`, `--api-key`, `--base-url`,
 | Variable | Default | Meaning |
 |---|---|---|
 | `CERTO_SKILLS_DIR` | `./skills` | Your own skills, loaded on top of the built-in ones. A missing folder is fine. |
-| `CERTO_THIRD_PARTY_SKILLS_DIR` | `./third_party_skills` | Where `certo-admin skills` installs third-party skills. Must not be inside, or contain, `CERTO_SKILLS_DIR` or the built-in skills folder. |
+| `CERTO_THIRD_PARTY_SKILLS_DIR` | `./third_party_skills` | Where `certo-admin skills` installs third-party skills ([experimental](../README.md#experimental-features)). Must not be inside, or contain, `CERTO_SKILLS_DIR` or the built-in skills folder. |
 | `CERTO_THIRD_PARTY_SKILLS_LOCK` | `./third_party_skills.lock.json` | The lockfile for third-party skills: source, commit, license, hashes and enabled state. Never the skill content. |
 
 ## Run records
@@ -107,7 +107,8 @@ Per-run overrides: `--model`, `--api-key`, `--base-url`,
 ## Server task records
 
 Read only by `certo-server` and `certo-admin`. See
-[Run as a server](../guides/run-as-a-server.md#keep-task-records).
+[Run as a server](../guides/run-as-a-server.md#keep-task-records). Every
+store except `memory` is [experimental](../README.md#experimental-features).
 
 | Variable | Default | Meaning |
 |---|---|---|
