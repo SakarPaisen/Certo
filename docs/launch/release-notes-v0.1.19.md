@@ -53,3 +53,10 @@ fix the setting "in .env", for example "Check CERTO_LLM_API_KEY in .env".
 Since 0.1.5 the value usually comes from the user settings file or the
 shell instead. The messages now say "in your settings"; `certo check`
 shows where each setting comes from.
+
+## Fixed: no traceback at the end of `certo bench`
+
+After the results, `certo bench` often printed a red traceback ending in
+`OSError: [Errno 9] Bad file descriptor` (`PTY reader thread error`). It
+was harmless: a terminal was closed while it was still being read. Certo
+now hides that one message; any other terminal error still shows.

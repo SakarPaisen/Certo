@@ -292,11 +292,6 @@ database).
 
 ## Smaller bugs
 
-- **Traceback when a benchmark ends.** After the results are written,
-  the SDK's terminal reader thread logs `PTY reader thread error: [Errno
-  9] Bad file descriptor` (`subprocess_terminal.py`): it reads a terminal
-  that was already closed. Harmless but alarming; users read it as a
-  crash. Close the conversations' terminals before exit, or silence it.
 - **Third-party skills: narrow license detection, `SKILL.md` only.** Eight
   permissive licenses are recognised; anything else is `unknown` and needs
   acknowledgement. Legacy single-file upstream skills can't be installed.

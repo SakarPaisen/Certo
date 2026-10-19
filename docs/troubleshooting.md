@@ -742,7 +742,8 @@ framework was still reading from it, as the benchmark shut down.
 
 **Fix:** none needed. The benchmark finished: the results are complete,
 and the `runs recorded` count at the top of `results.md` says how many
-runs were saved.
+runs were saved. Since 0.1.19, Certo hides this message; it appears only
+with older versions.
 
 ## Other problems
 

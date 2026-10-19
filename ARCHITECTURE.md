@@ -319,6 +319,10 @@ rule 2):
   `SKILL.md` directory's `.mcp.json` becomes MCP server config unless it is
   loaded with `skip_mcp=True`. `third_party_skills.py` neutralizes both for
   third-party skills. First-party skills are trusted and left as-is.
+- `SubprocessTerminal.close()` closes the PTY master fd while the reader
+  thread may sit in `select()` on it; the thread then logs `PTY reader
+  thread error: [Errno 9]` with a traceback (v1.47.0). Harmless. runner.py
+  filters exactly that record (EBADF only) on the SDK terminal's logger.
 - `find_skill_md_directories()` only checks direct children of a skills dir
   (`SKILL.md` one level deep), while `find_regular_md_files()` `rglob`s.
   So any `.md` under `CERTO_SKILLS_DIR` loads as a legacy skill.
