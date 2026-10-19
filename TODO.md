@@ -304,6 +304,12 @@ database).
 
 ## Smaller bugs
 
+- **`--model` alone fails when no model is configured.** `certo TASK
+  --model X` with no `CERTO_LLM_MODEL` anywhere stops with "CERTO_LLM_MODEL
+  is required": `load_config()` validates before `override_llm()` applies
+  the flags. Same for a local `--base-url` with no key. Found 2026-10-19
+  writing `examples/compare-models.sh.example`, which works around it by
+  setting the variables. Done when the flags alone are enough.
 - **The server tests leak into the current folder and read its `.env`.**
   Run from any folder, `tests/test_server.py` creates
   `projects/acme-website`, `delete-me` and `keep-me` there (found

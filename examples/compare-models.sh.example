@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Run the same task with several models, one after the other, to compare
+# them. Setup and usage: examples/README.md.
+#
+#   cp examples/compare-models.sh.example compare-models.sh
+#   chmod +x compare-models.sh
+#   ./compare-models.sh examples/hanoi.md
+#
+# Each model builds its own copy of the project, and a summary table is
+# written at the end. Keys come from environment variables, never from
+# this file.
+set -uo pipefail
+
+if [ $# -ne 1 ] || [ ! -f "$1" ]; then
+  echo "Usage: $0 TASK_FILE   (for example: $0 examples/hanoi.md)" >&2
+  exit 2
+fi
+TASK_FILE="$1"
+TASK_NAME="$(basename "$TASK_FILE" | sed 's/\.[^.]*$//')"
+
+# How to start Certo. From a source checkout, use: CERTO="uv run certo"
+CERTO="${CERTO:-certo}"
+# Where the projects, logs and summary go: one new folder per call.
+OUT="${OUT:-./compare-results/$TASK_NAME-$(date +%Y%m%d-%H%M%S)}"
+mkdir -p "$OUT/projects"
+SUMMARY="$OUT/summary.md"
+printf '| Model | Verdict | Time | Cost | Exit |\n|---|---|---|---|---|\n' > "$SUMMARY"
+
+# run MODEL KEY_VARIABLE [BASE_URL]
+#   MODEL         a LiteLLM model id, as in CERTO_LLM_MODEL
+#   KEY_VARIABLE  the name of the environment variable that holds its key
+#                 (for example ANTHROPIC_API_KEY), or "" for a local model
+#   BASE_URL      only for a local or self-hosted model
+run() {
+  local model="$1" key_var="$2" base_url="${3:-}"
+  local slug key
+  slug="$(printf '%s' "$model" | tr '/:.' '---')"
+  key=""
+  if [ -n "$key_var" ]; then
+    key="${!key_var:-}"
+    if [ -z "$key" ]; then
+      echo "== $model: skipped, $key_var is not set"
+      printf '| `%s` | skipped: %s not set | | | |\n' "$model" "$key_var" >> "$SUMMARY"
+      return
+    fi
+  fi
+  echo "== $model (log: $OUT/$slug.log)"
+  # The model and key go in the environment, not on the command line, so
+  # the key doesn't show up in the process list. --base-url "" clears any
+  # address set in .env, so a cloud model isn't sent to the Ollama server.
+  CERTO_LLM_MODEL="$model" CERTO_LLM_API_KEY="$key" CERTO_LLM_BASE_URL="$base_url" \
+    CERTO_MODEL_SELECTION=manual \
+    CERTO_PROJECTS_DIR="$OUT/projects" \
+    $CERTO "$TASK_FILE" --base-url "$base_url" --project "$slug" \
+    > "$OUT/$slug.log" 2>&1 < /dev/null
+  local code=$?
+  local verdict time cost
+  verdict="$(grep '^Verification: ' "$OUT/$slug.log" | tail -1 | sed 's/^Verification: //')"
+  time="$(grep 'Total running time:' "$OUT/$slug.log" | tail -1 | sed 's/.*Total running time: //')"
+  cost="$(grep 'Total cost:' "$OUT/$slug.log" | tail -1 | sed 's/.*Total cost: //')"
+  echo "   ${verdict:-no verdict (see the log)}, ${time:-?}, ${cost:-?}"
+  printf '| `%s` | %s | %s | %s | %s |\n' "$model" "${verdict:-none}" "${time:--}" "${cost:--}" "$code" >> "$SUMMARY"
+}
+
+# ---- The models to compare: one line each. Delete or add lines. --------
+run anthropic/claude-sonnet-5-5   ANTHROPIC_API_KEY
+run anthropic/claude-haiku-5-5    ANTHROPIC_API_KEY
+run openai/gpt-6.1-sol            OPENAI_API_KEY
+run openai/gpt-5.6-luna           OPENAI_API_KEY
+run gemini/gemini-3.8-flash       GEMINI_API_KEY
+run ollama/qwen3.8:27b            ""  http://localhost:11434
+# -------------------------------------------------------------------------
+
+echo
+cat "$SUMMARY"
+echo
+echo "Projects: $OUT/projects/   Logs and summary: $OUT/"
