@@ -34,7 +34,7 @@ setting comes from and makes one small call to the model.
   [`no_progress`](#no_progress), [`retry_exhausted`](#retry_exhausted),
   [`budget_exhausted`](#budget_exhausted),
   [nothing to resume](#nothing-to-resume),
-  [Rust fails on `cargo clippy`](#a-rust-project-fails-on-cargo-clippy)
+  [Rust: `cargo clippy` unavailable](#rust-cargo-clippy-is-unavailable)
 - Model files and escalation: [files not found](#no-models_listyaml-or-modelsyaml-found),
   [old format](#modelsyaml-is-in-the-old-format),
   [problems](#the-model-files-have-problems),
@@ -471,14 +471,22 @@ different folder or `--project` name than the task used, a run made with
 state is gone, start a new task; the files the agent wrote are still
 there.
 
-### A Rust project fails on `cargo clippy`
+### Rust: `cargo clippy` is unavailable
 
-**You see:** `failed      cargo clippy` with `error: no such command:
-clippy`, and `Verification: failed` or `retry_exhausted`.
+**You see:**
 
-**Cause:** Certo always runs `cargo clippy` for a Rust project, and treats
-the missing clippy component as a failure (a known bug: it should be a
-limitation).
+```text
+  passed      cargo test  (/usr/local/bin/cargo test)
+  passed      cargo check  (/usr/local/bin/cargo check)
+  unavailable cargo clippy  (/usr/local/bin/cargo clippy)
+
+Verification: verified
+  - cargo clippy: clippy is not installed (with rustup: rustup component add clippy)
+```
+
+**Cause:** Certo runs `cargo clippy` for every Rust project, and clippy
+isn't installed. The verdict still comes from `cargo test`; the lint
+check is just missing. Before 0.1.19, this made the project `failed`.
 
 **Fix:** install the component: `rustup component add clippy`.
 

@@ -76,3 +76,11 @@ between minor versions. See
   actions, and runs on `ubuntu-24.04` instead of `ubuntu-latest`.
 - The repository has issue forms for a wrong verdict, a bug, benchmark
   results and a feature request.
+
+## Fixed: a missing `clippy` no longer fails a Rust project
+
+Certo runs `cargo clippy` for every Rust project. When the clippy
+component wasn't installed, the check failed (exit 101), so the project
+was `failed` or `retry_exhausted` although its tests passed. The check is
+now `unavailable`, with a note saying how to install clippy, and the
+verdict comes from `cargo test`.

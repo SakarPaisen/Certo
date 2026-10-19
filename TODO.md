@@ -96,9 +96,6 @@ first item is the suggested next one.
 - **Node: "no tests" counts as verified.** `node --test` exits 0 with no
   test files, so `npm test` passes. Found by the first bench integration
   run (2026-10-16). Documented, not fixed.
-- **Rust: missing clippy fails the project.** `cargo clippy` is planned
-  whenever `cargo` exists; without the component it is `failed` (exit
-  101) instead of `unavailable`. Workaround in `docs/troubleshooting.md`.
 - **Node: detect jest/vitest/mocha.** Today `build`/`test` scripts run as
   opaque commands; the runner and its results aren't parsed.
 - **Node: infer ESLint/`tsc` from config**, as `_ruff_configured()` does
@@ -274,7 +271,7 @@ Today there are 12 (eight `lifecycle/`, `git/commit-conventions`,
   `lifecycle/testing-and-verification` instead.
 
 **Languages** (path-triggered, one per verified ecosystem): Go (`go.mod`),
-Rust (`Cargo.toml`, with the clippy gotcha), Java (commit the wrapper),
+Rust (`Cargo.toml`), Java (commit the wrapper),
 TypeScript (`tsc --noEmit` as a `typecheck` script), Python (extend
 `pytest-conventions` with ruff/mypy setup); new ecosystems get one when
 their verification lands.

@@ -8,6 +8,7 @@ else exercised via constructed `CheckSpec`s or monkeypatched `shutil.which`.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import shutil
@@ -755,6 +756,46 @@ def test_execute_check_reports_unavailable_when_the_binary_does_not_exist(tmp_pa
 
     assert outcome.status == "unavailable"
     assert "could not be run" in outcome.summary
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "error: no such command: `clippy`",
+        "error: 'cargo-clippy' is not installed for the toolchain 'stable-aarch64-apple-darwin'",
+    ],
+)
+def test_a_missing_clippy_is_unavailable_not_failed(tmp_path, monkeypatch, message):
+    # cargo exits 101 when the clippy component is missing; that's a gap in
+    # the toolchain, not a lint failure in the project.
+    clippy = next(
+        s
+        for s in discover_verification_plan(ProjectDetection(language="rust", root=str(tmp_path)))
+        if s.name == "cargo clippy"
+    )
+    script = f"import sys; print({message!r}, file=sys.stderr); sys.exit(101)"
+    spec = dataclasses.replace(clippy, command=[sys.executable, "-c", script])
+
+    outcome = execute_check(spec)
+
+    assert outcome.status == "unavailable"
+    assert outcome.exit_code is None
+    assert "rustup component add clippy" in outcome.summary
+    run = VerificationRun(checks=[outcome])
+    assert run.state != "failed"
+    assert run.limitation_notes == [f"cargo clippy: {outcome.summary}"]
+
+
+def test_a_real_clippy_finding_still_fails(tmp_path):
+    clippy = next(
+        s
+        for s in discover_verification_plan(ProjectDetection(language="rust", root=str(tmp_path)))
+        if s.name == "cargo clippy"
+    )
+    script = "import sys; print('error: this looks like a bug', file=sys.stderr); sys.exit(101)"
+    spec = dataclasses.replace(clippy, command=[sys.executable, "-c", script])
+
+    assert execute_check(spec).status == "failed"
 
 
 def test_execute_check_reports_timed_out(tmp_path, monkeypatch):
