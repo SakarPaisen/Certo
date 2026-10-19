@@ -231,8 +231,10 @@ compare-results/
 .env.local
 secrets/
 models.yaml
-# A personal copy of the model list (Certo ships only the .example).
+# Personal copies of the model files (Certo ships only the .example files).
 models_list.yaml
+task_profiles.yaml
+escalation.yaml
 # Working benchmark files at the repo root. The files behind published
 # results are committed in docs/benchmark/.
 /bench.yaml
