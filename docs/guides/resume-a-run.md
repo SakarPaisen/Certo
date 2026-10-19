@@ -56,6 +56,7 @@ my-project/
     .gitignore       contains *, so git ignores the whole folder
     STATUS.md        the last run, for you to read
     run.json         the same, for Certo
+    RUNS.md          every run, oldest first: date, model, verdict, cost
     conversations/   the agent's saved conversation
 ```
 

@@ -730,3 +730,10 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   it. The examples (and the example `models.yaml`) name
   `qwen3.8-27b-local` instead of `qwen3.6-35b-local`, which scored 0/27 in
   the 0.1.15 local benchmark.
+- **Run history goes in `.certo/RUNS.md`, appended by the CLI** (0.1.19).
+  `STATUS.md` keeps only the last run, so "which model built this?" had no
+  answer a few runs later (a user's `asteroids.2`). The history stays
+  inside the self-ignoring `.certo/` rather than at the project root: Certo
+  adds no file to the user's project, and nothing new can look like an
+  agent change. Written by `cli.py`, which alone knows the run was a CLI
+  run with state saving on; server and bench never write it.

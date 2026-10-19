@@ -1,0 +1,62 @@
+"""`.certo/RUNS.md`: rendering and appending, on a temp folder. No LLM."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from pathlib import Path
+
+from certo import __version__
+from certo.run_history import RunEntry, append_run, render_entry, runs_path
+from certo.run_summary import ModelUsage, RunSummary
+
+_WHEN = datetime(2026, 10, 19, 8, 5, tzinfo=UTC)
+
+
+def test_an_entry_names_the_date_verdict_task_version_model_and_cost():
+    summary = RunSummary(
+        duration_seconds=243,
+        models=(ModelUsage(model="openai/gpt-5.6-luna", prompt_tokens=1000, cost=0.0593),),
+    )
+    text = render_entry(
+        RunEntry(
+            task="Build Asteroids\nmore lines",
+            ended="verified",
+            started_at=_WHEN,
+            models=["openai/gpt-5.6-luna"],
+            summary=summary,
+        )
+    )
+
+    assert text.startswith("## 2026-10-19 08:05 UTC · verified\n")
+    assert "- Task: Build Asteroids\n" in text
+    assert f"- Certo: {__version__}\n" in text
+    assert "- Model: openai/gpt-5.6-luna\n" in text
+    assert "- Time: 4m 03s · Tokens: 1,000 · Cost: $0.0593" in text
+
+
+def test_an_escalation_entry_lists_every_rung():
+    text = render_entry(
+        RunEntry(
+            task="t",
+            ended="verified",
+            started_at=_WHEN,
+            models=["1. local (ollama/qwen3.8:27b): unchanged", "2. haiku (anthropic/h): verified"],
+            note="escalation, final result from rung 2",
+            resumed=True,
+        )
+    )
+
+    assert "- Task: t (resumed)" in text
+    assert "- Models: escalation, final result from rung 2\n" in text
+    assert "  - 1. local (ollama/qwen3.8:27b): unchanged\n" in text
+
+
+def test_entries_accumulate_and_the_folder_ignores_itself(tmp_path):
+    for verdict in ("retry_exhausted", "verified"):
+        append_run(str(tmp_path), RunEntry(task="t", ended=verdict, started_at=_WHEN, models=["m"]))
+
+    text = Path(runs_path(str(tmp_path))).read_text(encoding="utf-8")
+    assert text.startswith("# Certo runs in this folder")
+    assert text.count("# Certo runs in this folder") == 1
+    assert text.index("· retry_exhausted") < text.index("· verified")
+    assert (tmp_path / ".certo" / ".gitignore").read_text().strip().endswith("*")

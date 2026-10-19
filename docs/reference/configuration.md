@@ -59,7 +59,7 @@ Per-run overrides: `--model`, `--api-key`, `--base-url`,
 | `CERTO_WORKSPACE` | `.` | The folder the agent works in when `--project` is not given. |
 | `CERTO_PROJECTS_DIR` | `./projects` | The parent folder for `--project NAME`, which becomes `CERTO_PROJECTS_DIR/NAME`. |
 | `CERTO_NO_WORKTREE_WARNING` | `false` | `true` turns off the warning printed before the agent edits a folder with uncommitted changes, or a folder outside git. |
-| `CERTO_SAVE_STATE` | `true` | The `certo` command keeps the last run's state in the project's `.certo/` folder, for `certo --resume`. `false` turns this off (`--resume` still saves). Server mode and `certo bench` never write it. See [Resume an interrupted run](../guides/resume-a-run.md). |
+| `CERTO_SAVE_STATE` | `true` | The `certo` command keeps the last run's state in the project's `.certo/` folder, for `certo --resume`, and adds the run to `.certo/RUNS.md`. `false` turns both off (`--resume` still saves). Server mode and `certo bench` never write it. See [Resume an interrupted run](../guides/resume-a-run.md). |
 
 ## Limits and verification
 

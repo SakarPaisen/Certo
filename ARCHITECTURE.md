@@ -201,6 +201,13 @@ given design was chosen.
   verification. When the conversation can't be reopened (Docker, folder
   gone, SDK refuses), a fresh conversation gets the task and `STATUS.md`
   instead. Server and bench never pass `save_state`.
+- **`run_history.py`** — stdlib only. `.certo/RUNS.md`, appended by
+  `cli.py` (not the runner) once per run when state saving is on: after
+  the outcome, or from the `KeyboardInterrupt`/error branches. Models come
+  from `outcome.rungs`, else `run_summary.models` (what really made
+  calls), else the settings. A failed write is a stderr warning, never a
+  failed run. `tests/test_cli.py` stubs `append_run` (its workspace is the
+  checkout).
 - **`run_summary.py`** — pure: `summarize_run(duration, {usage_id:
   Metrics.get()})` → `RunSummary` (wall-clock time, models that actually
   made calls, tokens, cost; zero cost with nonzero tokens = "unknown",

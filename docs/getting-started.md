@@ -133,7 +133,7 @@ Certo first prints a banner with its version and the settings for this
 run, so you can stop it (Ctrl-C) if the model or the folder is wrong:
 
 ```text
-── Certo 0.1.18 ────────────────────────────────────────────
+── Certo 0.1.19 ────────────────────────────────────────────
   Model    openai/gpt-5.6-luna
   Folder   /home/you/certo-workspace/projects/wordle (project wordle)
   Runs on  this computer

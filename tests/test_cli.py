@@ -18,6 +18,15 @@ from certo.run_summary import ModelUsage, RunSummary
 from certo.runner import CompletionContract, TaskOutcome, TaskResult
 
 
+@pytest.fixture(autouse=True)
+def recorded_runs(monkeypatch):
+    """Most tests here use workspace ".", the checkout itself: catch the
+    .certo/RUNS.md entries instead of writing them there."""
+    entries = []
+    monkeypatch.setattr(cli, "append_run", lambda workspace, entry: entries.append(entry))
+    return entries
+
+
 def _fake_result(messages=(), verification_state="verified", limitations=()):
     """Build the same `TaskResult` shape `run_task` now returns, for tests
     that monkeypatch `run_task` — `messages[-1]`/`if messages:` behave
@@ -1781,3 +1790,48 @@ def test_unchanged_exits_like_inconclusive(monkeypatch, capsys, flag, expected):
 
     assert cli.main(["do something", *flag]) == expected
     assert "Verification: unchanged" in capsys.readouterr().out
+
+
+def test_a_finished_run_is_recorded_with_its_model_and_verdict(monkeypatch, recorded_runs):
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg())
+    monkeypatch.setattr(
+        cli, "run_task", lambda *a, **k: _fake_result(verification_state="verified")
+    )
+
+    assert cli.main(["Build a CLI todo app\nwith tests"]) == 0
+
+    (entry,) = recorded_runs
+    assert entry.ended == "verified"
+    assert entry.models == ["openai/gpt-4o"]
+    assert entry.task.startswith("Build a CLI todo app")
+
+
+def test_an_interrupted_run_is_recorded_too(monkeypatch, recorded_runs):
+    def _interrupt(*a, **k):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg())
+    monkeypatch.setattr(cli, "run_task", _interrupt)
+
+    assert cli.main(["do something"]) == 130
+    assert [e.ended for e in recorded_runs] == ["interrupted"]
+
+
+def test_no_run_is_recorded_when_saving_state_is_off(monkeypatch, recorded_runs):
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg(save_state=False))
+    monkeypatch.setattr(cli, "run_task", lambda *a, **k: _fake_result())
+
+    assert cli.main(["do something"]) == 0
+    assert recorded_runs == []
+
+
+def test_a_history_write_that_fails_never_fails_the_run(monkeypatch, capsys):
+    def _fail(workspace, entry):
+        raise OSError("read-only file system")
+
+    monkeypatch.setattr(cli, "append_run", _fail)
+    monkeypatch.setattr(cli, "load_config", lambda: _cfg())
+    monkeypatch.setattr(cli, "run_task", lambda *a, **k: _fake_result())
+
+    assert cli.main(["do something"]) == 0
+    assert "couldn't add this run to .certo/RUNS.md" in capsys.readouterr().err
