@@ -31,7 +31,7 @@ works this way is in
 | `confirmation_required` | Confirm mode (`CERTO_CONFIRM_MODE=always`) needed an approval and nobody could give it (server mode). The action was rejected and the task stopped. | 1 |
 | `budget_exhausted` | The task's time budget (`CERTO_MAX_TASK_SECONDS`, 30 minutes by default) ran out. | 1 |
 | `acceptance_failed` | Everything else passed, but a required [acceptance check](../guides/acceptance-checks.md) failed. | 1 |
-| `stuck` | The agent's run ended in a stuck or error state instead of finishing. Certo doesn't verify a run that never finished properly. | 1 |
+| `stuck` | The agent's run ended in a stuck or error state instead of finishing, including when it used all its steps (`CERTO_MAX_ITERATIONS`). Certo doesn't verify a run that never finished properly; `certo verify` checks the files it left. | 1 |
 
 The run itself can also fail before any verdict, for example with a
 configuration error or a provider error. Then Certo prints

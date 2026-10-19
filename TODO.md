@@ -312,6 +312,18 @@ database).
 
 ## Smaller bugs
 
+- **Using all the steps ends in `stuck`, unchecked.** When the agent
+  reaches `CERTO_MAX_ITERATIONS`, the SDK ends in an error state, Certo
+  says `stuck` ("stuck or errored") and runs no check. Seen 2026-10-19:
+  `claude-haiku-5-5` on the Asteroids example used its 50 steps while
+  still editing; `certo verify` afterwards said `failed` (a lint error,
+  and `npm test` passing with 0 tests). Name the cause in the message, and
+  run the checks anyway, as for `budget_exhausted` (see the budget item
+  above).
+- **The `--resume` hint ignores `CERTO_PROJECTS_DIR` from the
+  environment.** It prints `certo --resume --project NAME`, which then
+  looks in the default projects folder. Print the setting too when it
+  isn't the default.
 - **`--model` alone fails when no model is configured.** `certo TASK
   --model X` with no `CERTO_LLM_MODEL` anywhere stops with "CERTO_LLM_MODEL
   is required": `load_config()` validates before `override_llm()` applies
