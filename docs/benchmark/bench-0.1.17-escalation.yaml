@@ -1,0 +1,14 @@
+# The run behind escalation-0.1.17.md (Certo 0.1.17, 2026-10-18): two
+# ladders, a local model first and claude-haiku-5-5 when it fails. The
+# published run cost $0.11.
+# Run it with: certo bench --config bench-0.1.17-escalation.yaml
+# Every model below must be enabled in your models.yaml; see
+# docs/guides/write-a-benchmark-file.md.
+tasks: all
+repeats: 1
+arms:
+  # qwen3.6 wrote no file in most runs of the 0.1.15 baseline: does the
+  # ladder now climb past a model that did no work?
+  - {name: q36-ladder, strategy: escalate, models: [qwen3.6-35b-local, claude-haiku-5-5]}
+  # qwen3.8 passed 24 of 27 alone: how much of the work stays local?
+  - {name: q38-ladder, strategy: escalate, models: [qwen3.8-27b-local, claude-haiku-5-5]}

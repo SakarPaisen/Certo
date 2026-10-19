@@ -302,6 +302,9 @@ cost less than the cloud model. **Cost per solved task** and **which rung
 produced the final result** show where the money went. See
 [Benchmark models and strategies](benchmark.md).
 
+Certo's own run of two ladders, with the numbers, is
+[Escalation in 0.1.17](../benchmark/escalation-0.1.17.md).
+
 ## Related
 
 - [models.yaml and models_list.yaml](../reference/models-yaml.md#escalation)

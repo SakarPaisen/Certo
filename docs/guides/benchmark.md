@@ -241,5 +241,7 @@ bundled set: [Write or contribute a benchmark task](contribute-a-benchmark-task.
   results
 - [Baseline 0.1.15](../benchmark/baseline-0.1.15.md): four local and
   three cloud models compared
+- [Escalation in 0.1.17](../benchmark/escalation-0.1.17.md): two
+  local-then-cloud ladders
 - [Commands: certo bench](../reference/commands.md#certo-bench)
 - [How verification works](../concepts/how-verification-works.md)

@@ -29,13 +29,20 @@ first item is the suggested next one.
   only Python and Node, with no packages, so Go/Rust tasks need grading
   support first. Bump the task-set `VERSION`. Today's 9 tasks don't
   separate a local 27B model from a cloud one.
-- **Escalation has never climbed in a benchmark.** The 0.1.13 baseline
-  ended every run on rung 1, so climbing, the handoff and derived-ladder
-  ordering are unmeasured. Needs task set v2. Candidate ladder from the
+- **Escalation after a `failed` rung is unmeasured.** The 0.1.17
+  escalation run climbed 10 times, all past a model that did no work.
+  Climbing after a failed verification, the handoff of half-done work and
+  derived-ladder ordering are still unmeasured. Needs task set v2. Candidate ladder from the
   0.1.15 local benchmark: `qwen3.8-27b-local` → `gemma4-31b-qat-local` →
   a cloud model (qwen3.8 is about 3× faster; gemma never wrote tool calls
   as text, qwen3.8's only failure mode). Bench it as three arms: each
   model alone, and the ladder.
+- **An `inconclusive` rung that wrote code but no tests stops the
+  ladder.** 0.1.17 escalation run, `q36-ladder` · `temperature-table`:
+  qwen3.6 wrote the module, then its test file as a text tool call, so
+  nothing could be checked and haiku was never asked. Decide whether a
+  rung whose last message is a tool call written as text should climb.
+  Done when decided (DECISIONS.md) and, if yes, tested.
 - **Milestone 3: the live provider-swap proof.** One task with two
   `CERTO_LLM_MODEL` values (a local and a cloud model exist since
   2026-10-17). Not blocked any more, just not run.

@@ -75,7 +75,7 @@ takes you from install to your first verified project.
 | Measure which models and strategies really deliver | [Benchmark models and strategies](guides/benchmark.md) |
 | Set up my own benchmark file | [Write a benchmark file](guides/write-a-benchmark-file.md) |
 | Benchmark my own tasks, or add one to Certo's set | [Write or contribute a benchmark task](guides/contribute-a-benchmark-task.md) |
-| See how Certo did on its own benchmark | [Baseline 0.1.15](benchmark/baseline-0.1.15.md) (and [0.1.13](benchmark/baseline-0.1.13.md)) |
+| See how Certo did on its own benchmark | [Baseline 0.1.15](benchmark/baseline-0.1.15.md) (and [0.1.13](benchmark/baseline-0.1.13.md)), [escalation in 0.1.17](benchmark/escalation-0.1.17.md) |
 
 **Looking something up?** The reference pages are complete and exact:
 

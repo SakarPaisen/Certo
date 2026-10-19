@@ -100,6 +100,9 @@ sooner, list only a few tasks and use one repeat.
   move to a cloud model only when verification fails. See
   [Escalate between models](escalate-between-models.md). In the same
   benchmark, `claude-haiku-5-5` solved all 9 tasks for under a cent each.
+  With `qwen3.8-27b-local` first and haiku second, a ladder solved all 9
+  for about a quarter of haiku's cost, with qwen3.8 doing 7 of them (see
+  [Escalation in 0.1.17](../benchmark/escalation-0.1.17.md)).
 
 ## Related
 

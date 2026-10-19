@@ -179,11 +179,13 @@ depend on the machine serving the model.
 - One Ollama setup, whose version and context length weren't recorded,
   so the tool-call failures can't yet be traced to the model or the
   setup.
-- Single-model arms only: escalation wasn't measured.
+- Single-model arms only: escalation wasn't measured here. It is in
+  [Escalation in 0.1.17](escalation-0.1.17.md).
 
 ## Related
 
 - [Baseline 0.1.13](baseline-0.1.13.md)
+- [Escalation in 0.1.17](escalation-0.1.17.md)
 - [Choose a local model](../guides/choose-a-local-model.md)
 - [Benchmark models and strategies](../guides/benchmark.md)
 - [Ollama and local models](../guides/ollama-and-local-models.md)

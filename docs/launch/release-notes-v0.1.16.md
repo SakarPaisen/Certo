@@ -19,6 +19,9 @@ that no file was written. Two rungs in a row that changed no file still
 stop the climb, whatever their verdicts.
 
 See [What makes Certo climb](../guides/escalate-between-models.md#what-makes-certo-climb).
+In a benchmark with two local-then-haiku ladders, 10 of 18 runs climbed
+past a local model that did no work, and haiku solved all 10: see
+[Escalation in 0.1.17](../benchmark/escalation-0.1.17.md).
 
 ## Good to know
 
