@@ -91,8 +91,11 @@ way for every command: errors stop the run, warnings are printed (see
 ## How a model is chosen
 
 1. **Classify the task.** Certo looks for each profile's `triggers` in the
-   task text (ignoring case). The first profile in the file that matches
-   wins. If none matches, it uses the profile named `default`.
+   task's first line with text: a task file's title, or the whole task
+   when it is one line. A trigger matches a whole word, or its plural, in
+   any case. The first profile in the file that matches wins. If none
+   matches, it uses the profile named `default`. `MODEL_DECISIONS.md` says
+   which word matched.
 2. **Score every active model.** The score is the sum of
    `rating × weight` over the profile's weights.
 3. **Run the best one.** Models are ranked by score, once, at the start.

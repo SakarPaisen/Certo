@@ -141,7 +141,7 @@ A profile says which axes matter for a kind of task, for `--auto-model`.
 
 | Field | Meaning |
 |---|---|
-| `triggers` | A list of words or phrases. A profile matches when one of them appears anywhere in the task text (any case, also inside a longer word). |
+| `triggers` | A list of words or phrases. A profile matches when one of them appears in the task's first line with text (a task file's title, or the whole task when it is one line), as a whole word or with a plural `s`/`es`, in any case. |
 | `weights` | A map of axis name to number. |
 
 **Choosing the profile.** The profiles are tried in the order of the file,

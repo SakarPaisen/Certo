@@ -37,9 +37,10 @@ The two modes can't be combined: `--escalate` with `--auto-model` or
 ## How `--auto-model` decides
 
 1. **It picks a task profile.** Each profile in `models_list.yaml` has
-   trigger words. Certo looks for them in the task text, profile by
-   profile in the order of the file; the first profile with a match wins.
-   With no match, the profile named `default` is used.
+   trigger words. Certo looks for them in the task's first line (a task
+   file's title, or the whole task when it is one line), as whole words,
+   profile by profile in the order of the file; the first profile with a
+   match wins. With no match, the profile named `default` is used.
 2. **It scores every active model.** A model's score is each rating times
    the profile's weight for it, added up.
 3. **It runs the model with the highest score.** If the provider fails,
@@ -70,9 +71,12 @@ reasoning 3, precision 2, code 2, cost 0.5), `scaffolding` (triggers
 
 Two things follow from how it works:
 
-- **Matching is plain text.** "Handle errors gracefully" contains "error",
-  so a `debugging` profile with that trigger matches it. Pick trigger
-  words with care, and remember that the first matching profile wins.
+- **Only the first line counts, as whole words.** A task file titled
+  "# Durations" is not `debugging`, even when its text says "raise
+  ValueError on an error". A trigger also matches its plural ("bug" matches
+  "bugs"), but never part of another word ("fix" doesn't match "prefix").
+  Give each task a title that says what kind of work it is, and remember
+  that the first matching profile wins.
 - **The `default` profile decides most tasks.** Many tasks match no
   trigger. With equal weights, cost is one axis out of four, so the
   strongest model usually wins. Give `cost` a higher weight in `default`

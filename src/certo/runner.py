@@ -54,7 +54,7 @@ from .escalation import (
     rung_dicts,
     workspace_listing,
 )
-from .model_catalog import classify_task, rank_candidates
+from .model_catalog import classify_task, find_trigger, rank_candidates, task_title
 from .model_pricing import estimate_run_cost
 from .model_selection import (
     ModelChain,
@@ -1259,7 +1259,13 @@ def stream_task(
         profile = classify_task(task, catalog)
         ranked = rank_candidates(catalog, profile.weights)
         chosen_index = 0
-        reason = f"Task classified as '{profile.name}' (weights: {profile.weights})."
+        trigger = find_trigger(task, profile)
+        matched = (
+            f'"{trigger}" in the task\'s first line ({task_title(task)!r})'
+            if trigger
+            else "no profile's trigger in the task's first line"
+        )
+        reason = f"Task classified as '{profile.name}': {matched} (weights: {profile.weights})."
         if cfg.interactive and on_model_choice is not None:
             chosen_index = on_model_choice(ranked, 0, reason)
         model_chain = ModelChain(

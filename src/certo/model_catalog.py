@@ -24,6 +24,7 @@ toggle individual models on/off without deleting or re-adding entries.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
@@ -473,19 +474,43 @@ def load_model_catalog(list_path: str, models_path: str, *, strict: bool = True)
     )
 
 
+def task_title(task_text: str) -> str:
+    """The line a task is classified by: its first line with text, without
+    Markdown heading marks. A task file's title, or the whole task when it
+    is one line. Matching the whole text made almost every task file
+    `debugging`: a spec that says "raise ValueError" or "fix all build
+    failures" contains `error` or `fix` (seen 2026-10-19 on 12 of 14 bundled
+    tasks)."""
+    for line in task_text.splitlines():
+        if line.strip():
+            return line.strip().lstrip("#").strip()
+    return ""
+
+
+def _trigger_pattern(trigger: str) -> re.Pattern[str]:
+    # Whole words, any case, and a simple plural: `bug` matches "bugs",
+    # `crash` "crashes", but `fix` never matches "prefix".
+    return re.compile(r"(?<!\w)" + re.escape(trigger.lower()) + r"(?:s|es)?(?!\w)")
+
+
+def find_trigger(task_text: str, profile: TaskProfile) -> str | None:
+    """The first of the profile's triggers found in the task's title."""
+    title = task_title(task_text).lower()
+    return next((t for t in profile.triggers if _trigger_pattern(t).search(title)), None)
+
+
 def classify_task(task_text: str, catalog: ModelCatalog) -> TaskProfile:
-    """First declared task profile whose trigger appears (case-insensitive
-    substring match) in `task_text` wins — same tie-break convention as
+    """First declared task profile with a trigger in the task's title
+    (`task_title`, whole words) wins — same tie-break convention as
     `_LANGUAGE_MARKERS` in `run_tests_tool.py`. Falls back to a profile named
     `default` if one is declared, else a synthesized empty-weights profile
     (every model scores 0 and the declared order breaks the tie — see
     `rank_candidates`).
     """
-    lowered = task_text.lower()
     for profile in catalog.task_profiles:
         if profile.name == "default":
             continue
-        if any(trigger.lower() in lowered for trigger in profile.triggers):
+        if find_trigger(task_text, profile) is not None:
             return profile
     for profile in catalog.task_profiles:
         if profile.name == "default":

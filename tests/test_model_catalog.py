@@ -5,7 +5,10 @@ no mocking of yaml.safe_load itself.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
+import yaml
 from model_file_helpers import write_model_files
 
 from certo.model_catalog import (
@@ -14,9 +17,11 @@ from certo.model_catalog import (
     ModelCatalogError,
     TaskProfile,
     classify_task,
+    find_trigger,
     load_model_catalog,
     rank_candidates,
     score_entry,
+    task_title,
 )
 
 _MINIMAL_YAML = """
@@ -269,6 +274,69 @@ def test_classify_task_with_no_default_profile_synthesizes_empty_weights():
     profile = classify_task("Write a haiku about clouds", catalog)
 
     assert profile.weights == {}
+
+
+def test_classify_task_matches_whole_words_only():
+    debugging = TaskProfile(name="debugging", triggers=("fix",), weights={"reasoning": 3})
+    default = TaskProfile(name="default", weights={"reasoning": 1})
+    catalog = _catalog_with_profiles(debugging, default)
+
+    assert classify_task("Add a --prefix option", catalog).name == "default"
+    assert classify_task("Fix the prefix option", catalog).name == "debugging"
+
+
+def test_classify_task_matches_a_simple_plural():
+    debugging = TaskProfile(name="debugging", triggers=("bug", "crash"), weights={"a": 1})
+    catalog = _catalog_with_profiles(debugging)
+
+    assert classify_task("Two bugs in the parser", catalog).name == "debugging"
+    assert classify_task("It crashes on empty input", catalog).name == "debugging"
+
+
+def test_classify_task_reads_only_the_first_line_with_text():
+    # A spec body that says "raise an error" or "fix all failures" must not
+    # make a "build a game" task a debugging one.
+    debugging = TaskProfile(name="debugging", triggers=("fix", "error"), weights={"a": 3})
+    default = TaskProfile(name="default", weights={"a": 1})
+    catalog = _catalog_with_profiles(debugging, default)
+    task = "\n# Durations\n\nRaise ValueError on an error. Fix all failures.\n"
+
+    assert task_title(task) == "Durations"
+    assert classify_task(task, catalog).name == "default"
+    assert find_trigger("# Fix the parser\nmore text", debugging) == "fix"
+
+
+_BUNDLED_TASKS = Path(__file__).resolve().parent.parent / "src" / "certo"
+
+
+@pytest.mark.parametrize(
+    ("task_file", "expected"),
+    [
+        ("benchmark_tasks/duration-parser/task.md", "default"),
+        ("benchmark_tasks/inventory-fix/task.md", "debugging"),
+        ("benchmark_tasks/page-ranges/task.md", "default"),
+        ("benchmark_tasks/pedestrian-crossing/task.md", "default"),
+        ("benchmark_tasks/semver-order/task.md", "default"),
+        ("benchmark_tasks/slugify/task.md", "default"),
+        ("benchmark_tasks/temperature-table/task.md", "default"),
+        ("benchmark_tasks/token-bucket/task.md", "default"),
+        ("benchmark_tasks/wordle-score/task.md", "default"),
+        ("starter/tasks/wordle.md", "default"),
+        ("starter/tasks/asteroids.md", "default"),
+    ],
+)
+def test_shipped_profiles_classify_the_bundled_tasks(tmp_path, task_file, expected):
+    # Until 2026-10-19, whole-text matching sent 12 of 14 real tasks to
+    # `debugging` ("raise ValueError", "fix all failures" in the spec).
+    example = _BUNDLED_TASKS / "examples" / "models_list.yaml.example"
+    names = [m["name"] for m in yaml.safe_load(example.read_text())["models"]]
+    models = tmp_path / "models.yaml"
+    models.write_text(yaml.safe_dump({"models": [{"name": n} for n in names]}))
+    catalog = load_model_catalog(str(example), str(models), strict=False)
+
+    task = (_BUNDLED_TASKS / task_file).read_text()
+
+    assert classify_task(task, catalog).name == expected
 
 
 # --- score_entry / rank_candidates -----------------------------------------

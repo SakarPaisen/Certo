@@ -758,3 +758,11 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   unmeasured. Catalog ratings were left unchanged: they drive
   `--auto-model` and derived ladders, so changing them needs its own
   benchmark.
+- **Task profiles match whole words in the task's first line** (after
+  0.1.19). Whole-text substring matching sent 12 of 14 bundled tasks to
+  `debugging`, because a spec says "raise ValueError" or "fix all build
+  failures"; checked with the shipped example catalog, no model call. The
+  title says what kind of work a task is; its body is the spec. Whole
+  words (plus a plain `s`/`es` plural) match how skill triggers work.
+  `MODEL_DECISIONS.md` now names the matched word. Supersedes the
+  substring rule of the original auto-model design.

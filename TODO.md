@@ -119,6 +119,11 @@ first item is the suggested next one.
 
 ## 4. Models and strategies
 
+- **Live check of the auto-model fallback.** The in-conversation model
+  switch (`switch_llm`) has only run against a fake. A provider failure
+  (a deliberately wrong key on the top-ranked model, in a scratch
+  `models.yaml`) should switch and end `verified` on the next model;
+  `MODEL_DECISIONS.md` should show both steps.
 - **A `certo bench` strategy for `--auto-model`.** Only `single` and
   `escalate` exist (`bench_strategies.py`), so the README can say auto-model
   is unmeasured but not show a number. Add an `auto` strategy (task
