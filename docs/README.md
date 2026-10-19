@@ -93,7 +93,7 @@ takes you from install to your first verified project.
 | Measure which models and strategies really deliver | [Benchmark models and strategies](guides/benchmark.md) |
 | Set up my own benchmark file | [Write a benchmark file](guides/write-a-benchmark-file.md) |
 | Benchmark my own tasks, or add one to Certo's set | [Write or contribute a benchmark task](guides/contribute-a-benchmark-task.md) |
-| See how Certo did on its own benchmark | [Baseline 0.1.18, local](benchmark/baseline-0.1.18-local.md), [0.1.15](benchmark/baseline-0.1.15.md) (and [0.1.13](benchmark/baseline-0.1.13.md)), [escalation in 0.1.17](benchmark/escalation-0.1.17.md), [provider swap in 0.1.19](benchmark/provider-swap-0.1.19.md), [five models build Asteroids](benchmark/compare-asteroids-0.1.19.md) |
+| See how Certo did on its own benchmark | [Baseline 0.1.18, local](benchmark/baseline-0.1.18-local.md), [0.1.15](benchmark/baseline-0.1.15.md) (and [0.1.13](benchmark/baseline-0.1.13.md)), [escalation in 0.1.17](benchmark/escalation-0.1.17.md), [one escalation run](benchmark/escalation-wordle-0.1.19.md), [provider swap in 0.1.19](benchmark/provider-swap-0.1.19.md), [five models build Asteroids](benchmark/compare-asteroids-0.1.19.md) |
 
 **Looking something up?** The reference pages are complete and exact:
 
@@ -169,9 +169,10 @@ limitation below.
   verified.** `node --test` and some other runners exit successfully when
   there is nothing to run. See
   [Verification by language](reference/verification-by-language.md#node-in-detail).
-- **Escalation climbs only on a verification signal.** A rung that wrote
-  files the project can't check (code with no tests) ends `inconclusive`
-  and stops the climb; a rung that changed no file at all climbs.
+- **Escalation climbs only on a verification signal or a provider
+  failure.** A rung that wrote files the project can't check (code with
+  no tests) ends `inconclusive` and stops the climb; a rung that changed
+  no file at all climbs.
   In Docker mode a provider failure can't be told apart from another run
   error. See [Escalate between models](guides/escalate-between-models.md).
 - **Resume in Docker mode starts a new conversation**: the agent gets the

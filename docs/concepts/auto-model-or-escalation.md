@@ -6,9 +6,10 @@ questions:
 
 - **`--auto-model`** asks: *which model fits this task?* It decides once,
   before the run, from the words in the task.
-- **`--escalate`** asks: *how cheaply can this task be done?* It starts on
-  a cheap model, and moves to a stronger one only when Certo's
-  verification shows the cheap one couldn't finish.
+- **`--escalate`** asks: *which model on my list can finish this task?*
+  It starts on the first model of a ladder you write (often the cheapest),
+  and moves to the next one when Certo's verification shows the model
+  couldn't finish, or when its provider fails.
 
 This page explains how each one decides, when to use which, and how to
 turn each on. The step-by-step setup is in two guides:
@@ -19,13 +20,13 @@ turn each on. The step-by-step setup is in two guides:
 
 | | `--auto-model` | `--escalate` |
 |---|---|---|
-| **The question** | Which model fits this task? | How cheaply can this task be done? |
+| **The question** | Which model fits this task? | Which model on my list can finish this task? |
 | **When it decides** | Once, before the run, from the task text | Step by step, after each run, from Certo's verdict |
 | **What it uses** | Task profiles: trigger words and weights | A ladder: one you write, or one derived from capability and cost |
-| **First model** | The best fit for the task's profile, often an expensive one | The cheapest rung |
-| **Changes model when** | The provider fails (rate limit, outage, bad key), or a fix attempt still fails Certo's checks | The model's whole run fails: checks still fail after all its fix attempts, the agent is stuck, out of time, or changed no file |
+| **First model** | The best fit for the task's profile, often an expensive one | The first rung of the ladder: usually the cheapest |
+| **Changes model when** | The provider fails (rate limit, outage, bad key), or a fix attempt still fails Certo's checks | The model's whole run fails (checks still fail after all its fix attempts, a check timed out, the agent is stuck, or it changed no file), or its provider fails (outage, rate limit, rejected key). Not when the task's own time budget or cost cap runs out: that stops the climb |
 | **How it changes** | Inside the same conversation: the next model carries on from where the last one was | A new conversation in the same folder, with a note on what the previous model did |
-| **Next model** | The next best fit, not necessarily a stronger one | Always the next rung, a stronger one |
+| **Next model** | The next best fit, not necessarily a stronger one | The next rung: usually a stronger model, or one from another provider |
 | **Cost** | Set by the choice | Low when the cheap model succeeds; more when it climbs |
 | **Turn it on** | `--auto-model`, or `CERTO_MODEL_SELECTION=auto` | `--escalate [LADDER]`, or `CERTO_MODEL_SELECTION=escalate` |
 
@@ -92,8 +93,9 @@ Two things follow from how it works:
    same folder, with the files as they are, the failing checks, and a note
    from Certo on what the previous model did.
 4. **It stops** at `verified`, at a verdict that gives no reason to climb
-   (`inconclusive`, `budget_exhausted`, `confirmation_required`), when two
-   rungs in a row end `unchanged`, or after the last rung.
+   (`inconclusive`, `budget_exhausted`, `confirmation_required`), when
+   `CERTO_MAX_TASK_COST` is reached, when two rungs in a row end
+   `unchanged`, or after the last rung.
 
 The full list of verdicts and what each does is in
 [Escalate between models](../guides/escalate-between-models.md#what-makes-certo-climb).
