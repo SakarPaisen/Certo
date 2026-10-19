@@ -45,7 +45,9 @@ first item is the suggested next one.
   qwen3.6 wrote the module, then its test file as a text tool call, so
   nothing could be checked and haiku was never asked. Decide whether a
   rung whose last message is a tool call written as text should climb.
-  Done when decided (DECISIONS.md) and, if yes, tested.
+  Two options to discuss (2026-10-19): just climb, or climb and ask the
+  next rung to write the missing tests first. Done when decided
+  (DECISIONS.md) and, if yes, tested.
 - **Re-verify the "confident but wrong" fixes live**: #1, #3, #5, #10
   and #6 for Java in `ARCHITECTURE.md` say "not re-verified live" (#2, #4
   and #6 for Go/Rust were, 2026-10-19). #1 and #5 are hard to trigger on
@@ -192,10 +194,6 @@ first item is the suggested next one.
   `certo init`, then a first verified project. Getting started shows only
   that path. Measure it: time from `pip install` to the first `verified`,
   on a clean machine.
-- **Mark the less central parts as experimental in the docs**: the
-  server's SQL and Redis stores, the OpenAI-compatible endpoint,
-  third-party skills, Docker execution. They stay, but stop setting the
-  pace.
 - **GitHub Action**: an issue labelled `certo` becomes a pull request with
   the verdict and checks in its description.
 - **Docs articles still to write** (ideas from 2026-10-18): build an
