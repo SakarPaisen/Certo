@@ -27,7 +27,9 @@ levels down, skipping folders such as `node_modules`, `.git`, `.venv`,
   **ambiguous**: nothing is checked, the verdict is `inconclusive`, and the
   note names every candidate. Run Certo from the sub-project instead.
 - With none of these files, a folder with `.py` files is treated as
-  Python.
+  Python. The checks run from the folder that holds every folder with
+  `.py` files: for a `game/` package and a `tests/` folder side by side,
+  that is the folder above them.
 - Otherwise the type is **unknown**: nothing is checked and the verdict is
   `inconclusive`. The note lists the files found.
 
@@ -83,7 +85,10 @@ failure. Other tools (flake8, pylint, pyright) are not run.
   defined after it doesn't exist yet when the program runs, even though
   tests that import the file see it. This check exists because of a real
   bug; see [Why agents lie](../concepts/why-agents-lie.md).
-- **`python <file>`** runs the program with no input. It proves the
+- **`python <file>`** runs the program with no input. A file inside a
+  package (a folder with `__init__.py`) runs as a module instead, the way
+  such code is meant to run: `game/__main__.py` runs as `python -m game`,
+  `game/cli.py` as `python -m game.cli`. It proves the
   program starts without crashing. It can't test menus or prompts, because
   nobody types anything. A program that crashes when input ends (an
   uncaught `EOFError`) fails this check.

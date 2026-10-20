@@ -266,6 +266,30 @@ def test_detects_python_via_bare_source_files_when_no_manifest(tmp_path):
     assert detection == ProjectDetection(language="python", root=str(tmp_path))
 
 
+def test_bare_python_root_is_the_folder_that_holds_every_source_folder(tmp_path):
+    # The live Hanoi layout: a package and a sibling tests/ folder, no
+    # manifest. Rooting at the package (the first folder walked) made
+    # pytest collect nothing.
+    (tmp_path / "hanoi").mkdir()
+    (tmp_path / "hanoi" / "__init__.py").write_text("")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_game.py").write_text("def test_ok():\n    assert True\n")
+
+    detection = detect_project(str(tmp_path))
+
+    assert detection == ProjectDetection(language="python", root=str(tmp_path))
+
+
+def test_bare_python_root_stays_in_the_only_source_folder(tmp_path):
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "main.py").write_text("")
+    (tmp_path / "README.md").write_text("")
+
+    detection = detect_project(str(tmp_path))
+
+    assert detection == ProjectDetection(language="python", root=str(tmp_path / "app"))
+
+
 def test_detects_node_via_package_json(tmp_path):
     _write_package_json(tmp_path, {"build": "vite build"})
 
@@ -1071,6 +1095,34 @@ def test_python_plan_smoke_run_command_uses_the_relative_nested_path(tmp_path):
     assert len(smoke_specs) == 1
     assert smoke_specs[0].command[-1] == os.path.join("src", "main.py")
     assert smoke_specs[0].cwd == str(tmp_path)
+
+
+def test_python_plan_runs_a_package_main_as_a_module(tmp_path):
+    package = tmp_path / "hanoi"
+    package.mkdir()
+    (package / "__init__.py").write_text("")
+    (package / "cli.py").write_text("def main():\n    return 0\n")
+    (package / "__main__.py").write_text(
+        "from hanoi.cli import main\n\nif __name__ == '__main__':\n    raise SystemExit(main())\n"
+    )
+
+    plan = _python_plan(str(tmp_path), _state(tmp_path))
+    check = next(s for s in plan if s.name == "python -m hanoi")
+
+    assert check.command[-2:] == ["-m", "hanoi"]
+    assert check.cwd == str(tmp_path)
+    assert execute_check(check).status == "passed"
+
+
+def test_python_plan_runs_a_package_module_with_a_guard_as_a_module(tmp_path):
+    package = tmp_path / "tool"
+    package.mkdir()
+    (package / "__init__.py").write_text("")
+    (package / "cli.py").write_text("if __name__ == '__main__':\n    pass\n")
+
+    plan = _python_plan(str(tmp_path), _state(tmp_path))
+
+    assert "python -m tool.cli" in {s.name for s in plan}
 
 
 def test_entrypoint_ordering_spec_is_none_without_any_entrypoint(tmp_path):

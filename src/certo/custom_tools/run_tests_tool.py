@@ -137,7 +137,11 @@ def detect_project(working_dir: str) -> ProjectDetection:
     Falls back to "python" when no manifest is found but real Python source
     is present (`*.py` files) — this is what keeps a bare directory of
     `test_*.py` files (this repo's own test fixtures, and plenty of small
-    real scripts with no `pyproject.toml`) working exactly as before. Only
+    real scripts with no `pyproject.toml`) working exactly as before. The
+    root is then the deepest directory containing every directory that has
+    `.py` files, not the first one the walk visits: confirmed live, a
+    manifest-less `hanoi/` package plus a sibling `tests/` was otherwise
+    rooted at the package, so pytest collected nothing. Only
     when *neither* a manifest *nor* any Python source is found does this
     report `"unknown"` — verification-plan discovery turns that into an
     explicit "verification unavailable" result rather than silently
@@ -145,7 +149,7 @@ def detect_project(working_dir: str) -> ProjectDetection:
     """
     base_depth = working_dir.rstrip(os.sep).count(os.sep)
     matches_by_depth: dict[int, list[tuple[str, str]]] = {}
-    python_source_root: str | None = None
+    python_source_dirs: list[str] = []
     for root, dirs, files in os.walk(working_dir):
         depth = root.rstrip(os.sep).count(os.sep) - base_depth
         if depth >= _MAX_SCAN_DEPTH:
@@ -161,8 +165,8 @@ def detect_project(working_dir: str) -> ProjectDetection:
                 if any(marker in files for marker in markers):
                     matches_by_depth.setdefault(depth, []).append((language, root))
                     break  # one match per directory — same-dir ties are not "ambiguous"
-        if python_source_root is None and any(f.endswith(".py") for f in files):
-            python_source_root = root
+        if any(f.endswith(".py") for f in files):
+            python_source_dirs.append(root)
     if matches_by_depth:
         shallowest = matches_by_depth[min(matches_by_depth)]
         if len(shallowest) == 1:
@@ -171,8 +175,8 @@ def detect_project(working_dir: str) -> ProjectDetection:
         return ProjectDetection(
             language="ambiguous", root=working_dir, candidates=tuple(shallowest)
         )
-    if python_source_root is not None:
-        return ProjectDetection(language="python", root=python_source_root)
+    if python_source_dirs:
+        return ProjectDetection(language="python", root=os.path.commonpath(python_source_dirs))
     return ProjectDetection(language="unknown", root=working_dir)
 
 
@@ -730,6 +734,22 @@ def _find_python_entrypoints(root: str) -> list[str]:
     return sorted(entrypoints)
 
 
+def _entrypoint_args(root: str, name: str) -> list[str]:
+    """How to run one entry point from `root`: a file inside a package (its
+    directory has `__init__.py`) as a module, `-m pkg` or `-m pkg.mod`, the
+    way such code is meant to run; any other file by its path. Running
+    `pkg/__main__.py` by path puts `pkg/` itself on `sys.path`, so the
+    package's own absolute imports (`from pkg.cli import main`) fail —
+    confirmed live, it pushed the agent into a `sys.path` workaround."""
+    directory = os.path.dirname(name)
+    if not directory or not os.path.isfile(os.path.join(root, directory, "__init__.py")):
+        return [name]
+    module = os.path.splitext(name)[0].split(os.sep)
+    if module[-1] == "__main__":
+        module = module[:-1]
+    return ["-m", ".".join(module)]
+
+
 def _entrypoint_ordering_spec(root: str, entrypoints: list[str]) -> CheckSpec | None:
     """A precomputed (no-subprocess) static check: for each detected entry
     point, is its `if __name__ == "__main__":` guard the file's *last*
@@ -949,11 +969,12 @@ def _python_plan(root: str, state: PythonEnvState | None = None) -> list[CheckSp
     # verification".
     if python is not None:
         for name in entrypoints:
+            args = _entrypoint_args(root, name)
             specs.append(
                 CheckSpec(
-                    name=f"python {name}",
+                    name=f"python {' '.join(args)}",
                     primary=False,
-                    command=[*python, name],
+                    command=[*python, *args],
                     cwd=root,
                     env=env_vars,
                 )

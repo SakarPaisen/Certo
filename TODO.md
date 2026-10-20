@@ -311,14 +311,6 @@ database).
 
 ## Smaller bugs
 
-- **A Python project with no manifest is verified in the wrong folder.**
-  With no `pyproject.toml` (or other marker), detection falls back to the
-  first folder with `.py` files that the walk visits. Seen 2026-10-19: a
-  Hanoi project with `hanoi/` (the package) and `tests/` got root
-  `hanoi/`, so pytest found no tests and the verdict was `inconclusive`;
-  from the top folder, 79 tests pass. Use the common folder of every
-  folder with `.py` files (within the depth bound) instead. Done when that
-  project ends `verified`.
 - **Mid-run notices never reach the terminal.** The CLI prints only the
   run's last message, so "Certo: escalating from X to Y", the step-limit
   notice and the like are lost; only `MODEL_DECISIONS.md` shows a

@@ -95,3 +95,19 @@ whole word, or its plural: "bug" matches "bugs", "fix" no longer matches
 "prefix". `MODEL_DECISIONS.md` says which word matched. If your own task
 profiles relied on words in the body of a task, put them in its title.
 See [Pick models automatically](../guides/pick-models-automatically.md).
+
+## Fixed: a Python project with no manifest is checked from its top folder
+
+Without a `pyproject.toml` (or `setup.py`, `setup.cfg`), Certo used to run
+the checks from the first folder with `.py` files it found. For a project
+with a `hanoi/` package and a `tests/` folder side by side, that was
+`hanoi/`, so pytest found no tests and the verdict was `inconclusive`,
+although the project's 79 tests pass. Now the checks run from the folder
+that holds both.
+
+A program inside a package now also runs as a module: `hanoi/__main__.py`
+runs as `python -m hanoi`, not `python __main__.py` from inside the
+package. Run by its path, the package's own imports (`from hanoi.cli
+import main`) fail, which had pushed the agent to add a `sys.path`
+workaround to pass the check. See
+[Verification by language](../reference/verification-by-language.md).
