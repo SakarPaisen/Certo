@@ -1,4 +1,4 @@
-# Certo v0.1.20 (not released yet)
+# Certo v0.1.20
 
 The task profiles and the escalation ladders move out of
 `models_list.yaml` into files of their own, a run that uses all its steps
