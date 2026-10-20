@@ -3,7 +3,9 @@ it: `--auto-model`, `--escalate`, `certo bench` and `certo check`.
 
 `check_catalog` returns every problem at once, in plain words naming the
 model, ladder or profile. Errors stop the command; warnings are printed and
-the command runs. `load_checked_catalog` is the one way commands load the
+the command runs. A problem only one mode cares about (a ladder for
+`--escalate`, a profile's `model:` for `--auto-model`) is a warning in the
+other mode, so a broken ladder never stops an `--auto-model` run. `load_checked_catalog` is the one way commands load the
 file. Pure: no SDK, no network.
 """
 
@@ -45,9 +47,24 @@ def _names(models: list[ModelCatalogEntry]) -> str:
     return ", ".join(m.name for m in models) or "(none)"
 
 
-def check_catalog(catalog: ModelCatalog) -> CatalogReport:
+# What each mode doesn't use, and the note its problems get there.
+_UNUSED_BY_MODE = {
+    "auto": ("escalation", "Only --escalate uses ladders, so this run goes on."),
+    "escalate": ("profiles", "Only --auto-model uses task profiles, so this run goes on."),
+}
+
+
+def check_catalog(catalog: ModelCatalog, *, mode: str | None = None) -> CatalogReport:
+    """Every problem in the model files. `mode` is the run's model
+    selection ("auto" or "escalate"): problems in the part of the files the
+    mode doesn't use become warnings. None (certo check, certo bench) keeps
+    them all errors."""
     report = CatalogReport()
     errors, warnings = report.errors, report.warnings
+    # Errors in the escalation settings and in task profiles, kept apart
+    # until `mode` decides whether they stop the command.
+    ladder_errors: list[str] = []
+    profile_errors: list[str] = []
     by_name: dict[str, ModelCatalogEntry] = {}
     errors.extend(catalog.load_problems)
     warnings.extend(catalog.load_warnings)
@@ -67,7 +84,7 @@ def check_catalog(catalog: ModelCatalog) -> CatalogReport:
 
     settings = catalog.escalation
     if settings.cost_axis_set and not any(settings.cost_axis in m.ratings for m in catalog.models):
-        errors.append(
+        ladder_errors.append(
             f"escalation.cost_axis is {settings.cost_axis!r}, but no model has a rating "
             "with that name. Use the axis your ratings use for cost-effectiveness (usually "
             "'cost')."
@@ -78,7 +95,7 @@ def check_catalog(catalog: ModelCatalog) -> CatalogReport:
         seen: set[tuple[str, str | None]] = set()
         for i, rung in enumerate(ladder.rungs, start=1):
             if rung.model not in by_name:
-                errors.append(
+                ladder_errors.append(
                     f"{where}, rung {i}: there is no model named {rung.model!r}. "
                     f"Models: {_names(catalog.models)}."
                 )
@@ -94,16 +111,16 @@ def check_catalog(catalog: ModelCatalog) -> CatalogReport:
                 )
             key = (rung.model, rung.reasoning_effort)
             if key in seen:
-                errors.append(f"{where} lists {rung.model} twice with the same settings.")
+                ladder_errors.append(f"{where} lists {rung.model} twice with the same settings.")
             seen.add(key)
             if rung.retries is not None and rung.retries < 0:
-                errors.append(
+                ladder_errors.append(
                     f"{where}, rung {i} ({rung.model}): retries must be 0 or more, "
                     f"got {rung.retries}."
                 )
         usable = usable_rungs(ladder, catalog)
         if not usable:
-            errors.append(
+            ladder_errors.append(
                 f"{where} has no usable rung: none of its models is enabled in models.yaml."
             )
         elif len(usable) == 1:
@@ -124,7 +141,7 @@ def check_catalog(catalog: ModelCatalog) -> CatalogReport:
             continue
         where = f"Task profile {profile.name!r}"
         if profile.model not in by_name:
-            errors.append(
+            profile_errors.append(
                 f"{where}: there is no model named {profile.model!r}. "
                 f"Models: {_names(catalog.models)}."
             )
@@ -133,6 +150,13 @@ def check_catalog(catalog: ModelCatalog) -> CatalogReport:
                 f"{where}: {profile.model} isn't enabled in models.yaml, so tasks of this "
                 "profile use the model the weights rank first."
             )
+
+    unused, note = _UNUSED_BY_MODE.get(mode, (None, ""))
+    for part, problems in (("escalation", ladder_errors), ("profiles", profile_errors)):
+        if part == unused:
+            warnings.extend(f"{problem} {note}" for problem in problems)
+        else:
+            errors.extend(problems)
 
     weighted: dict[str, list[str]] = {}
     for profile in catalog.task_profiles:
@@ -162,11 +186,12 @@ def load_checked_catalog(
     task_profiles_file: str = "",
     escalation_file: str = "",
     on_warning: Callable[[str], None] | None = None,
+    mode: str | None = None,
 ) -> ModelCatalog:
     """Find, load and check the model files (see model_files.py; "" means
     look them up; task_profiles.yaml and escalation.yaml are optional).
     Raises `ModelCatalogError` listing every error; passes each warning to
-    `on_warning`."""
+    `on_warning`. `mode` as in `check_catalog`."""
     list_path, models_path = resolve(models_file, models_list_file)
     profiles_path, escalation_path = resolve_optional(task_profiles_file, escalation_file)
     catalog = load_model_catalog(
@@ -176,7 +201,7 @@ def load_checked_catalog(
         escalation_path=escalation_path,
         strict=False,
     )
-    report = check_catalog(catalog)
+    report = check_catalog(catalog, mode=mode)
     if report.errors:
         raise ModelCatalogError(
             f"{list_path} and {models_path} have {len(report.errors)} problem(s):\n"

@@ -160,6 +160,69 @@ def test_load_checked_catalog_lists_every_error(tmp_path):
     assert "no model named 'nope'" in message
 
 
+# --- problems a mode doesn't use --------------------------------------------------
+
+_BROKEN_LADDER = "escalation:\n  ladders:\n    x:\n      - model: parked\n"
+_BROKEN_PROFILE = _MODELS.replace(
+    "  default:\n", "  debugging:\n    triggers: [fix]\n    model: stronk\n  default:\n"
+)
+
+
+def _mode_report(tmp_path, mode, extra="", models=_MODELS):
+    files = write_split_model_files(tmp_path, models + extra)
+    return check_catalog(load_model_catalog(**files, strict=False), mode=mode)
+
+
+def test_a_broken_ladder_does_not_stop_auto_model(tmp_path):
+    # Seen live 2026-10-19: unusable ladders stopped an --auto-model run.
+    report = _mode_report(tmp_path, "auto", _BROKEN_LADDER)
+    assert report.ok
+    assert (
+        "Ladder 'x' has no usable rung: none of its models is enabled in models.yaml. "
+        "Only --escalate uses ladders, so this run goes on." in report.warnings
+    )
+
+
+def test_a_broken_ladder_still_stops_escalate(tmp_path):
+    report = _mode_report(tmp_path, "escalate", _BROKEN_LADDER)
+    assert "Ladder 'x' has no usable rung: none of its models is enabled in models.yaml." in (
+        report.errors
+    )
+
+
+def test_a_broken_profile_does_not_stop_escalate(tmp_path):
+    report = _mode_report(tmp_path, "escalate", models=_BROKEN_PROFILE)
+    assert report.ok
+    assert (
+        "Task profile 'debugging': there is no model named 'stronk'. "
+        "Models: local, mid, strong, parked. "
+        "Only --auto-model uses task profiles, so this run goes on." in report.warnings
+    )
+
+
+def test_a_broken_profile_still_stops_auto_model(tmp_path):
+    report = _mode_report(tmp_path, "auto", models=_BROKEN_PROFILE)
+    assert not report.ok
+
+
+def test_a_problem_both_modes_share_stops_either(tmp_path):
+    duplicated = _MODELS.replace("name: mid", "name: local")
+    for mode in ("auto", "escalate", None):
+        (tmp_path / str(mode)).mkdir()
+        assert not _mode_report(tmp_path / str(mode), mode, models=duplicated).ok
+
+
+def test_load_checked_catalog_passes_the_mode_on(tmp_path):
+    files = write_split_model_files(tmp_path, _MODELS + _BROKEN_LADDER)
+    args = (files["models_path"], files["list_path"])
+    kwargs = {"escalation_file": files["escalation_path"]}
+    seen = []
+    load_checked_catalog(*args, **kwargs, on_warning=seen.append, mode="auto")
+    assert any("Only --escalate uses ladders" in w for w in seen)
+    with pytest.raises(ModelCatalogError):
+        load_checked_catalog(*args, **kwargs)
+
+
 # --- warnings --------------------------------------------------------------------
 
 

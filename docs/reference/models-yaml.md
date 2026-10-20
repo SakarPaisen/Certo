@@ -268,6 +268,12 @@ Errors:
 - a task profile's `model` names a model that doesn't exist;
 - a ladder has no usable rung.
 
+A problem in a part that the run doesn't use is a warning instead, and
+the run goes on: an `--auto-model` run doesn't stop for a ladder or
+`escalation.cost_axis` problem, and an `--escalate` run doesn't stop for
+a task profile's `model`. `certo check` and `certo bench` report them all
+as errors.
+
 Warnings:
 
 - `models_list.yaml` still has a `task_profiles:` or `escalation:`

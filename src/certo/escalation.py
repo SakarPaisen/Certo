@@ -217,6 +217,7 @@ def load_ladder(
         task_profiles_file=task_profiles_file,
         escalation_file=escalation_file,
         on_warning=on_warning,
+        mode="escalate",
     )
     return resolve_ladder(catalog, name)
 

@@ -1314,6 +1314,7 @@ def stream_task(
             task_profiles_file=cfg.task_profiles_file,
             escalation_file=cfg.escalation_file,
             on_warning=lambda w: _emit_notice(emit, f"Certo: models.yaml: {w}"),
+            mode="auto",
         )
         profile = classify_task(task, catalog)
         ranked, how = rank_for_profile(catalog, profile)

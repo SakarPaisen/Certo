@@ -320,11 +320,6 @@ database).
   Since 0.1.20 they have their own files; the old sections are still read
   with a warning. Remove that path (and the tests that use the old layout
   through `write_model_files`) a version or two later.
-- **`--auto-model` refuses to run when a ladder has no usable rung.**
-  `certo check`'s catalog errors include escalation ladders, which
-  `--auto-model` never uses; with only two models enabled, two unusable
-  ladders stopped an auto-model run (2026-10-19). Treat ladder problems as
-  warnings outside `--escalate`.
 - **A configuration error prints a resume hint, then the banner.** The
   same run printed the model-file error, then "Continue with: certo
   --resume --project leap" (there was nothing to resume), then the banner.

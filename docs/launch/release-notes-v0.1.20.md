@@ -122,3 +122,12 @@ package. Run by its path, the package's own imports (`from hanoi.cli
 import main`) fail, which had pushed the agent to add a `sys.path`
 workaround to pass the check. See
 [Verification by language](../reference/verification-by-language.md).
+
+## Fixed: a broken ladder no longer stops `--auto-model`
+
+`--auto-model` never uses escalation ladders, but a ladder problem (such
+as a ladder with no enabled model) stopped an `--auto-model` run with an
+error. Now a problem in a part of the model files the run doesn't use is
+a warning, and the run goes on: ladders for `--auto-model`, a task
+profile's `model:` for `--escalate`. `certo check` still reports them as
+errors. See [The model files](../reference/models-yaml.md#checks).
