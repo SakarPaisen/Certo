@@ -2408,7 +2408,9 @@ def test_stream_task_gives_a_python_project_its_env_in_the_agents_terminal(
 
     assert captured["project_env"].host_dir == venv
     assert captured["terminal_env"]["VIRTUAL_ENV"] == venv
-    assert captured["terminal_env"]["PATH"].startswith(os.path.join(venv, "bin"))
+    scripts = "Scripts" if os.name == "nt" else "bin"
+    first_path = captured["terminal_env"]["PATH"].split(os.pathsep)[0]
+    assert os.path.normpath(first_path) == os.path.join(venv, scripts)
 
 
 def test_stream_task_creates_no_env_for_a_node_project(monkeypatch, tmp_path):

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import glob
 import os
 import subprocess
 import sys
@@ -29,7 +28,7 @@ def make_project_venv(project_dir) -> str:
     """
     venv = os.path.join(str(project_dir), ".venv")
     subprocess.run([sys.executable, "-m", "venv", "--without-pip", venv], check=True)
-    site = glob.glob(os.path.join(venv, "lib", "python*", "site-packages"))[0]
+    site = sysconfig.get_path("purelib", vars={"base": venv, "platbase": venv})
     with open(os.path.join(site, "certo_tests.pth"), "w", encoding="utf-8") as f:
         f.write(sysconfig.get_path("purelib") + "\n")
     return venv

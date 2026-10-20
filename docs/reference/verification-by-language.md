@@ -65,6 +65,10 @@ Certo installs pytest into the project environment (5-minute limit). If
 that fails, pytest is `unavailable`. See
 [Work on an existing project](../guides/work-on-an-existing-project.md#python-projects-get-their-own-environment).
 
+Virtual environments use `Scripts/python.exe` on Windows and `bin/python`
+on macOS and Linux. Docker uses the container's Linux layout regardless of
+the host OS.
+
 **Configured** means:
 
 - ruff: a `[tool.ruff]` section in `pyproject.toml`, or a `ruff.toml` or

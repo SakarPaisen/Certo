@@ -254,15 +254,21 @@ class ProjectEnv:
     venv_dir: str  # the venv directory, as the runner sees it
     python: tuple[str, ...]  # command prefix that runs the project's python
     install_hint: str  # how to add a dependency, shown to the agent
+    windows: bool = False  # the environment's execution platform, not the host's
 
     def bin_dir(self) -> str:
-        return f"{self.venv_dir.rstrip('/')}/bin"
+        directory = self.venv_dir.rstrip("/\\")
+        return f"{directory}/{'Scripts' if self.windows else 'bin'}"
+
+    def venv_python(self) -> str:
+        return f"{self.bin_dir()}/{'python.exe' if self.windows else 'python'}"
 
     def env_vars(self, base_path: str) -> dict[str, str]:
-        """VIRTUAL_ENV, plus the venv's bin/ first on PATH."""
+        """VIRTUAL_ENV, plus the environment's scripts directory first on PATH."""
+        separator = ";" if self.windows else ":"
         return {
             "VIRTUAL_ENV": self.venv_dir,
-            "PATH": os.pathsep.join(p for p in (self.bin_dir(), base_path) if p),
+            "PATH": separator.join(p for p in (self.bin_dir(), base_path) if p),
         }
 
 
@@ -275,15 +281,33 @@ class EnvSetup:
     notices: list[str] = field(default_factory=list)
 
 
+def _windows_venv(runner: CommandRunner, host_dir: str) -> bool:
+    # Docker always executes on Linux, even when its bind mount holds a Windows venv.
+    if isinstance(runner, WorkspaceRunner):
+        return False
+    return os.path.lexists(os.path.join(host_dir, "Scripts", "python.exe")) or (
+        isinstance(runner, LocalRunner) and os.name == "nt"
+    )
+
+
 def _env_from_venv(runner: CommandRunner, host_dir: str, uv: str | None) -> ProjectEnv:
     venv_dir = runner.exec_path(host_dir)
-    python = f"{venv_dir}/bin/python"
-    has_pip = os.path.lexists(os.path.join(host_dir, "bin", "pip"))
+    windows = _windows_venv(runner, host_dir)
+    scripts, executable, pip = (
+        ("Scripts", "python.exe", "pip.exe") if windows else ("bin", "python", "pip")
+    )
+    python = f"{venv_dir}/{scripts}/{executable}"
+    has_pip = os.path.lexists(os.path.join(host_dir, scripts, pip))
     hint = (
         "python -m pip install <package>" if has_pip or uv is None else "uv pip install <package>"
     )
     return ProjectEnv(
-        kind="venv", host_dir=host_dir, venv_dir=venv_dir, python=(python,), install_hint=hint
+        kind="venv",
+        host_dir=host_dir,
+        venv_dir=venv_dir,
+        python=(python,),
+        install_hint=hint,
+        windows=windows,
     )
 
 
@@ -295,6 +319,7 @@ def _env_from_uv_project(runner: CommandRunner, project_dir: str, uv: str) -> Pr
         venv_dir=runner.exec_path(host_dir),
         python=(uv, "run", "--project", runner.exec_path(project_dir), "python"),
         install_hint="uv add <package> (or uv add --dev <package> for test tools)",
+        windows=_windows_venv(runner, host_dir),
     )
 
 
@@ -451,7 +476,7 @@ def install_into_env(env: ProjectEnv, runner: CommandRunner, package: str, cwd: 
     project interpreter's own pip. stdin is closed and the call is bounded.
     """
     uv = runner.which("uv")
-    python = f"{env.venv_dir}/bin/python"
+    python = env.venv_python()
     if uv:
         command = [uv, "pip", "install", "--quiet", "--python", python, package]
     else:
