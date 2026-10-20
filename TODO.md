@@ -367,14 +367,6 @@ database).
 
 ## Smaller bugs
 
-- **`certo --escalate "task"` reads the task as a ladder name.**
-  `--escalate` takes an optional ladder name, so with the flag first the
-  task is swallowed and Certo stops with "the following arguments are
-  required: task" (2026-10-20). `docs/concepts/auto-model-or-escalation.md`
-  shows exactly that form; the README puts the task first, which works.
-  Accept a task there (for example: a value that names no ladder and has
-  a space is the task), or document only the working order. Done when
-  every documented form works, with a test.
 - **`models.yaml.example` says the list holds task profiles and
   ladders.** Its header still describes `models_list.yaml` as "ids,
   descriptions, ratings, task profiles, escalation ladders"; since 0.1.20

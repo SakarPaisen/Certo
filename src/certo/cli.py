@@ -297,7 +297,8 @@ def _build_parser() -> argparse.ArgumentParser:
             "next one only when Certo's verification shows the model couldn't finish, or "
             "its provider fails. LADDER names a ladder under escalation.ladders; without "
             "it, the ladder named 'default' is used, else one built from the ratings. "
-            "Can't be combined with --auto-model or --model."
+            'With only one value after it (certo --escalate "task"), that value is the '
+            "task. Can't be combined with --auto-model or --model."
         ),
     )
     parser.add_argument(
@@ -423,6 +424,12 @@ def main(argv: list[str] | None = None) -> int:
         return bench_main(argv[1:])
     parser = _build_parser()
     args = parser.parse_args(argv)
+    if args.task is None and args.escalate and not args.resume:
+        # `certo --escalate "task"`: LADDER is optional, so argparse took the
+        # task for a ladder name. A ladder with no task can't run, so it was
+        # the task, on the default ladder. (`certo --escalate hard "task"`
+        # still names the ladder.)
+        args.task, args.escalate = args.escalate, ""
     if args.task is None and not args.resume:
         parser.error("the following arguments are required: task")
 

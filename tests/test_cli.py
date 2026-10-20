@@ -1671,7 +1671,13 @@ def _escalation_cfg(tmp_path, **overrides):
 
 @pytest.mark.parametrize(
     ("argv", "ladder_name"),
-    [(["do it", "--escalate"], "default"), (["do it", "--escalate", "cloud-only"], "cloud-only")],
+    [
+        (["do it", "--escalate"], "default"),
+        (["do it", "--escalate", "cloud-only"], "cloud-only"),
+        # The flag first: a lone value is the task (seen failing 2026-10-20).
+        (["--escalate", "do it"], "default"),
+        (["--escalate", "cloud-only", "do it"], "cloud-only"),
+    ],
 )
 def test_escalate_resolves_the_ladder_and_passes_it(monkeypatch, tmp_path, argv, ladder_name):
     calls: list = []
@@ -1679,6 +1685,7 @@ def test_escalate_resolves_the_ladder_and_passes_it(monkeypatch, tmp_path, argv,
     monkeypatch.setattr(cli, "run_task", _recording_run_task(calls))
 
     assert cli.main(argv) == 0
+    assert calls[0]["task"] == "do it"
     assert calls[0]["cfg"].model_selection == "escalate"
     assert calls[0]["ladder"].name == ladder_name
 
