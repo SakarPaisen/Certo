@@ -14,6 +14,25 @@ first item is the suggested next one.
 
 ## Before the next release
 
+- **A recorded demo of escalation on a provider failure.** Urgent: it
+  checks live an assumption Certo's escalation rests on, that `--escalate`
+  climbs to the next rung when a provider fails. Only `--auto-model`'s
+  switch on a provider failure has been seen live (2026-10-19). A short GIF
+  for the top of the README: a task moves to another provider's model
+  when the first fails, and still ends `verified`. Setup: a two-rung
+  ladder across providers in `escalation.yaml` (for example
+  `claude-sonnet-5-5` → a cheap OpenAI model), with an invalid key for
+  rung 1 in `models.yaml`; the bundled Wordle task, with `--escalate`.
+  Dry run first: check what Certo prints when a rung fails on a provider
+  error. If the line is unclear or buried, improve it before recording (a
+  one-liner naming the failed model, the reason and the next rung): a
+  code change, with docs and tests. Alessio records the real run with
+  asciinema and converts it to a GIF. Add a record page for that run
+  under `docs/benchmark/`, like `escalation-wordle-0.1.19.md`, and link
+  the GIF to it. The caption says rung 1's key was rejected for the demo;
+  don't call it an outage. Related: a small `certo bench` run of the
+  Haiku → Sonnet ladder, so the README can drop one "not benchmarked
+  yet". Done when the GIF is in the README, linked to its record page.
 - **Unpin the release runner from `ubuntu-24.04`.** Pinned for 0.1.18
   because `ubuntu-latest` moved to Ubuntu 26 on 2026-10-19. Switch the
   three jobs back once a run on `ubuntu-latest` has passed (the
