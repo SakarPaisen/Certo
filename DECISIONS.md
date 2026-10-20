@@ -811,3 +811,9 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   agent's steps keep the SDK's rendering. The CLI no longer reprints the
   agent's last message at the end: the visualizer already printed it,
   and it was the duplicate.
+- **API keys live only in the settings file** (2026-10-20, the Author).
+  `models.yaml` refers to a key as `${VAR}` (for example
+  `${ANTHROPIC_API_KEY}`) instead of holding a copy, so each key is in
+  one place and `certo init` never writes a key into a second file. This
+  needs `${VAR}` expansion in `models.yaml`, which it doesn't have yet. A
+  secret manager may replace the settings file later (TODO.md).

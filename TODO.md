@@ -264,6 +264,24 @@ cut that first run's output from 2,949 lines to 1,021.)
   The plain one-model path must stay as short as it is. Done when a new
   user gets from `uv tool install` to an `--auto-model` run without
   editing a file, measured like the first run.
+
+  Agreed with the Author on 2026-10-20 (screens reviewed as mockups):
+  - "Add more models?" defaults to No, and the last screen always offers
+    "Just one model, without --auto-model or --escalate" (which one, from
+    the models set up) as the default, besides `--auto-model` and
+    `--escalate` as the mode for every run.
+  - Every list (provider, Ollama model, extra models) ends with "Another
+    model": a typed LiteLLM id, tested like the others. A model that
+    isn't in the example list gets ratings from the user (1 to 5, Enter
+    keeps 3), saved as "rated by you"; without them it can be used only
+    alone.
+  - Keys stay only in the settings file; `models.yaml` refers to them as
+    `${VAR}` (see DECISIONS.md).
+  - `models_list.yaml` is the example list, copied unchanged, kept up to
+    date by `certo models update`.
+  - Order, one commit each: `${VAR}` in `models.yaml`; `certo init
+    models` (extra models, testing, the preview and the mode); `certo
+    models update`; menus for all of `init`; the sample run.
 - **A first run in minutes, with one model.** No catalog, no ladders:
   `certo init`, then a first verified project. Getting started shows only
   that path. Measured 2026-10-19 in an empty home folder: 88.5s from
@@ -287,7 +305,17 @@ cut that first run's output from 2,949 lines to 1,021.)
 - **`certo models update`**: compare the shipped example catalog with the
   user's `models_list.yaml` and offer to merge. Since 0.1.20 the list holds
   only model data, so a merge never touches the user's profiles or
-  ladders.
+  ladders. Agreed design (2026-10-20): when Certo copies the example, it
+  keeps a copy of that version too, so the update is a three-way merge.
+  It shows new, changed and removed models and applies each only on
+  confirmation (all, one by one, or none); a model the user added or a
+  field the user changed is never touched, and a field both changed is
+  asked about. `certo init` offers it when a list already exists. Part
+  of the `certo init` work above.
+- **A secret manager for keys** (an idea, 2026-10-20). Keys live only in
+  the settings file for now. Later, read them from the system keychain
+  or a secret manager (1Password, Bitwarden, a cloud vault) instead.
+  Decide which, and how a key is named, when someone asks for it.
 - **MCP server**, so Claude Desktop, Cursor, Zed and others can call Certo
   as a tool and get the verdict back.
 - **Run report**: an HTML/Markdown summary per run (what changed, which
