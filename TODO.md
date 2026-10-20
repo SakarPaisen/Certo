@@ -236,18 +236,46 @@ first item is the suggested next one.
 
 ## 5. Adoption
 
+Walked through as a new user on 2026-10-20 (certo 0.1.20 from PyPI, an
+empty home folder, Ollama on another machine). `certo init` took 16s and
+the first task, Wordle, ended `verified` in 11m 49s. What got in the way
+is in the first two items and in "Smaller bugs".
+
+- **`certo init` sets up more than one model, in menus, and runs a
+  first task.** Today a second model means: copy three examples from
+  deep inside the tool's install folder (`certo check` prints the `cp`
+  commands only once a model file exists, although the pick-models guide
+  says it prints them when one is missing), then edit 600 lines of YAML.
+  The copied `models.yaml` is live at once: three models enabled, one at
+  a made-up `192.168.1.50`, one cloud model with an empty key, and
+  `certo check` warns only about the key. The model `init` already saved
+  has to be entered again, under another name. Instead, `init` (or `certo
+  init models`) offers a navigable menu (arrow keys; `prompt_toolkit` and
+  `rich` come with the SDK already, so declare them as Certo's own
+  dependencies before using them): start from the model already saved,
+  offer models from the example list for the keys and Ollama models it
+  finds, never invent ratings, take keys at a hidden prompt or as `${VAR}`
+  (which `models.yaml` doesn't expand yet: an `api_key: ${VAR}` is sent as
+  written, checked 2026-10-19), test each one with the `check --models`
+  call and leave failures disabled, write only the models that work, then
+  show `certo check`'s profile table. At the end it offers to run one
+  sample task, so the user sees a verdict without typing another command.
+  The plain one-model path must stay as short as it is. Done when a new
+  user gets from `uv tool install` to an `--auto-model` run without
+  editing a file, measured like the first run.
+- **A quieter run.** The first task printed 2,949 lines: 28 lines of SDK
+  logs before Certo's banner, the agent's whole system prompt (500
+  lines), the task with its skills (240 lines), and the final message
+  twice. Certo's own lines are lost in it. Certo doesn't configure the
+  SDK's console output. Show the banner, the agent's actions, Certo's
+  own notices (see "Mid-run notices" below) and the verdict; keep the
+  full text behind a flag. Feature bump; measure that nothing the user
+  needs is lost.
 - **A first run in minutes, with one model.** No catalog, no ladders:
   `certo init`, then a first verified project. Getting started shows only
   that path. Measured 2026-10-19 in an empty home folder: 88.5s from
   `uv tool install` to `verified` (`docs/benchmark/first-run-0.1.19.md`).
-  Still to do: a truly clean machine (no Python, no uv), and the two
-  items below.
-- **A quieter run.** The SDK's default console output prints the whole
-  system prompt (~500 lines) and the first user message with the skills
-  (~500 more) before the first action. Certo doesn't configure it. Show
-  the banner, the agent's actions and the verdict; keep the full text
-  behind a flag. Feature bump; measure that nothing the user needs is
-  lost.
+  Still to do: a truly clean machine (no Python, no uv).
 - **Fast start-up.** `certo --version` takes ~3s (18.6s on the very first
   run, compiling bytecode): `certo.cli` imports the SDK at the top
   (~2.6s). Import it only for the commands that run an agent, so
@@ -263,13 +291,6 @@ first item is the suggested next one.
   the repo, which isn't in the wheel. Ship the Dockerfile and tool source
   as package data, or publish an image. Documented in
   `docs/guides/run-in-docker.md`.
-- **`certo init models`**: a setup helper for `models_list.yaml`/
-  `models.yaml`. Find provider keys and Ollama models, copy the example
-  list, offer only entries the user can run (never invent ratings), write
-  keys as `${VAR}` (`models.yaml` doesn't expand it today: an
-  `api_key: ${VAR}` is sent as written, checked 2026-10-19), test each with
-  the `check --models` call and deactivate failures, print the ladder. The
-  first run must still need no model files.
 - **`certo models update`**: compare the shipped example catalog with the
   user's `models_list.yaml` and offer to merge. Since 0.1.20 the list holds
   only model data, so a merge never touches the user's profiles or
@@ -346,19 +367,36 @@ database).
 
 ## Smaller bugs
 
+- **`certo --escalate "task"` reads the task as a ladder name.**
+  `--escalate` takes an optional ladder name, so with the flag first the
+  task is swallowed and Certo stops with "the following arguments are
+  required: task" (2026-10-20). `docs/concepts/auto-model-or-escalation.md`
+  shows exactly that form; the README puts the task first, which works.
+  Accept a task there (for example: a value that names no ladder and has
+  a space is the task), or document only the working order. Done when
+  every documented form works, with a test.
+- **`models.yaml.example` says the list holds task profiles and
+  ladders.** Its header still describes `models_list.yaml` as "ids,
+  descriptions, ratings, task profiles, escalation ladders"; since 0.1.20
+  those have their own files.
 - **Mid-run notices never reach the terminal.** The CLI prints only the
   run's last message, so "Certo: escalating from X to Y", the step-limit
   notice and the like are lost; only `MODEL_DECISIONS.md` shows a
-  switch. Print Certo's own notices as they happen (see also "A quieter
-  run").
+  switch. The SDK's own output does reach the terminal, in full (see "A
+  quieter run"), so the fix is to print Certo's notices among it, as
+  they happen.
 - **Stop reading `task_profiles:` / `escalation:` in `models_list.yaml`.**
   Since 0.1.20 they have their own files; the old sections are still read
   with a warning. Remove that path (and the tests that use the old layout
   through `write_model_files`) a version or two later.
-- **A configuration error prints a resume hint, then the banner.** The
-  same run printed the model-file error, then "Continue with: certo
-  --resume --project leap" (there was nothing to resume), then the banner.
-  Print the error alone, after the banner or instead of it.
+- **A configuration error prints a resume hint, then the banner, and is
+  logged as a run.** The same run printed the model-file error, then
+  "Continue with: certo --resume --project leap" (there was nothing to
+  resume), then the banner. Seen again in 0.1.20 with `--auto-model` and
+  no model files, which also created `.certo/` in the current folder with
+  a `RUNS.md` entry saying "Model: ollama/qwen3.8:27b (picked by
+  --auto-model)", although nothing was picked or run. Print the error
+  alone, after the banner or instead of it, and write nothing.
 - **The `--resume` hint ignores `CERTO_PROJECTS_DIR` from the
   environment.** It prints `certo --resume --project NAME`, which then
   looks in the default projects folder. Print the setting too when it
