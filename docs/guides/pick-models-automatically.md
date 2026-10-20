@@ -15,7 +15,8 @@ computer can reach, tests each one, writes the files below and asks
 whether to use `--auto-model` for every run. See
 [the reference](../reference/commands.md#certo-init-models). The rest of
 this section is what it writes, for when you want to edit the files
-yourself.
+yourself. After a Certo upgrade, `certo models update` adds the example
+list's new models and ratings to your copy, keeping your edits.
 
 `--auto-model` uses three files, and Certo ships each only as an example:
 

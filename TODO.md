@@ -280,8 +280,8 @@ cut that first run's output from 2,949 lines to 1,021.)
     date by `certo models update`.
   - Order, one commit each: `${VAR}` in `models.yaml` (done, 0.1.21);
     `certo init models` (extra models, testing, the preview and the mode;
-    done, 0.1.21); `certo models update`; menus for all of `init`; the
-    sample run.
+    done, 0.1.21); `certo models update` (done, 0.1.21); menus for all
+    of `init`; the sample run.
 - **A first run in minutes, with one model.** No catalog, no ladders:
   `certo init`, then a first verified project. Getting started shows only
   that path. Measured 2026-10-19 in an empty home folder: 88.5s from
@@ -302,16 +302,6 @@ cut that first run's output from 2,949 lines to 1,021.)
   the repo, which isn't in the wheel. Ship the Dockerfile and tool source
   as package data, or publish an image. Documented in
   `docs/guides/run-in-docker.md`.
-- **`certo models update`**: compare the shipped example catalog with the
-  user's `models_list.yaml` and offer to merge. Since 0.1.20 the list holds
-  only model data, so a merge never touches the user's profiles or
-  ladders. Agreed design (2026-10-20): when Certo copies the example, it
-  keeps a copy of that version too, so the update is a three-way merge.
-  It shows new, changed and removed models and applies each only on
-  confirmation (all, one by one, or none); a model the user added or a
-  field the user changed is never touched, and a field both changed is
-  asked about. `certo init` offers it when a list already exists. Part
-  of the `certo init` work above.
 - **A secret manager for keys** (an idea, 2026-10-20). Keys live only in
   the settings file for now. Later, read them from the system keychain
   or a secret manager (1Password, Bitwarden, a cloud vault) instead.

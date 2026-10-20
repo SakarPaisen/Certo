@@ -122,6 +122,8 @@ def test_choosing_a_listed_model_tests_both_and_writes_the_files(home):
     ]
     assert oct(os.stat(home / "models.yaml").st_mode & 0o777) == "0o600"
     assert (home / "models_list.yaml").exists()
+    # The copy's origin, for certo models update.
+    assert (home / ".models_list.base.yaml").read_text() == (home / "models_list.yaml").read_text()
     assert (home / "task_profiles.yaml").exists()
     assert "What --auto-model would choose:" in text
     assert "How --escalate would climb:" in text

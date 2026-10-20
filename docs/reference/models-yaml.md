@@ -37,7 +37,10 @@ cp <examples>/escalation.yaml.example ~/.config/certo/escalation.yaml         # 
 ```
 
 The quick way is `certo init models`, which writes the files for the
-models it tested (see [Commands](commands.md#certo-init-models)). A run
+models it tested (see [Commands](commands.md#certo-init-models)). A new
+Certo release may update the example list; `certo models update` brings
+your copy up to date and keeps your changes (see
+[Commands](commands.md#certo-models-update)). A run
 that needs a missing file prints the exact `cp` command, with the
 examples folder of your installation; so does `certo check` when one of
 the two required files exists. With neither, `certo check` says to run

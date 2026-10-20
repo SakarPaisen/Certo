@@ -417,7 +417,7 @@ def verify_main(argv: list[str]) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else list(argv)
-    # `verify`, `init`, `check` and `bench` are subcommands only as the exact, whole
+    # `verify`, `init`, `check`, `models` and `bench` are subcommands only as the exact, whole
     # first argument. A task is always one argument (quoted), so "verify the
     # login flow" or "init a repo" can never match, and `certo -- verify`
     # still runs the one-word task.
@@ -427,6 +427,10 @@ def main(argv: list[str] | None = None) -> int:
         return init_main(argv[1:])
     if argv and argv[0] == "check":
         return check_main(argv[1:])
+    if argv and argv[0] == "models":
+        from .models_cmd import models_main
+
+        return models_main(argv[1:])
     if argv and argv[0] == "bench":
         from .bench import bench_main
 

@@ -217,6 +217,61 @@ nothing is written: one model needs no model files. Exit code 0, or 1
 when fewer than two models passed; 130 on Ctrl-C. A folder named `models`
 is created with `certo init ./models`.
 
+## `certo models`
+
+Manage your list of models, `models_list.yaml`. One subcommand, `update`.
+
+### `certo models update`
+
+Bring your `models_list.yaml` up to date with the example list of the
+installed Certo, keeping your own changes.
+
+```text
+certo models update [--yes]
+```
+
+| Flag | Effect |
+|---|---|
+| `--yes`, `-y` | Apply every change without asking, and keep your version of an entry that both you and the example changed. Needed without a terminal. |
+
+It compares three versions of each model entry: your file, the example it
+was copied from (saved next to your file as `.models_list.base.yaml` by
+`certo init models` and by each update), and the new example. Then:
+
+- **New**: a model the new example has and you don't. Not offered again if
+  you removed it yourself.
+- **Changed**: an entry the example changed (id, ratings, description)
+  and you didn't.
+- **Removed**: a model no longer in the example, unchanged by you. Never
+  removed while `models.yaml` uses it.
+- **Both changed**: you and the example both changed it. Asked one by
+  one; `--yes` keeps yours.
+- **Kept**: your own models and your edits.
+
+On a terminal, it asks whether to apply all the changes, one by one, or
+none. Without the base file (a list you copied by hand, or one from
+before 0.1.21), Certo can't tell who changed an entry, so every entry
+that differs is asked about, and nothing is removed. For example, a list
+copied on 17 October 2026, with one rating changed by its owner and one
+model of their own:
+
+```text
+  Kept          claude-sonnet-5-5: your changes
+  Kept          my-finetune: yours
+  New           gpt-oss-20b-local
+                ollama/gpt-oss:20b
+  Changed       gpt-6-luna
+                ratings: precision 3 -> 4
+                description changed
+```
+
+The file is edited entry by entry, so your comments and layout stay; new
+models go after the last entry of the list. The old file is kept as
+`models_list.yaml.bak`. If the file's layout isn't the example's (entries
+at `  - name:` with their fields indented below), nothing is written and
+the message says so. Exit code 0, or 1 when there is no list or it can't
+be edited safely.
+
 ## `certo check`
 
 Check that the configured model works.

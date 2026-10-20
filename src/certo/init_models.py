@@ -50,6 +50,7 @@ from .model_catalog import (
     load_model_catalog,
 )
 from .model_files import example_path, find
+from .models_cmd import save_base
 
 # The rating axes the example list uses, asked in this order for a model
 # the list doesn't have.
@@ -442,6 +443,7 @@ def _write(
     written = []
     if not os.path.isfile(list_path):
         shutil.copyfile(example_path(LIST_FILE), list_path)
+        save_base(list_path)  # for certo models update
         written.append(f"{LIST_FILE}  the example list")
     unlisted = [c for c in working if not c.listed]
     if unlisted:

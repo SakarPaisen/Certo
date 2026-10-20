@@ -278,6 +278,14 @@ given design was chosen.
   (`_set_setting`, mode 600); user-rated models are appended to the
   list's `models:`, refused (nothing written) when the result wouldn't parse
   as part of that list.
+- **`models_cmd.py`** — `certo models update`. `plan()` is a three-way
+  merge per entry (user file, `.models_list.base.yaml` saved when the
+  example was copied, new example), compared as parsed YAML; `apply()`
+  edits the text block by block (`  - name:` plus the lines indented four
+  or more spaces), so comments stay, inserts new entries after the last
+  block (a pre-0.1.20 list has sections after it), then `_check()`
+  re-parses and compares with the plan; any mismatch raises and nothing
+  is written.
 - **`project_env.py`** — each Python project's own environment (stdlib
   only, since the Docker image imports it next to `custom_tools`).
   `ensure_project_env()` reuses a `uv.lock` project (through `uv run`), or a

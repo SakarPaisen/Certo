@@ -1,6 +1,7 @@
 # Certo v0.1.21 (not released yet)
 
 `certo init models` sets up more than one model without editing a file,
+`certo models update` keeps the list of models up to date,
 a run prints a third of what it did, Certo's own notes now show as they
 happen, `certo init` offers DeepSeek and Kimi, and `models.yaml` can
 name a key that lives in your settings file.
@@ -43,6 +44,16 @@ with one small request, writes only the ones that pass, shows what
 to use for every run, with one model as the default. A model that isn't
 in Certo's list is rated by you, next to the list's ratings of the
 models you chose. See [Commands](../reference/commands.md#certo-init-models).
+
+## New: `certo models update`
+
+Your `models_list.yaml` is a copy of the example list, and a Certo release
+can update the example: new models, new ratings. `certo models update`
+compares your copy with the example it came from and the new one, offers
+Certo's changes (all, one by one, or none) and keeps yours: a model you
+added, a rating you changed. An entry both changed is asked about. Your
+comments stay, and the old file is kept as `models_list.yaml.bak`. See
+[Commands](../reference/commands.md#certo-models-update).
 
 ## New: DeepSeek and Kimi in `certo init`
 
