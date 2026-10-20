@@ -148,6 +148,14 @@ provider and model (never the key) and asks before replacing it. Nothing
 is written until the last answer, so Ctrl-C leaves everything as it was
 (exit 130).
 
+**The sample task.** On a terminal, when the sample folder was created and
+the model check passed, `init` ends by offering to run
+`tasks/wordle.md --project wordle` at once, in the sample folder, as a
+normal run (its output, verdict and cost as for any run). It says how
+long it takes (a few minutes on a cloud model, 10 to 15 on a local one)
+and that a cloud model uses your credits. **Not now** prints the command
+instead. It is never offered with `--yes` or `--no-check`.
+
 **Without a terminal** and without `--provider`, `--model` or `--yes`,
 `init` asks nothing and writes `FOLDER/.env` with every provider commented
 out. Without a terminal, settings go to `FOLDER/.env` unless `--global` or

@@ -21,7 +21,7 @@ from .banner import format_banner
 from .config import ConfigError, load_config, override_llm, resolve_project_dir
 from .custom_tools.run_tests_tool import detect_project, run_full_verification
 from .escalation import format_rung_lines, load_ladder
-from .init_cmd import check_main, init_main
+from .init_cmd import check_main, init_main, run_sample_task
 from .model_catalog import ModelCatalogEntry
 from .project_state import load_record, status_path
 from .run_history import RunEntry, append_run, note_models_in_readme
@@ -424,7 +424,7 @@ def main(argv: list[str] | None = None) -> int:
     if argv and argv[0] == "verify":
         return verify_main(argv[1:])
     if argv and argv[0] == "init":
-        return init_main(argv[1:])
+        return init_main(argv[1:], run_sample=run_sample_task)
     if argv and argv[0] == "check":
         return check_main(argv[1:])
     if argv and argv[0] == "models":

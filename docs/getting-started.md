@@ -127,6 +127,9 @@ its fix, is in [Troubleshooting](troubleshooting.md).
 
 ## 4. Run your first task
 
+When the model check passed, `certo init` ends by offering to run this
+task for you (**Run it now**). Otherwise, or later, run it yourself:
+
 ```bash
 cd certo-workspace
 certo tasks/wordle.md --project wordle

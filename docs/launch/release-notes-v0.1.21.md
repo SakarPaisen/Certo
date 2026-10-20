@@ -1,10 +1,15 @@
 # Certo v0.1.21 (not released yet)
 
-`certo init models` sets up more than one model without editing a file,
-`certo models update` keeps the list of models up to date,
-a run prints a third of what it did, Certo's own notes now show as they
-happen, `certo init` offers DeepSeek and Kimi, and `models.yaml` can
-name a key that lives in your settings file.
+This release is about the first hour with Certo, from a walk-through as
+a new user:
+
+- **Setting up:** `certo init` asks with arrow-key menus, offers DeepSeek
+  and Kimi, and can run your first task at the end. `certo init models`
+  sets up more than one model without editing a file, and `certo models
+  update` keeps your list of models up to date. Keys stay in one place,
+  your settings file.
+- **Running:** a run prints a third of what it did, and Certo's own notes
+  show as they happen.
 
 ## Changed: a quieter run
 
@@ -44,6 +49,14 @@ with one small request, writes only the ones that pass, shows what
 to use for every run, with one model as the default. A model that isn't
 in Certo's list is rated by you, next to the list's ratings of the
 models you chose. See [Commands](../reference/commands.md#certo-init-models).
+
+## New: `certo init` can run your first task
+
+When the model check passes, `certo init` now ends by offering to run the
+sample task (a Wordle game) right away, so a new user sees a first
+verdict without typing another command. It says how long that takes and,
+for a cloud model, that it uses your credits. **Not now** prints the
+command for later, as before.
 
 ## New: arrow-key menus in `certo init`
 

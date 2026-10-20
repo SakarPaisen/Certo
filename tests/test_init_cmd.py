@@ -554,6 +554,76 @@ def test_invalid_choice_is_asked_again(tmp_path, monkeypatch, checks):
     assert script.text.count("Please enter a number from 1 to 7.") == 2
 
 
+# --- the sample task at the end ---------------------------------------------------
+
+
+def _with_sample(tmp_path, monkeypatch, answers, *, models=None):
+    ran = []
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    script = Script(answers=answers, secrets=[SECRET])
+    code = init_main(
+        ["w", "--local"],
+        prompter=script.prompter(),
+        env={},
+        interactive=True,
+        fetch_models=lambda _url: list(models or []),
+        run_sample=lambda folder: ran.append(folder) or 0,
+    )
+    return code, script.text, ran
+
+
+def test_after_a_passing_check_init_offers_to_run_the_sample(tmp_path, monkeypatch, checks):
+    code, text, ran = _with_sample(tmp_path, monkeypatch, ["2", "", "1"])
+
+    assert code == 0
+    assert "a Wordle game, built in w/projects/wordle/. It takes a few minutes; it uses" in text
+    assert "Certo prints the cost at the end." in text
+    assert ran == ["w"]
+    assert "certo tasks/wordle.md --project wordle" not in text  # it already ran
+    assert "open projects/wordle/ to see what the agent built" in text
+
+
+def test_not_now_keeps_the_next_steps(tmp_path, monkeypatch, checks):
+    code, text, ran = _with_sample(tmp_path, monkeypatch, ["2", "", "2"])
+
+    assert code == 0
+    assert ran == []
+    assert "certo tasks/wordle.md --project wordle" in text
+
+
+def test_a_local_model_is_said_to_be_free_and_slower(tmp_path, monkeypatch, checks):
+    _code, text, _ran = _with_sample(
+        tmp_path, monkeypatch, ["6", "", "", "2"], models=["qwen3.8:27b"]
+    )
+
+    assert "It takes 10 to 15 minutes; free on your local model." in text
+
+
+def test_no_sample_offer_when_the_check_failed(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        init_cmd, "check_tool_calling", lambda cfg, **_k: _result("authentication", "bad key")
+    )
+    _code, text, ran = _with_sample(tmp_path, monkeypatch, ["2", ""])
+
+    assert "Run it?" not in text
+    assert ran == []
+
+
+def test_the_sample_runs_as_a_normal_certo_run(monkeypatch, tmp_path):
+    seen = {}
+
+    def fake_run(command, cwd, check):
+        seen.update(command=command, cwd=cwd)
+        return type("Done", (), {"returncode": 0})()
+
+    monkeypatch.setattr(init_cmd.subprocess, "run", fake_run)
+
+    assert init_cmd.run_sample_task(str(tmp_path)) == 0
+    assert seen["command"][1:] == ["-m", "certo", "tasks/wordle.md", "--project", "wordle"]
+    assert seen["cwd"] == str(tmp_path)
+
+
 # --- no terminal ---------------------------------------------------------------
 
 
@@ -987,7 +1057,7 @@ def test_certo_check_failure_exits_nonzero(tmp_path, monkeypatch):
 
 def test_init_and_check_dispatch_only_on_the_exact_first_argument(monkeypatch):
     seen = []
-    monkeypatch.setattr(cli, "init_main", lambda argv: seen.append(("init", argv)) or 0)
+    monkeypatch.setattr(cli, "init_main", lambda argv, **_kw: seen.append(("init", argv)) or 0)
     monkeypatch.setattr(cli, "check_main", lambda argv: seen.append(("check", argv)) or 0)
 
     assert cli.main(["init", "x", "--yes"]) == 0
@@ -997,7 +1067,7 @@ def test_init_and_check_dispatch_only_on_the_exact_first_argument(monkeypatch):
 
 @pytest.mark.parametrize("task", ["init a git repo here", "check the tests", "Init"])
 def test_a_task_mentioning_init_or_check_is_still_a_task(monkeypatch, task):
-    monkeypatch.setattr(cli, "init_main", lambda _argv: pytest.fail("init must not run"))
+    monkeypatch.setattr(cli, "init_main", lambda _argv, **_kw: pytest.fail("init must not run"))
     monkeypatch.setattr(cli, "check_main", lambda _argv: pytest.fail("check must not run"))
     # Reaching load_config means main() took the task path.
     monkeypatch.setattr(cli, "load_config", lambda: pytest.fail("task path"))

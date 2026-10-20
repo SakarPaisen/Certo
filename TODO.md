@@ -281,7 +281,10 @@ cut that first run's output from 2,949 lines to 1,021.)
   - Order, one commit each: `${VAR}` in `models.yaml` (done, 0.1.21);
     `certo init models` (extra models, testing, the preview and the mode;
     done, 0.1.21); `certo models update` (done, 0.1.21); menus for all
-    of `init` (done, 0.1.21); the sample run.
+    of `init` (done, 0.1.21); the sample run (done, 0.1.21). Left: the
+    "Done when" measurement, a new user from `uv tool install` to an
+    `--auto-model` run, timed like the first run, once 0.1.21 is on
+    PyPI.
 - **A first run in minutes, with one model.** No catalog, no ladders:
   `certo init`, then a first verified project. Getting started shows only
   that path. Measured 2026-10-19 in an empty home folder: 88.5s from

@@ -20,6 +20,7 @@ import getpass
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tomllib
 import urllib.error
@@ -695,8 +696,11 @@ def init_main(
     interactive: bool | None = None,
     fetch_models: Callable[[str], list[str]] = fetch_ollama_models,
     user_path: str | None = None,
+    run_sample: Callable[[str], int] | None = None,
 ) -> int:
-    """`certo init`. `user_path` defaults to `user_settings_path()`."""
+    """`certo init`. `user_path` defaults to `user_settings_path()`.
+    `run_sample` runs the sample task in a folder; the CLI passes
+    `run_sample_task`. None (the default, and in tests) never offers it."""
     if argv[:1] == ["models"]:
         # `certo init models`; a folder named "models" is `certo init ./models`.
         from .init_models import init_models_main
@@ -831,13 +835,22 @@ def init_main(
             file=out,
         )
 
+    ran_sample = False
+    if ask and samples and checked_ok is True and run_sample is not None:
+        try:
+            ran_sample = _offer_sample(prompter, folder, settings, run_sample)
+        except Cancelled:
+            ran_sample = False
+
     print("\nNext:", file=out)
     if samples and os.path.abspath(folder) != os.getcwd():
         print(f"  cd {folder}", file=out)
     if checked_ok is not True:
         print("  certo check", file=out)
-    if samples:
+    if samples and not ran_sample:
         print("  certo tasks/wordle.md --project wordle", file=out)
+    if ran_sample:
+        print("  open projects/wordle/ to see what the agent built", file=out)
     if scope == USER_SCOPE:
         print(
             '\nYou can now run certo "<task>" in any project folder: the settings apply '
@@ -845,6 +858,47 @@ def init_main(
             file=out,
         )
     return 0
+
+
+# Measured first Wordle runs: 4m03s on a cloud model (gpt-5.6-luna,
+# docs/benchmark/first-run-0.1.19.md); 9m28s, 11m49s and 15m04s on
+# qwen3.8:27b over Ollama (2026-10-20). No cost figure is quoted: one
+# measurement isn't one.
+_SAMPLE_TIME_CLOUD = "a few minutes"
+_SAMPLE_TIME_LOCAL = "10 to 15 minutes"
+
+
+def _offer_sample(
+    prompter: Prompter, folder: str, settings: Settings, run_sample: Callable[[str], int]
+) -> bool:
+    """Ask to run the sample task now; True when it ran."""
+    local = settings.provider.id == "ollama"
+    took = _SAMPLE_TIME_LOCAL if local else _SAMPLE_TIME_CLOUD
+    cost = (
+        "free on your local model"
+        if local
+        else ("it uses your model credits; Certo prints the cost at the end")
+    )
+    where = os.path.join(folder.rstrip("/"), "projects", "wordle")
+    prompter.say(
+        f"\nYou can run a sample task now: a Wordle game, built in {where}/. "
+        f"It takes {took}; {cost}."
+    )
+    if prompter.choose("Run it?", ["Run it now", "Not now"]) != 0:
+        return False
+    prompter.say()
+    run_sample(folder)
+    return True
+
+
+def run_sample_task(folder: str) -> int:
+    """The sample task, as a normal run from the sample folder, in its own
+    process (its output and Ctrl-C work as for any run)."""
+    command = [sys.executable, "-m", "certo", "tasks/wordle.md", "--project", "wordle"]
+    try:
+        return subprocess.run(command, cwd=folder, check=False).returncode
+    except KeyboardInterrupt:
+        return 130
 
 
 def _folder_blocked(folder: str, force: bool) -> str | None:
