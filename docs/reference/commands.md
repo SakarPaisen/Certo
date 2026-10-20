@@ -17,7 +17,7 @@ Run a task through the agent, then verify the result.
 ```text
 certo TASK [--project NAME] [--execution {local,docker}] [--model MODEL]
            [--api-key KEY] [--base-url URL] [--reasoning-effort LEVEL]
-           [--agents-md TEXT] [--interactive] [--auto-model]
+           [--agents-md TEXT] [--interactive] [--verbose] [--auto-model]
            [--require-verification] [--acceptance-checks JSON_OR_FILE]
            [--escalate [LADDER]]
 certo --resume [TASK] [same options]
@@ -45,6 +45,7 @@ current folder, the file is read instead.
 | `--reasoning-effort LEVEL` | `CERTO_LLM_REASONING_EFFORT` | Reasoning effort for this run only: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, or any value the provider accepts. `none` or `off` turns it off. |
 | `--agents-md TEXT` | none | Write `TEXT` as the project's `AGENTS.md` before the task. Needs `--project`. |
 | `--interactive` | off (`CERTO_INTERACTIVE`) | Let the agent stop and ask you questions. See [Interactive and confirm mode](../guides/interactive-mode.md). |
+| `--verbose` | off (`CERTO_VERBOSE`) | Print the agent's full output: the whole system prompt, the task with the skills Certo adds, and the SDK's own logs. Without it, each of these is one line. |
 | `--auto-model` | off (`CERTO_MODEL_SELECTION`) | Pick the model from the model files (`models_list.yaml`, `models.yaml`, and the task profiles in `task_profiles.yaml`). See [Pick models automatically](../guides/pick-models-automatically.md). |
 | `--require-verification` | off | Exit 1 for `inconclusive` and `unchanged` too. |
 | `--acceptance-checks JSON_OR_FILE` | none | Extra file checks for this task, as inline JSON or a JSON file. See [Acceptance checks](../guides/acceptance-checks.md). |
@@ -63,7 +64,10 @@ model line shows its host and port; the API key is never shown. A run
 refused because of a wrong flag or setting prints only the error, no
 banner. With `--resume`, a `Resuming:` line follows. A warning about
 uncommitted changes may follow (see [Work on an existing project](../guides/work-on-an-existing-project.md)).
-At the end: the agent's last message (or Certo's last note), the
+Then one line for the agent's system prompt and one for the task (the
+whole text with `--verbose`), the agent's actions and their results as
+they happen, and Certo's own notes (a failing check, a model switch, a
+step limit) as they happen. At the end: the
 `Model used:` line with `--auto-model`, then `Verification: <verdict>`,
 any limitations as `-` lines, and the run summary. After a failing
 verdict, a last line names `.certo/STATUS.md` and the `certo --resume`

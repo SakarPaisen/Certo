@@ -801,3 +801,13 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   is left out of `ruff format` (0.17 formats code blocks in `.md`), so
   docs samples stay as written. The release workflow now runs both checks,
   so a lint failure blocks a release.
+- **A run is quiet by default** (0.1.21). The system prompt and the task
+  with its skills are one line each, the SDK's INFO logs are hidden, and
+  Certo's notices print as they happen; `--verbose` / `CERTO_VERBOSE`
+  restores the full output. The first Wordle run of a new user printed
+  2,949 lines with Certo's own lines lost in them; the same run now
+  prints 1,021, every agent step still shown. Done by subclassing the
+  SDK's default visualizer (only `on_event`), not by replacing it, so the
+  agent's steps keep the SDK's rendering. The CLI no longer reprints the
+  agent's last message at the end: the visualizer already printed it,
+  and it was the duplicate.

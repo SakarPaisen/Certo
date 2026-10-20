@@ -239,7 +239,8 @@ first item is the suggested next one.
 Walked through as a new user on 2026-10-20 (certo 0.1.20 from PyPI, an
 empty home folder, Ollama on another machine). `certo init` took 16s and
 the first task, Wordle, ended `verified` in 11m 49s. What got in the way
-is in the first two items and in "Smaller bugs".
+is in the first item and in "Smaller bugs". (The quieter run, 0.1.21,
+cut that first run's output from 2,949 lines to 1,021.)
 
 - **`certo init` sets up more than one model, in menus, and runs a
   first task.** Today a second model means: copy three examples from
@@ -263,14 +264,6 @@ is in the first two items and in "Smaller bugs".
   The plain one-model path must stay as short as it is. Done when a new
   user gets from `uv tool install` to an `--auto-model` run without
   editing a file, measured like the first run.
-- **A quieter run.** The first task printed 2,949 lines: 28 lines of SDK
-  logs before Certo's banner, the agent's whole system prompt (500
-  lines), the task with its skills (240 lines), and the final message
-  twice. Certo's own lines are lost in it. Certo doesn't configure the
-  SDK's console output. Show the banner, the agent's actions, Certo's
-  own notices (see "Mid-run notices" below) and the verdict; keep the
-  full text behind a flag. Feature bump; measure that nothing the user
-  needs is lost.
 - **A first run in minutes, with one model.** No catalog, no ladders:
   `certo init`, then a first verified project. Getting started shows only
   that path. Measured 2026-10-19 in an empty home folder: 88.5s from
@@ -371,12 +364,6 @@ database).
   ladders.** Its header still describes `models_list.yaml` as "ids,
   descriptions, ratings, task profiles, escalation ladders"; since 0.1.20
   those have their own files.
-- **Mid-run notices never reach the terminal.** The CLI prints only the
-  run's last message, so "Certo: escalating from X to Y", the step-limit
-  notice and the like are lost; only `MODEL_DECISIONS.md` shows a
-  switch. The SDK's own output does reach the terminal, in full (see "A
-  quieter run"), so the fix is to print Certo's notices among it, as
-  they happen.
 - **Stop reading `task_profiles:` / `escalation:` in `models_list.yaml`.**
   Since 0.1.20 they have their own files; the old sections are still read
   with a warning. Remove that path (and the tests that use the old layout

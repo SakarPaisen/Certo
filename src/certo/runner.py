@@ -37,6 +37,7 @@ from .agent import build_agent
 from .artifacts import write_run_artifacts
 from .catalog_check import load_checked_catalog
 from .config import Config, load_config, override_llm
+from .console import quiet_sdk_logs, visualizer_for
 from .custom_tools.run_tests_tool import (
     CheckOutcome,
     VerificationRun,
@@ -480,8 +481,18 @@ def _build_completion_contract(
     )
 
 
+# The `name` of every message Certo itself writes (never the agent's), so a
+# caller can show Certo's notices as they happen (cli.py's on_notice).
+NOTICE_NAME = "certo"
+
+
 def _emit_notice(emit: Callable[[Message], None], text: str) -> None:
-    emit(Message(role="assistant", content=[TextContent(text=text)]))
+    emit(Message(role="assistant", content=[TextContent(text=text)], name=NOTICE_NAME))
+
+
+def is_notice(message: Message) -> bool:
+    """True for a message Certo wrote (`_emit_notice`), not the agent."""
+    return getattr(message, "name", None) == NOTICE_NAME
 
 
 # A caller-supplied decision function for CERTO_CONFIRM_MODE=always:
@@ -1256,6 +1267,7 @@ def stream_task(
     started_at = datetime.now(UTC).isoformat()
     if cfg is None:
         cfg = load_config()
+    quiet_sdk_logs(cfg)
     emit = on_message or (lambda _msg: None)
     checkpoint_buffer: list[Message] = []
     all_messages: list[Message] = []
@@ -1353,6 +1365,7 @@ def stream_task(
                 ),
                 callbacks=[on_event],
                 workspace=workspace,
+                visualizer=visualizer_for(agent_cfg),
                 # Previously unset (SDK default 500), so CERTO_MAX_ITERATIONS
                 # was parsed/validated but silently had no effect — found while
                 # bounding the verify-and-retry loop above, which reuses the same
@@ -1992,6 +2005,7 @@ def _stream_escalation(
                         ),
                         callbacks=[io.on_event],
                         workspace=workspace,
+                        visualizer=visualizer_for(rung_cfg),
                         max_iteration_per_run=rung_cfg.max_iterations,
                         **persistence,
                     )
@@ -2184,12 +2198,24 @@ def run_task(
     ladder: ResolvedLadder | None = None,
     on_escalate: OnEscalate | None = None,
     on_progress: Callable[[str], None] | None = None,
+    on_notice: Callable[[str], None] | None = None,
 ) -> TaskResult:
+    """`stream_task`, collecting the messages. `on_notice` receives the text
+    of each of Certo's own notices as it happens, for a terminal."""
     messages: list = []
+
+    def on_message(message: Message) -> None:
+        messages.append(message)
+        if on_notice is not None and is_notice(message):
+            for content in message.content:
+                text = getattr(content, "text", None)
+                if text:
+                    on_notice(text)
+
     outcome = stream_task(
         task,
         cfg=cfg,
-        on_message=messages.append,
+        on_message=on_message,
         on_confirm=on_confirm,
         acceptance_checks=acceptance_checks,
         on_awaiting_input=on_awaiting_input,

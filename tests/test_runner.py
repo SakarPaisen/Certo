@@ -2800,3 +2800,20 @@ def test_closed_terminal_read_error_is_not_logged():
 def test_other_terminal_reader_errors_still_log():
     assert len(_pty_reader_records(OSError(errno.EIO, "Input/output error"))) == 1
     assert len(_pty_reader_records(ValueError("boom"))) == 1
+
+
+def test_run_task_passes_certo_notices_on_as_they_happen(monkeypatch):
+    from openhands.sdk import Message, TextContent
+
+    def fake_stream_task(task, *, on_message, **_kwargs):
+        runner._emit_notice(on_message, "Certo: escalating from a to b")
+        on_message(Message(role="assistant", content=[TextContent(text="agent text")]))
+        return "outcome"
+
+    monkeypatch.setattr(runner, "stream_task", fake_stream_task)
+    notices: list[str] = []
+
+    result = runner.run_task("do it", on_notice=notices.append)
+
+    assert notices == ["Certo: escalating from a to b"]  # the agent's text is not a notice
+    assert len(result) == 2

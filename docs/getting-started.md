@@ -145,8 +145,16 @@ run, so you can stop it (Ctrl-C) if the model or the folder is wrong:
 ────────────────────────────────────────────────────────────
 ```
 
-The agent now works for a few minutes. It writes files, runs commands and
-runs the tests. When it says it is done, Certo checks the result itself.
+Two lines follow, one for the agent's instructions and one for your task
+(`certo --verbose ...` prints them in full):
+
+```text
+System prompt: 270 lines (--verbose shows it)
+Task: Wordle in the terminal (210 lines with the skills; --verbose shows them)
+```
+
+The agent now works for a few minutes. Each step it takes is printed as
+it happens: it writes files, runs commands and runs the tests. When it says it is done, Certo checks the result itself.
 The end of the output looks like this:
 
 ```text

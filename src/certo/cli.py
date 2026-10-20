@@ -273,6 +273,15 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help=(
+            "Print the full output of the agent: the whole system prompt, the "
+            "task with the skills Certo adds, and the SDK's own logs. By default "
+            "each of these is one line. The same as CERTO_VERBOSE=yes."
+        ),
+    )
+    parser.add_argument(
         "--auto-model",
         action="store_true",
         help=(
@@ -466,6 +475,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.interactive:
         cfg = replace(cfg, interactive=True)
 
+    if args.verbose:
+        cfg = replace(cfg, verbose=True)
+
     if args.escalate is not None:
         if args.auto_model or args.model is not None:
             print(
@@ -603,6 +615,7 @@ def main(argv: list[str] | None = None) -> int:
             ladder=ladder,
             on_escalate=_confirm_escalation if cfg.interactive else None,
             on_progress=_print_progress if ladder is not None else None,
+            on_notice=_print_progress,
         )
     except KeyboardInterrupt:
         record_run("interrupted")
@@ -617,11 +630,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Continue with: {resume_hint}", file=sys.stderr)
         return 1
 
-    if messages:
-        for content in messages[-1].content:
-            text = getattr(content, "text", None)
-            if text:
-                print(text)
+    # The agent's last message is already on screen (the SDK's visualizer
+    # printed it) and Certo's notices were printed as they happened, so
+    # nothing is printed again here.
 
     # Make the terminal outcome explicit rather than letting the agent's own
     # (possibly optimistic) last message stand as the only signal — see

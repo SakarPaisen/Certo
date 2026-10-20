@@ -219,6 +219,16 @@ given design was chosen.
   verification. When the conversation can't be reopened (Docker, folder
   gone, SDK refuses), a fresh conversation gets the task and `STATUS.md`
   instead. Server and bench never pass `save_state`.
+- **`console.py`** — what a run prints. `QuietVisualizer` subclasses the
+  SDK's `DefaultConversationVisualizer` and overrides only `on_event`:
+  the `SystemPromptEvent` and the first user `MessageEvent` (the task
+  with its skills) become one line each; every other event, Certo's
+  later user messages included, goes to the SDK's rendering unchanged.
+  `visualizer_for(cfg)` returns a new one per conversation (it remembers
+  the task line) or, with `CERTO_VERBOSE`, the SDK's class. Certo's
+  notices carry `Message.name == "certo"` (`runner.NOTICE_NAME`), which
+  `run_task(on_notice=)` uses to print them live; the CLI no longer
+  reprints the last message, which the visualizer already showed.
 - **`run_history.py`** — stdlib only. `.certo/RUNS.md`, appended by
   `cli.py` (not the runner) once per run when state saving is on: after
   the outcome, or from the `KeyboardInterrupt`/error branches. Models come
@@ -337,6 +347,12 @@ rule 2):
   `SKILL.md` directory's `.mcp.json` becomes MCP server config unless it is
   loaded with `skip_mcp=True`. `third_party_skills.py` neutralizes both for
   third-party skills. First-party skills are trusted and left as-is.
+- `ConversationVisualizerBase.initialize` is `@final` (v1.47.0), so a
+  visualizer that wraps another can't hand it the state its metrics line
+  needs: `console.py` subclasses the default visualizer instead. The SDK
+  reads `LOG_LEVEL` once, at import, and its loggers inherit from
+  `openhands`; `quiet_sdk_logs` sets that logger to WARNING per run
+  (not when `LOG_LEVEL` is set).
 - `SubprocessTerminal.close()` closes the PTY master fd while the reader
   thread may sit in `select()` on it; the thread then logs `PTY reader
   thread error: [Errno 9]` with a traceback (v1.47.0). Harmless. runner.py

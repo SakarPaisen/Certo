@@ -284,7 +284,9 @@ def test_project_flag_rejects_a_path_escape_attempt(monkeypatch, tmp_path, capsy
     assert not (tmp_path.parent / "escaped").exists()
 
 
-def test_local_execution_runs_task_and_prints_final_message(monkeypatch, capsys):
+def test_local_execution_runs_task_and_prints_the_verdict_not_the_message_again(
+    monkeypatch, capsys
+):
     calls = {}
 
     def _fake_run_task(
@@ -310,7 +312,10 @@ def test_local_execution_runs_task_and_prints_final_message(monkeypatch, capsys)
     assert exit_code == 0
     assert calls["task"] == "do something"
     assert calls["cfg"].execution == "local"
-    assert "all done" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    # The SDK's visualizer already printed the agent's last message.
+    assert "all done" not in out
+    assert "Verification: verified" in out
 
 
 def test_agents_md_without_project_is_rejected(monkeypatch, capsys):

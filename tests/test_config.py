@@ -559,6 +559,14 @@ def test_invalid_interactive_raises():
         load_config(_base_env(CERTO_INTERACTIVE="maybe"))
 
 
+# --- Verbose output (CERTO_VERBOSE) ----------------------------------------------
+
+
+def test_verbose_defaults_to_false_and_reads_yes():
+    assert load_config(_base_env()).verbose is False
+    assert load_config(_base_env(CERTO_VERBOSE="yes")).verbose is True
+
+
 # --- Deterministic auto model selection (CERTO_MODEL_SELECTION) ----------
 
 

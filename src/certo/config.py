@@ -193,6 +193,11 @@ class Config:
     # unchanged.
     interactive: bool = False
 
+    # The full SDK console output: the system prompt, the whole task with
+    # its skills, the SDK's INFO logs. Off by default (console.py shows a
+    # line for each instead).
+    verbose: bool = False
+
     # Deterministic auto model selection (see model_catalog.py/
     # model_selection.py). Default ("manual") is byte-for-byte the
     # pre-existing behavior — cfg.model is used exactly as it always has
@@ -614,6 +619,7 @@ def load_config(
         "INTERACTIVE",
         default=False,
     )
+    verbose = _parse_bool(env, "VERBOSE", default=False)
     model_selection = _parse_choice(
         env,
         "MODEL_SELECTION",
@@ -668,6 +674,7 @@ def load_config(
         task_store_redis_password=task_store_redis_password,
         task_store_redis_use_tls=task_store_redis_use_tls,
         interactive=interactive,
+        verbose=verbose,
         model_selection=model_selection,
         models_file=models_file,
         models_list_file=models_list_file,
