@@ -8,8 +8,8 @@ steps in order.
 
 - **Python 3.12 or newer.**
 - **A model.** Either [Ollama](https://ollama.com) running on your own
-  machine, or an API key for a cloud provider (OpenAI, Anthropic or
-  Google Gemini). A local model keeps your code on your machine and costs
+  machine, or an API key for a cloud provider (OpenAI, Anthropic,
+  Google Gemini, DeepSeek or Kimi). A local model keeps your code on your machine and costs
   nothing per run; a cloud model is faster and costs money per run, and
   Certo prints the cost at the end. Later you can use more than one: for
   example a local model first, and a cloud model only for the tasks it
@@ -61,8 +61,10 @@ Which model provider do you want to use?
   1. OpenAI
   2. Anthropic (Claude)
   3. Google Gemini
-  4. Ollama (local models, no API key)
-  5. Other (any LiteLLM model id)
+  4. DeepSeek
+  5. Kimi (Moonshot AI)
+  6. Ollama (local models, no API key)
+  7. Other (any LiteLLM model id)
 Choice [1]:
 
 Model [openai/gpt-6.1-sol]:

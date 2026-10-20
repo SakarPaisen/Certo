@@ -1,7 +1,8 @@
 # OpenAI, Claude and Gemini
 
 This guide shows how to use a cloud model: OpenAI, Anthropic (Claude),
-Google Gemini, or any other provider that LiteLLM supports. It also shows
+Google Gemini, DeepSeek, Kimi, or any other provider that LiteLLM
+supports. It also shows
 how to switch provider and how to try another model for one run only.
 
 ## Set up with `certo init`
@@ -18,6 +19,11 @@ the API key. The default models are:
 | OpenAI | `openai` | `openai/gpt-6.1-sol` | `OPENAI_API_KEY` |
 | Anthropic | `anthropic` | `anthropic/claude-sonnet-5-5` | `ANTHROPIC_API_KEY` |
 | Google Gemini | `gemini` | `gemini/gemini-3.8-flash` | `GEMINI_API_KEY` |
+| DeepSeek | `deepseek` | `deepseek/deepseek-flash` | `DEEPSEEK_API_KEY` |
+| Kimi (Moonshot AI) | `moonshot` | `moonshot/kimi-k2.7-code` | `MOONSHOT_API_KEY` |
+
+With DeepSeek, the run summary may show the cost as unknown: LiteLLM's
+price list doesn't know the name `deepseek-flash` yet.
 
 You can type any model id. If you type it without the provider prefix,
 `init` adds it: `claude-sonnet-5-5` becomes `anthropic/claude-sonnet-5-5`.
@@ -48,14 +54,9 @@ The part before the `/` selects the provider. Then run `certo check`.
 ## Other providers
 
 `CERTO_LLM_MODEL` takes any [LiteLLM model id](https://docs.litellm.ai/docs/providers),
-so many more providers work the same way, for example:
-
-```bash
-CERTO_LLM_MODEL=deepseek/deepseek-chat
-CERTO_LLM_MODEL=moonshot/kimi-k2.7-code
-```
-
-With `certo init`, choose **Other** and type the id. The model must support
+so many more providers work the same way: the part before the `/` is
+the provider, as in LiteLLM's list. With `certo init`, choose **Other**
+and type the id. The model must support
 tool calling (also called function calling): Certo's agent works only
 through tool calls. `certo check` tells you if it doesn't.
 

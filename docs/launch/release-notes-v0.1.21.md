@@ -1,7 +1,7 @@
 # Certo v0.1.21 (not released yet)
 
-A run prints a third of what it did, and Certo's own notes now show as
-they happen.
+A run prints a third of what it did, Certo's own notes now show as they
+happen, and `certo init` offers DeepSeek and Kimi.
 
 ## Changed: a quieter run
 
@@ -27,6 +27,16 @@ The same run now prints 1,021 lines, with every step of the agent still
 shown. `--verbose` (or `CERTO_VERBOSE=yes`) prints everything as before.
 See [Commands](../reference/commands.md#certo) and
 [Configuration](../reference/configuration.md).
+
+## New: DeepSeek and Kimi in `certo init`
+
+`certo init` now offers DeepSeek (`deepseek/deepseek-flash`) and Kimi
+from Moonshot AI (`moonshot/kimi-k2.7-code`) by name, and reuses
+`DEEPSEEK_API_KEY` or `MOONSHOT_API_KEY` when you have exported one.
+Before, both needed **Other** and a typed model id. With DeepSeek, the
+run summary may show the cost as unknown, because LiteLLM's price list
+doesn't know the name `deepseek-flash` yet. See
+[OpenAI, Claude and Gemini](../guides/openai-claude-gemini.md).
 
 ## Fixed: `certo --escalate "task"` runs the task
 

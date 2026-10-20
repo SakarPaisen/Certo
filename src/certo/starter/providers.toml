@@ -35,6 +35,29 @@ source = "https://ai.google.dev/gemini-api/docs/models"
 checked = "2026-10-15"
 
 [[provider]]
+id = "deepseek"
+label = "DeepSeek"
+# The provider's current name. LiteLLM's price map (LiteLLM 1.100.1,
+# checked 2026-10-20) still knows only the legacy deepseek-v4-flash,
+# which DeepSeek routes to the same model, so a run's cost may show as
+# unknown until LiteLLM catches up.
+model = "deepseek/deepseek-flash"
+key_env = "DEEPSEEK_API_KEY"
+key_url = "https://platform.deepseek.com/api_keys"
+source = "https://api-docs.deepseek.com/quick_start/pricing"
+checked = "2026-10-20"
+
+[[provider]]
+# The id is LiteLLM's prefix for Kimi models (moonshot/...).
+id = "moonshot"
+label = "Kimi (Moonshot AI)"
+model = "moonshot/kimi-k2.7-code"
+key_env = "MOONSHOT_API_KEY"
+key_url = "https://platform.kimi.ai/console/api-keys"
+source = "https://platform.kimi.ai/docs/pricing/chat"
+checked = "2026-10-20"
+
+[[provider]]
 id = "ollama"
 label = "Ollama (local models, no API key)"
 # Measured: 27/27 hidden tests in docs/benchmark/baseline-0.1.18-local.md,

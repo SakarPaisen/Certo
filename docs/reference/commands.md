@@ -109,7 +109,7 @@ and `timed_out`, and 1 if `PATH` is not a folder. See
 Save your model settings and create a folder with sample tasks.
 
 ```text
-certo init [FOLDER] [--provider {openai,anthropic,gemini,ollama,other}]
+certo init [FOLDER] [--provider {openai,anthropic,gemini,deepseek,moonshot,ollama,other}]
                     [--model ID] [--base-url URL] [--global | --local]
                     [--no-samples] [--no-check] [--yes] [--force]
 ```
@@ -117,7 +117,7 @@ certo init [FOLDER] [--provider {openai,anthropic,gemini,ollama,other}]
 | Argument or flag | Effect |
 |---|---|
 | `FOLDER` | The sample folder to create. Default: `./certo-workspace`. |
-| `--provider {openai,anthropic,gemini,ollama,other}` | Skip the provider question. |
+| `--provider {openai,anthropic,gemini,deepseek,moonshot,ollama,other}` | Skip the provider question. `moonshot` is Kimi. |
 | `--model ID` | Skip the model question. Without `--provider`, the provider comes from the model's prefix. |
 | `--base-url URL` | Skip the Ollama address question. Also sets `CERTO_LLM_BASE_URL` for any provider. |
 | `--global` | Save for all projects, in the user settings file. Skip the "Save these settings for" question. |

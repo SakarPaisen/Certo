@@ -144,16 +144,18 @@ def test_interactive_anthropic_flow_writes_only_the_chosen_settings(tmp_path, mo
     assert checks[0].api_key == SECRET
 
 
-def test_provider_menu_lists_the_five_choices_in_order(tmp_path, monkeypatch, checks):
+def test_provider_menu_lists_the_choices_in_order(tmp_path, monkeypatch, checks):
     _code, script = _run(tmp_path, monkeypatch, [], Script(answers=["", ""], secrets=[SECRET]))
 
     menu = script.text.split("Which model provider do you want to use?\n", 1)[1]
-    assert menu.splitlines()[:5] == [
+    assert menu.splitlines()[:7] == [
         "  1. OpenAI",
         "  2. Anthropic (Claude)",
         "  3. Google Gemini",
-        "  4. Ollama (local models, no API key)",
-        "  5. Other (any LiteLLM model id)",
+        "  4. DeepSeek",
+        "  5. Kimi (Moonshot AI)",
+        "  6. Ollama (local models, no API key)",
+        "  7. Other (any LiteLLM model id)",
     ]
 
 
@@ -163,6 +165,8 @@ def test_provider_menu_lists_the_five_choices_in_order(tmp_path, monkeypatch, ch
         ("1", "openai/gpt-6.1-sol", ["Anthropic (Claude)", "Google Gemini", "Ollama"]),
         ("2", "anthropic/claude-sonnet-5-5", ["OpenAI", "Google Gemini", "Ollama"]),
         ("3", "gemini/gemini-3.8-flash", ["OpenAI", "Anthropic (Claude)", "Ollama"]),
+        ("4", "deepseek/deepseek-flash", ["OpenAI", "Kimi (Moonshot AI)", "Ollama"]),
+        ("5", "moonshot/kimi-k2.7-code", ["OpenAI", "DeepSeek", "Ollama"]),
     ],
 )
 def test_cloud_provider_env(tmp_path, monkeypatch, checks, choice, model, other_presets):
@@ -187,7 +191,7 @@ def test_a_typed_model_without_prefix_gets_the_providers(tmp_path, monkeypatch, 
 
 
 def test_ollama_lists_installed_models_and_preselects_a_coder(tmp_path, monkeypatch, checks):
-    script = Script(answers=["4", "gpu-box:11434", ""])
+    script = Script(answers=["6", "gpu-box:11434", ""])
 
     _run(tmp_path, monkeypatch, ["w"], script, models=["llama3.2:3b", "qwen3-coder:30b"])
 
@@ -207,7 +211,7 @@ def test_ollama_lists_installed_models_and_preselects_a_coder(tmp_path, monkeypa
 def test_ollama_preselects_the_recommended_model_over_a_coder(tmp_path, monkeypatch, checks):
     # qwen3.8:27b beat qwen3-coder:30b in the 0.1.18 local benchmark, so
     # when both are installed the recommended one is offered first.
-    script = Script(answers=["4", "", ""])
+    script = Script(answers=["6", "", ""])
 
     _run(tmp_path, monkeypatch, ["w"], script, models=["qwen3-coder:30b", "qwen3.8:27b"])
 
@@ -216,7 +220,7 @@ def test_ollama_preselects_the_recommended_model_over_a_coder(tmp_path, monkeypa
 
 
 def test_ollama_unreachable_says_so_and_still_writes(tmp_path, monkeypatch, no_check):
-    script = Script(answers=["4", "", ""])
+    script = Script(answers=["6", "", ""])
 
     _run(tmp_path, monkeypatch, ["w", "--no-check"], script, models=OSError("refused"))
 
@@ -229,7 +233,7 @@ def test_ollama_unreachable_says_so_and_still_writes(tmp_path, monkeypatch, no_c
 
 
 def test_ollama_without_models_prints_the_pull_commands(tmp_path, monkeypatch, no_check):
-    script = Script(answers=["4", "", ""])
+    script = Script(answers=["6", "", ""])
 
     _run(tmp_path, monkeypatch, ["w", "--no-check"], script, models=[])
 
@@ -238,7 +242,7 @@ def test_ollama_without_models_prints_the_pull_commands(tmp_path, monkeypatch, n
 
 
 def test_other_asks_for_any_litellm_id_and_optional_key_and_url(tmp_path, monkeypatch, checks):
-    script = Script(answers=["5", "deepseek/deepseek-chat", ""], secrets=[SECRET])
+    script = Script(answers=["7", "deepseek/deepseek-chat", ""], secrets=[SECRET])
 
     _run(tmp_path, monkeypatch, ["w"], script)
 
@@ -477,7 +481,7 @@ def test_global_with_a_used_sample_folder_saves_settings_and_skips_samples(
 def test_choosing_this_folder_for_a_used_folder_is_refused(tmp_path, monkeypatch, no_check, capsys):
     (tmp_path / "w").mkdir()
     (tmp_path / "w" / "notes.txt").write_text("mine")
-    script = Script(answers=["4", "", "", "2"], secrets=[])
+    script = Script(answers=["6", "", "", "2"], secrets=[])
 
     code, _ = _run(tmp_path, monkeypatch, ["w"], script, local=False, models=OSError("down"))
 
@@ -537,7 +541,7 @@ def test_invalid_choice_is_asked_again(tmp_path, monkeypatch, checks):
 
     _run(tmp_path, monkeypatch, ["w"], script)
 
-    assert script.text.count("Please enter a number from 1 to 5.") == 2
+    assert script.text.count("Please enter a number from 1 to 7.") == 2
 
 
 # --- no terminal ---------------------------------------------------------------

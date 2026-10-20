@@ -153,6 +153,6 @@ store except `memory` is [experimental](../README.md#experimental-features).
 | Variable | Meaning |
 |---|---|
 | `XDG_CONFIG_HOME` | Changes where the user settings file is (see the table at the top). |
-| `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` | Read only by `certo init`, which offers to reuse them (and then writes `CERTO_LLM_API_KEY=${...}`). |
+| `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `DEEPSEEK_API_KEY`, `MOONSHOT_API_KEY` | Read only by `certo init`, which offers to reuse them (and then writes `CERTO_LLM_API_KEY=${...}`). |
 | `OPENHANDS_SUPPRESS_BANNER` | Certo sets it to `1` unless you set it, to hide the OpenHands start-up banner. |
 | `LITELLM_MODE` | Certo sets it to `PRODUCTION` unless you set it. Otherwise LiteLLM loads a `.env` file of its own, found from its install folder, which could override your settings. |

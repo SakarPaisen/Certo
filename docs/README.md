@@ -44,7 +44,7 @@ The stories behind each of these checks are in
 
 ## What Certo can do
 
-- Work with almost any model: OpenAI, Anthropic, Google Gemini, Ollama on
+- Work with almost any model: OpenAI, Anthropic, Google Gemini, DeepSeek, Kimi, Ollama on
   your own machine, or any model that [LiteLLM](https://docs.litellm.ai/docs/providers)
   supports. Switching is one setting.
 - Pick the best model for each task from a list you write, and fall back to
