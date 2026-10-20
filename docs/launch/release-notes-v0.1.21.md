@@ -1,7 +1,8 @@
 # Certo v0.1.21 (not released yet)
 
 A run prints a third of what it did, Certo's own notes now show as they
-happen, and `certo init` offers DeepSeek and Kimi.
+happen, `certo init` offers DeepSeek and Kimi, and `models.yaml` can
+name a key that lives in your settings file.
 
 ## Changed: a quieter run
 
@@ -37,6 +38,23 @@ Before, both needed **Other** and a typed model id. With DeepSeek, the
 run summary may show the cost as unknown, because LiteLLM's price list
 doesn't know the name `deepseek-flash` yet. See
 [OpenAI, Claude and Gemini](../guides/openai-claude-gemini.md).
+
+## New: keys in one place, with `${NAME}` in `models.yaml`
+
+`models.yaml` can now name a key instead of holding it:
+
+```yaml
+models:
+  - name: claude-haiku-5-5
+    api_key: "${ANTHROPIC_API_KEY}"
+```
+
+The key itself goes in your settings file, as `ANTHROPIC_API_KEY=...`,
+so each key is in one place. `base_url` can use `${NAME}` too. Before,
+`${NAME}` was sent to the provider as written, which is a rejected key.
+When the variable isn't set, the model is now left out and Certo says
+which variable is missing. The example `models.yaml` uses this form. See
+[The model files](../reference/models-yaml.md#modelsyaml).
 
 ## Fixed: `certo --escalate "task"` runs the task
 

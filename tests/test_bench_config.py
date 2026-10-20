@@ -203,9 +203,11 @@ def test_an_arm_naming_a_model_missing_from_models_yaml(tmp_path):
         load_bench_config(str(path))
 
 
-def test_the_shipped_example_is_valid_against_the_shipped_models_example(tmp_path):
+def test_the_shipped_example_is_valid_against_the_shipped_models_example(tmp_path, monkeypatch):
     # Both shipped model examples as they are: copying the three examples
-    # must give a benchmark file that loads.
+    # must give a benchmark file that loads, once the keys they name are
+    # in the settings.
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     text = (_REPO / "src/certo/examples/bench.yaml.example").read_text()
     list_path = _REPO / "src/certo/examples/models_list.yaml.example"
     models_path = _REPO / "src/certo/examples/models.yaml.example"
@@ -402,3 +404,15 @@ def test_escalate_strategy_derives_a_ladder_per_task(tmp_path):
 
     assert seen["kind"] == "derived"
     assert "parked" not in seen["rungs"]
+
+
+def test_an_arm_on_a_model_whose_key_variable_is_unset_says_which(tmp_path, monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    text = (_REPO / "src/certo/examples/bench.yaml.example").read_text()
+    list_path = _REPO / "src/certo/examples/models_list.yaml.example"
+    models_path = _REPO / "src/certo/examples/models.yaml.example"
+    path = tmp_path / "bench.yaml"
+    path.write_text(f"models_file: {models_path}\nmodels_list_file: {list_path}\n" + text)
+
+    with pytest.raises(BenchConfigError, match=r"uses \$\{OPENAI_API_KEY\} in models.yaml"):
+        load_bench_config(str(path))

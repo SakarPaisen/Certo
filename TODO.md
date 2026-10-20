@@ -255,9 +255,8 @@ cut that first run's output from 2,949 lines to 1,021.)
   `rich` come with the SDK already, so declare them as Certo's own
   dependencies before using them): start from the model already saved,
   offer models from the example list for the keys and Ollama models it
-  finds, never invent ratings, take keys at a hidden prompt or as `${VAR}`
-  (which `models.yaml` doesn't expand yet: an `api_key: ${VAR}` is sent as
-  written, checked 2026-10-19), test each one with the `check --models`
+  finds, never invent ratings, take keys at a hidden prompt into the
+  settings file and name them in `models.yaml` as `${VAR}`, test each one with the `check --models`
   call and leave failures disabled, write only the models that work, then
   show `certo check`'s profile table. At the end it offers to run one
   sample task, so the user sees a verdict without typing another command.
@@ -279,8 +278,8 @@ cut that first run's output from 2,949 lines to 1,021.)
     `${VAR}` (see DECISIONS.md).
   - `models_list.yaml` is the example list, copied unchanged, kept up to
     date by `certo models update`.
-  - Order, one commit each: `${VAR}` in `models.yaml`; `certo init
-    models` (extra models, testing, the preview and the mode); `certo
+  - Order, one commit each: `${VAR}` in `models.yaml` (done, 0.1.21);
+    `certo init models` (extra models, testing, the preview and the mode); `certo
     models update`; menus for all of `init`; the sample run.
 - **A first run in minutes, with one model.** No catalog, no ladders:
   `certo init`, then a first verified project. Getting started shows only
@@ -388,10 +387,6 @@ database).
 
 ## Smaller bugs
 
-- **`models.yaml.example` says the list holds task profiles and
-  ladders.** Its header still describes `models_list.yaml` as "ids,
-  descriptions, ratings, task profiles, escalation ladders"; since 0.1.20
-  those have their own files.
 - **Stop reading `task_profiles:` / `escalation:` in `models_list.yaml`.**
   Since 0.1.20 they have their own files; the old sections are still read
   with a warning. Remove that path (and the tests that use the old layout

@@ -552,6 +552,7 @@ way, and stops on an error. The errors and their fixes:
 | `Task profile '...': there is no model named '...'` | The profile's `model:` names a model that isn't in `models_list.yaml`. Fix the spelling, or remove `model:`. |
 | `... may only contain 'task_profiles:'` (or `'escalation:'`) | `task_profiles.yaml` and `escalation.yaml` each hold one section. Move anything else to `models_list.yaml` or `models.yaml`. |
 | `CERTO_TASK_PROFILES_FILE names ..., which doesn't exist` (or `CERTO_ESCALATION_FILE`) | Fix the path, or clear the setting to let Certo look for the file. |
+| `models.yaml: '...' has api_key ${NAME}, which isn't set in your settings file or the environment` (a warning; the model is left out) | Add `NAME=...` with the key to your settings file (`~/.config/certo/.env`, or `.env` in the project folder), or export it. Check the spelling of the variable in `models.yaml`. |
 
 **Fix:** run `certo check` after each change: it lists every problem at
 once.

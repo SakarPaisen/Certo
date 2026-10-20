@@ -65,13 +65,16 @@ task_profiles:
 # models.yaml
 models:
   - name: claude-sonnet
-    api_key: "sk-ant-..."
+    api_key: "${ANTHROPIC_API_KEY}"   # the key is in your settings file
   - name: local-coder
     base_url: "http://localhost:11434"
 ```
 
 - Only the models listed in `models.yaml` are used. `activated: false`
   keeps an entry there without using it.
+- Keep each key in your settings file (`ANTHROPIC_API_KEY=sk-ant-...` in
+  `~/.config/certo/.env`) and name it in `models.yaml` as
+  `"${ANTHROPIC_API_KEY}"`. See [the reference](../reference/models-yaml.md#modelsyaml).
 - To add a model, add it to `models_list.yaml` first, then name it in
   `models.yaml`. To change a rating for yourself only, override it in
   `models.yaml` (`ratings: {code: 4}`).

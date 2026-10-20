@@ -24,7 +24,9 @@ toggle individual models on/off without deleting or re-adding entries.
 
 from __future__ import annotations
 
+import os
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
@@ -62,6 +64,9 @@ class ModelCatalogEntry:
     # Whether models.yaml lists this model. A model that is only in
     # models_list.yaml is never used (and is not `activated`).
     configured: bool = True
+    # The `${NAME}` variables models.yaml names for this model that aren't
+    # set; such a model is left out (not `activated`).
+    missing_vars: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -466,11 +471,33 @@ def _merge(listed: ModelCatalogEntry, personal: dict | None) -> ModelCatalogEntr
         base_url=personal["base_url"],
         activated=personal["activated"],
         configured=True,
+        missing_vars=personal.get("missing_vars", ()),
         ratings={**listed.ratings, **personal.get("ratings", {})},
         reasoning_effort=personal.get("reasoning_effort", listed.reasoning_effort),
         timeout_seconds=personal.get("timeout_seconds", listed.timeout_seconds),
         description=personal.get("description", listed.description),
     )
+
+
+# `${NAME}` in models.yaml's api_key and base_url: the key stays in the
+# settings file (DECISIONS.md), models.yaml only names it.
+_VAR_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+def _expand_vars(value: str | None, environ: Mapping[str, str]) -> tuple[str | None, list[str]]:
+    """`value` with every `${NAME}` replaced from `environ`, and the names
+    that were unset or blank."""
+    if value is None:
+        return None, []
+    missing: list[str] = []
+
+    def lookup(match: re.Match[str]) -> str:
+        found = (environ.get(match.group(1)) or "").strip()
+        if not found:
+            missing.append(match.group(1))
+        return found
+
+    return _VAR_RE.sub(lookup, value).strip() or None, missing
 
 
 def load_model_catalog(
@@ -480,6 +507,7 @@ def load_model_catalog(
     profiles_path: str | None = None,
     escalation_path: str | None = None,
     strict: bool = True,
+    environ: Mapping[str, str] | None = None,
 ) -> ModelCatalog:
     """Build the catalog from `models_list.yaml` (the models) and
     `models.yaml` (which of them to use, with keys, addresses and
@@ -498,7 +526,13 @@ def load_model_catalog(
     list doesn't have are collected in `load_problems` for
     `catalog_check.py` to report with everything else; commands load
     through `catalog_check.load_checked_catalog`. No minimum catalog size
-    is enforced (see `rank_candidates()`)."""
+    is enforced (see `rank_candidates()`).
+
+    `${NAME}` in an `api_key` or `base_url` is read from `environ`
+    (os.environ, which a run has filled from the settings files). A model
+    whose variable is unset is left out, with a warning, rather than sent
+    the literal text."""
+    environ = os.environ if environ is None else environ
     listed, profiles, escalation = _parse_list(list_path)
     warnings: list[str] = []
     for key, own_path, own_file in (
@@ -524,6 +558,18 @@ def load_model_catalog(
                 "It is still read for now."
             )
     personal = _parse_personal(models_path)
+    for data in personal:
+        for key in ("api_key", "base_url"):
+            data[key], missing = _expand_vars(data[key], environ)
+            if missing and data["activated"]:
+                data["activated"] = False
+                data["missing_vars"] = (*data.get("missing_vars", ()), *missing)
+                names = ", ".join(f"${{{name}}}" for name in missing)
+                warnings.append(
+                    f"{MODELS_FILE}: {data['name']!r} has {key} {names}, which isn't set in "
+                    "your settings file or the environment, so this model is left out. Add "
+                    f"{missing[0]}=... to your settings file."
+                )
     problems: list[str] = []
 
     seen: set[str] = set()

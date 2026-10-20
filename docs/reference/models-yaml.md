@@ -92,9 +92,9 @@ models:          # required, a non-empty list
   - name: qwen3-coder-local          # a name from models_list.yaml
     base_url: http://localhost:11434
   - name: gpt-6-luna
-    api_key: sk-...
+    api_key: "${OPENAI_API_KEY}"     # read from your settings file
   - name: claude-sonnet-5-5
-    api_key: sk-...
+    api_key: "${ANTHROPIC_API_KEY}"
     activated: false
     ratings: {code: 4}               # an override
 ```
@@ -102,8 +102,8 @@ models:          # required, a non-empty list
 | Field | Required | Meaning |
 |---|---|---|
 | `name` | yes | The `name` of a model in `models_list.yaml`. A name the list doesn't have is an error: add new models to the list. |
-| `api_key` | no | As `CERTO_LLM_API_KEY`. Empty means no key. |
-| `base_url` | no | As `CERTO_LLM_BASE_URL`, for Ollama and other local or self-hosted servers. Empty means the provider's default. |
+| `api_key` | no | As `CERTO_LLM_API_KEY`. Empty means no key. Best written as `"${NAME}"`, the name of a variable in your settings file (see below). |
+| `base_url` | no | As `CERTO_LLM_BASE_URL`, for Ollama and other local or self-hosted servers. Empty means the provider's default. Can use `${NAME}` too. |
 | `activated` | no | `true` (default) or `false`. A `false` entry stays in the file but is never used. |
 | `ratings` | no | Overrides, axis by axis: `{code: 4}` changes only `code`; the other axes keep the list's values. |
 | `reasoning_effort`, `timeout_seconds`, `description` | no | Overrides of the list's values. |
@@ -117,6 +117,15 @@ Each model is complete on its own: settings it leaves empty are **not**
 taken from `CERTO_LLM_*`. A local model with no `api_key` never gets the
 key of another provider. `CERTO_LLM_MODEL` must still be set, because
 Certo checks the normal settings first.
+
+**Keys belong in the settings file.** Write `api_key: "${ANTHROPIC_API_KEY}"`
+and put the key itself in your settings file (`~/.config/certo/.env`, or
+`.env` in the project folder), as `ANTHROPIC_API_KEY=sk-ant-...`. Each key
+is then in one place, and `models.yaml` holds no secret. Certo reads
+`${NAME}` from the environment and the settings files, in the same order
+as every other setting. When the variable isn't set, the model is left
+out, and `certo check` and the run say which variable is missing; the
+text `${NAME}` is never sent as a key.
 
 Before version 0.1.10 everything was in `models.yaml`. An old-style file
 (with model ids, `task_profiles` or `escalation`) is an error that says
@@ -287,6 +296,8 @@ Warnings:
   counts as 0;
 - an enabled model has no `api_key` and no `base_url`: it works only if
   the provider's own key variable (such as `OPENAI_API_KEY`) is set;
+- an `api_key` or `base_url` uses `${NAME}`, and that variable isn't set:
+  the model is left out;
 - a ladder goes from a more capable model to a less capable one
   (capability: the sum of the ratings except the cost axis). Allowed,
   since you may know better, but check the order.

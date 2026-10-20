@@ -122,6 +122,12 @@ def model_name(
             f"{where}: model {value!r} is in models_list.yaml but not in models.yaml. List it "
             "in models.yaml, with its key or address, to benchmark it."
         )
+    if catalog[value].missing_vars:
+        names = ", ".join(f"${{{name}}}" for name in catalog[value].missing_vars)
+        raise BenchConfigError(
+            f"{where}: model {value!r} uses {names} in models.yaml, which isn't set in your "
+            "settings file or the environment. Set it to benchmark this model."
+        )
     if not catalog[value].activated:
         raise BenchConfigError(
             f"{where}: model {value!r} has 'activated: false' in models.yaml, and Certo never "

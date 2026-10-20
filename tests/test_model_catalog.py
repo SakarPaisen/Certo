@@ -758,6 +758,8 @@ def test_the_shipped_examples_load_together():
         str(examples / "models.yaml.example"),
         profiles_path=str(examples / "task_profiles.yaml.example"),
         escalation_path=str(examples / "escalation.yaml.example"),
+        # The example names its keys as variables of the settings file.
+        environ={"OPENAI_API_KEY": "sk-test", "ANTHROPIC_API_KEY": "sk-test"},
     )
     report = check_catalog(catalog)
     assert report.errors == []
@@ -843,3 +845,69 @@ def test_a_section_file_holds_only_its_section(tmp_path, kwarg, text):
 
     with pytest.raises(ModelCatalogError, match="may only contain"):
         load_model_catalog(list_path, models_path, **{kwarg: str(extra)})
+
+
+# --- ${VAR} in models.yaml -----------------------------------------------------------
+
+_VAR_MODELS = """
+models:
+  - name: cloud
+    model: anthropic/claude-haiku-5-5
+    api_key: "${ANTHROPIC_API_KEY}"
+    ratings: {code: 4}
+  - name: local
+    model: ollama/qwen3.8:27b
+    base_url: "http://${OLLAMA_HOST_NAME}:11434"
+    ratings: {code: 3}
+"""
+
+
+def _load_with(tmp_path, environ, models=_VAR_MODELS):
+    list_path, models_path = write_model_files(tmp_path, models)
+    return load_model_catalog(list_path, models_path, environ=environ)
+
+
+def test_a_key_named_as_a_variable_is_read_from_the_settings(tmp_path):
+    catalog = _load_with(
+        tmp_path, {"ANTHROPIC_API_KEY": "sk-from-settings", "OLLAMA_HOST_NAME": "turing.local"}
+    )
+    by_name = {m.name: m for m in catalog.models}
+
+    assert by_name["cloud"].api_key == "sk-from-settings"
+    assert by_name["local"].base_url == "http://turing.local:11434"
+    assert all(m.activated for m in catalog.models)
+    assert catalog.load_warnings == ()
+
+
+def test_a_model_whose_variable_is_unset_is_left_out_with_a_warning(tmp_path):
+    # Before 0.1.21 the literal "${ANTHROPIC_API_KEY}" was sent as the key.
+    catalog = _load_with(tmp_path, {"OLLAMA_HOST_NAME": "turing.local", "ANTHROPIC_API_KEY": " "})
+    by_name = {m.name: m for m in catalog.models}
+
+    assert by_name["cloud"].activated is False
+    assert by_name["cloud"].api_key is None
+    assert by_name["local"].activated is True
+    assert catalog.load_warnings == (
+        "models.yaml: 'cloud' has api_key ${ANTHROPIC_API_KEY}, which isn't set in your "
+        "settings file or the environment, so this model is left out. Add "
+        "ANTHROPIC_API_KEY=... to your settings file.",
+    )
+
+
+def test_an_unset_variable_on_a_model_already_switched_off_says_nothing(tmp_path):
+    models = _VAR_MODELS.replace(
+        "    ratings: {code: 4}", "    ratings: {code: 4}\n    activated: false"
+    )
+    catalog = _load_with(tmp_path, {"OLLAMA_HOST_NAME": "h"}, models=models)
+
+    assert catalog.load_warnings == ()
+
+
+def test_the_shipped_models_example_names_its_cloud_keys_as_variables():
+    from pathlib import Path
+
+    text = (
+        Path(__file__).resolve().parent.parent / "src/certo/examples/models.yaml.example"
+    ).read_text()
+    assert 'api_key: "${OPENAI_API_KEY}"' in text
+    assert 'api_key: ""' not in text

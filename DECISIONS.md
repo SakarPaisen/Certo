@@ -814,6 +814,6 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
 - **API keys live only in the settings file** (2026-10-20, the Author).
   `models.yaml` refers to a key as `${VAR}` (for example
   `${ANTHROPIC_API_KEY}`) instead of holding a copy, so each key is in
-  one place and `certo init` never writes a key into a second file. This
-  needs `${VAR}` expansion in `models.yaml`, which it doesn't have yet. A
-  secret manager may replace the settings file later (TODO.md).
+  one place and `certo init` never writes a key into a second file
+  (`${VAR}` expansion added in 0.1.21; an unset variable leaves the model
+  out instead of sending the literal text). A secret manager may replace the settings file later (TODO.md).

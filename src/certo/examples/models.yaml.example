@@ -1,11 +1,12 @@
-# models.yaml: your personal model settings. It holds API keys: keep it
-# out of git, like .env.
+# models.yaml: your personal model settings: which models you use, where
+# each one runs, and which key it uses. Keep it out of git, like .env.
 #
 # Certo ships this file only as an example and never reads the example.
 # Copy it to models.yaml (in your project folder, or in ~/.config/certo/)
 # and edit it. It works together with models_list.yaml, the catalog of
-# models (ids, descriptions, ratings, task profiles, escalation ladders),
-# which Certo also ships as an example to copy.
+# models (ids, descriptions, ratings), which Certo also ships as an example
+# to copy. Task profiles and escalation ladders have their own files,
+# task_profiles.yaml and escalation.yaml.
 #
 # List here the models you want Certo to use, each by the `name` it has in
 # models_list.yaml. A model that isn't listed here is never used: not by
@@ -14,7 +15,10 @@
 #
 # Per model:
 #   name              required: the model's name in models_list.yaml
-#   api_key           the provider key (blank for a local model)
+#   api_key           the provider key, best as the name of a variable in
+#                     your settings file: "${ANTHROPIC_API_KEY}". The key
+#                     then stays in one place. A model whose variable isn't
+#                     set is left out. (Blank for a local model.)
 #   base_url          the server address (for Ollama and other local or
 #                     self-hosted servers; blank = the provider's default)
 #   activated         true (default) or false, to keep an entry but not
@@ -37,11 +41,12 @@ models:
     base_url: "http://192.168.1.50:11434"
     timeout_seconds: 1200
 
-  # A cloud model: its key.
+  # A cloud model. Its key is OPENAI_API_KEY in your settings file
+  # (~/.config/certo/.env, or .env in the project folder).
   - name: gpt-6-luna
-    api_key: ""
+    api_key: "${OPENAI_API_KEY}"
 
   # Kept, but not used for now.
   - name: claude-sonnet-5-5
-    api_key: ""
+    api_key: "${ANTHROPIC_API_KEY}"
     activated: false
