@@ -68,7 +68,6 @@ def _restore_environ():
     os.environ.update(saved)
 
 
-
 @pytest.fixture
 def model_files():
     from model_file_helpers import write_model_files

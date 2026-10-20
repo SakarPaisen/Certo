@@ -41,6 +41,9 @@ uv run ruff check .
 uv run ruff format --check .
 ```
 
+- The release workflow runs the two ruff commands too: a lint or format
+  failure blocks a release. The rules are named in `pyproject.toml`
+  (`[tool.ruff.lint]`), so a ruff upgrade doesn't change them.
 - `tests/` mirrors `src/certo/`. Tool executors are tested directly, with
   no model and no network.
 - The end-to-end tests in `tests/test_runner.py` make real model calls and

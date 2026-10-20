@@ -38,7 +38,10 @@ from certo.config import (
 
 
 def _base_env(**overrides: str) -> dict[str, str]:
-    env = {"CERTO_LLM_MODEL": "anthropic/claude-sonnet-4-5-20250929", "CERTO_LLM_API_KEY": "sk-test"}
+    env = {
+        "CERTO_LLM_MODEL": "anthropic/claude-sonnet-4-5-20250929",
+        "CERTO_LLM_API_KEY": "sk-test",
+    }
     env.update(overrides)
     return env
 
@@ -184,7 +187,9 @@ def test_missing_key_without_base_url_raises():
 
 def test_base_url_allows_missing_key():
     # Local models can be keyless: base_url present, api_key absent -> OK.
-    cfg = load_config({"CERTO_LLM_MODEL": "ollama/llama3", "CERTO_LLM_BASE_URL": "http://localhost:11434"})
+    cfg = load_config(
+        {"CERTO_LLM_MODEL": "ollama/llama3", "CERTO_LLM_BASE_URL": "http://localhost:11434"}
+    )
     assert cfg.api_key is None
     assert cfg.base_url == "http://localhost:11434"
 

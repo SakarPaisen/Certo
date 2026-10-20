@@ -793,3 +793,11 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   capable", was not chosen: one rule for every failed attempt). Runaway
   loops stay bounded by the per-run step limit, the finite model list,
   the time budget and the cost cap.
+- **Ruff's rules are named, not inherited** (2026-10-20). Ruff 0.16 raised
+  its default rule set from 59 rules to 413, and with no `select` the
+  project silently inherited them (13 findings, all style). `select` pins
+  the pre-0.16 defaults (`E4`, `E7`, `E9`, `F`) so an upgrade can't change
+  what is checked; widening it is a separate, deliberate change. Markdown
+  is left out of `ruff format` (0.17 formats code blocks in `.md`), so
+  docs samples stay as written. The release workflow now runs both checks,
+  so a lint failure blocks a release.

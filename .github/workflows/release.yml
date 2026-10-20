@@ -38,6 +38,10 @@ jobs:
           fi
       - name: Install
         run: uv sync --locked --extra dev
+      - name: Lint and format
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
       - name: Test (no API key)
         run: uv run pytest -q
 

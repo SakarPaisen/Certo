@@ -20,7 +20,10 @@ from certo.llm import build_llm
 
 
 def _base_env(**overrides: str) -> dict[str, str]:
-    env = {"CERTO_LLM_MODEL": "anthropic/claude-sonnet-4-5-20250929", "CERTO_LLM_API_KEY": "sk-test"}
+    env = {
+        "CERTO_LLM_MODEL": "anthropic/claude-sonnet-4-5-20250929",
+        "CERTO_LLM_API_KEY": "sk-test",
+    }
     env.update(overrides)
     return env
 
@@ -80,7 +83,9 @@ def test_build_llm_reasoning_off_passes_explicit_none(value):
 
 
 def test_build_llm_reasoning_off_via_override_passes_explicit_none():
-    cfg = override_llm(load_config(_base_env(CERTO_LLM_REASONING_EFFORT="high")), reasoning_effort="off")
+    cfg = override_llm(
+        load_config(_base_env(CERTO_LLM_REASONING_EFFORT="high")), reasoning_effort="off"
+    )
 
     assert build_llm(cfg).reasoning_effort is None
 
