@@ -10,6 +10,13 @@ extra model call.
 
 ## 1. Create the model files
 
+**The quick way:** run `certo init models`. It offers the models this
+computer can reach, tests each one, writes the files below and asks
+whether to use `--auto-model` for every run. See
+[the reference](../reference/commands.md#certo-init-models). The rest of
+this section is what it writes, for when you want to edit the files
+yourself.
+
 `--auto-model` uses three files, and Certo ships each only as an example:
 
 - **`models_list.yaml`**, the catalog: the models and their ratings. No
@@ -22,8 +29,9 @@ extra model call.
   the order of `models_list.yaml` decides.
 
 Copy the examples into your user settings folder (or into a project
-folder, which then overrides them). `certo check` prints the exact
-commands for your installation when a file is missing:
+folder, which then overrides them). An `--auto-model` run without the
+files prints the exact commands for your installation (so does `certo
+check`, once one of the two required files exists):
 
 ```bash
 cp <examples>/models_list.yaml.example ~/.config/certo/models_list.yaml

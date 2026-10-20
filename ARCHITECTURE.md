@@ -265,6 +265,19 @@ given design was chosen.
   `src/certo/starter/`: `providers.toml` (menu order, default models),
   the workspace `README.md`, `gitignore`, and `tasks/wordle.md`/
   `asteroids.md`.
+- **`init_models.py`** — `certo init models` (`init_main` hands over when
+  the first argument is `models`). `_gather()` builds the candidates from
+  the saved `CERTO_LLM_*` model, the Ollama server's `/api/tags`, and the
+  list's models for every provider whose key variable is set (the saved
+  model's provider reuses `${CERTO_LLM_API_KEY}`); every other provider
+  is an action that asks for its key. Names made up for unlisted models
+  never collide with the list's (`_unique_name`). Each chosen model is
+  tested with `check_tool_calling` on `catalog_report.entry_config`, its
+  `${VAR}` resolved from the environment; only passing models are
+  written. Typed keys go to the user settings file only
+  (`_set_setting`, mode 600); user-rated models are appended to the
+  list's `models:`, refused (nothing written) when the result wouldn't parse
+  as part of that list.
 - **`project_env.py`** — each Python project's own environment (stdlib
   only, since the Docker image imports it next to `custom_tools`).
   `ensure_project_env()` reuses a `uv.lock` project (through `uv run`), or a

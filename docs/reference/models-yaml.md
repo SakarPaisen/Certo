@@ -36,9 +36,12 @@ cp <examples>/task_profiles.yaml.example ~/.config/certo/task_profiles.yaml   # 
 cp <examples>/escalation.yaml.example ~/.config/certo/escalation.yaml         # for --escalate
 ```
 
-`certo check` prints the exact `cp` command, with the examples folder of
-your installation, when a required file is missing, and lists the two
-optional files it found. In the repository the examples are in
+The quick way is `certo init models`, which writes the files for the
+models it tested (see [Commands](commands.md#certo-init-models)). A run
+that needs a missing file prints the exact `cp` command, with the
+examples folder of your installation; so does `certo check` when one of
+the two required files exists. With neither, `certo check` says to run
+`certo init models`. It also lists the two optional files it found. In the repository the examples are in
 [src/certo/examples/](../../src/certo/examples/models_list.yaml.example)
 (`models_list.yaml.example`, `models.yaml.example`,
 `task_profiles.yaml.example`, `escalation.yaml.example`). A new Certo

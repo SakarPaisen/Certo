@@ -154,6 +154,69 @@ out. Without a terminal, settings go to `FOLDER/.env` unless `--global` or
 There is no `--api-key` flag, on purpose: a key on the command line is
 saved in your shell history.
 
+### `certo init models`
+
+Set up more than one model, for `--auto-model` and `--escalate`, without
+editing a file. Needs a terminal.
+
+```text
+certo init models [--timeout SECONDS]
+```
+
+| Flag | Default | Effect |
+|---|---|---|
+| `--timeout SECONDS` | `120` | How long to wait for each model's test answer. A local model may need time to load. |
+
+It starts from the model `certo init` saved, and offers the models this
+computer can reach:
+
+- the Ollama models installed on the server of the saved model (or on
+  `localhost`);
+- the cloud models of each provider whose key is in your settings or
+  environment, including the saved model's own key;
+- for every other provider, a line that asks for its key (hidden);
+- **Another model**, any LiteLLM model id.
+
+Numbers turn a model on or off; Enter ends the choice. A model that isn't
+in Certo's list needs your ratings (1 to 5, shown next to the list's
+ratings of the other models you chose; 0 leaves it out), because Certo
+never invents them. Each chosen model is then tested with the same request
+as `certo check --models`, and only the ones that pass are written, to the
+user settings folder (`~/.config/certo/`):
+
+- `models.yaml`, with the models that passed (permissions `600`). An
+  existing one is replaced only if you say so, and kept as
+  `models.yaml.bak`;
+- `models_list.yaml` and `task_profiles.yaml`, copied from the examples
+  when missing; a model you rated is added at the end of the list;
+- a key you typed, in the user settings file as the provider's variable
+  (`DEEPSEEK_API_KEY='...'`). `models.yaml` names it (`${DEEPSEEK_API_KEY}`)
+  and never holds a key.
+
+Then it shows what `--auto-model` would choose for each task profile and
+how `--escalate` would climb, and asks which mode to use for every run.
+The first answer, the default, is one model without `--auto-model` or
+`--escalate`; the choice is saved as `CERTO_MODEL_SELECTION` in the user
+settings file. For example, from a real run:
+
+```text
+Testing each model with one small request:
+  ok  qwen3.8-27b-local (11.9s)
+  ok  gemma4-31b-qat-local (21.4s)
+  ok  nemotron-3.5-lightning-30b-local (35.1s)
+
+Written to /home/you/.config/certo:
+  models.yaml  3 models
+  models_list.yaml  the example list
+  models_list.yaml  1 model(s) rated by you, added
+  task_profiles.yaml  the example profiles
+```
+
+With fewer than two models chosen, or fewer than two passing the test,
+nothing is written: one model needs no model files. Exit code 0, or 1
+when fewer than two models passed; 130 on Ctrl-C. A folder named `models`
+is created with `certo init ./models`.
+
 ## `certo check`
 
 Check that the configured model works.

@@ -674,6 +674,13 @@ def init_main(
     user_path: str | None = None,
 ) -> int:
     """`certo init`. `user_path` defaults to `user_settings_path()`."""
+    if argv[:1] == ["models"]:
+        # `certo init models`; a folder named "models" is `certo init ./models`.
+        from .init_models import init_models_main
+
+        return init_models_main(
+            argv[1:], prompter=prompter, fetch_models=fetch_models, interactive=interactive
+        )
     prompter = prompter or Prompter()
     out = prompter.out
     env = os.environ if env is None else env

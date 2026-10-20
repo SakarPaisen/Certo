@@ -59,7 +59,8 @@ def find(name: str, explicit: str = "") -> str | None:
 def missing_message(name: str, setting: str) -> str:
     return (
         f"No {name} found: Certo looked in the current folder and in {user_dir()}. "
-        f"Certo ships an example to start from; copy it and edit it:\n"
+        "Run certo init models to set up your models and write it. Or copy the "
+        "example Certo ships and edit it:\n"
         f"  cp {example_path(name)} {os.path.join(user_dir(), name)}\n"
         f"(or put it in the project folder, or set {setting})."
     )

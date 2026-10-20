@@ -215,6 +215,12 @@ def print_catalog_report(
         if test_models:
             print(f"--models: {missing_message(MODELS_FILE, 'CERTO_MODELS_FILE')}", file=out)
             return False
+        print(
+            "Model files: none, so Certo uses the one model above. To use more than one "
+            "(--auto-model, --escalate), run: certo init models",
+            file=out,
+        )
+        print(file=out)
         return True
     catalog = _load_catalog(out)
     if catalog is None:

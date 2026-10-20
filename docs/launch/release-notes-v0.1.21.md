@@ -1,6 +1,7 @@
 # Certo v0.1.21 (not released yet)
 
-A run prints a third of what it did, Certo's own notes now show as they
+`certo init models` sets up more than one model without editing a file,
+a run prints a third of what it did, Certo's own notes now show as they
 happen, `certo init` offers DeepSeek and Kimi, and `models.yaml` can
 name a key that lives in your settings file.
 
@@ -28,6 +29,20 @@ The same run now prints 1,021 lines, with every step of the agent still
 shown. `--verbose` (or `CERTO_VERBOSE=yes`) prints everything as before.
 See [Commands](../reference/commands.md#certo) and
 [Configuration](../reference/configuration.md).
+
+## New: `certo init models`
+
+More than one model, for `--auto-model` and `--escalate`, no longer means
+copying three example files and editing YAML. `certo init models` starts
+from the model `certo init` saved and offers the models this computer can
+reach: the Ollama models on your server, the cloud models whose key you
+have, a key for another provider (asked hidden, saved only in your
+settings file), or any other LiteLLM model id. It tests each chosen model
+with one small request, writes only the ones that pass, shows what
+`--auto-model` and `--escalate` would do with them, and asks which mode
+to use for every run, with one model as the default. A model that isn't
+in Certo's list is rated by you, next to the list's ratings of the
+models you chose. See [Commands](../reference/commands.md#certo-init-models).
 
 ## New: DeepSeek and Kimi in `certo init`
 

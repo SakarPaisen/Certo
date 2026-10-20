@@ -279,8 +279,9 @@ cut that first run's output from 2,949 lines to 1,021.)
   - `models_list.yaml` is the example list, copied unchanged, kept up to
     date by `certo models update`.
   - Order, one commit each: `${VAR}` in `models.yaml` (done, 0.1.21);
-    `certo init models` (extra models, testing, the preview and the mode); `certo
-    models update`; menus for all of `init`; the sample run.
+    `certo init models` (extra models, testing, the preview and the mode;
+    done, 0.1.21); `certo models update`; menus for all of `init`; the
+    sample run.
 - **A first run in minutes, with one model.** No catalog, no ladders:
   `certo init`, then a first verified project. Getting started shows only
   that path. Measured 2026-10-19 in an empty home folder: 88.5s from

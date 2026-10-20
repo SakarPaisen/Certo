@@ -500,16 +500,19 @@ check is just missing. Before 0.1.19, this made the project `failed`.
 ### No `models_list.yaml` or `models.yaml` found
 
 **You see:** `No models_list.yaml found: Certo looked in the current folder
-and in ~/.config/certo. Certo ships an example to start from; copy it and
-edit it:` followed by a `cp` command (the same for `models.yaml`).
+and in ~/.config/certo. Run certo init models to set up your models and
+write it. Or copy the example Certo ships and edit it:` followed by a `cp`
+command (the same for `models.yaml`).
 
 **Cause:** `--auto-model`, `--escalate`, `certo bench` and
 `certo check --models` need both model files, and Certo ships them only as
 examples, which it never reads. (`task_profiles.yaml` and
 `escalation.yaml` are optional: a missing one is never this error.)
 
-**Fix:** run the `cp` command the message prints, then edit the copy: name
-the models you use in `models.yaml`, with their keys. Put the files in a
+**Fix:** run `certo init models`: it offers the models you can reach,
+tests them and writes the files. Or run the `cp` command the message
+prints, then edit the copy: name the models you use in `models.yaml`,
+with their keys. Put the files in a
 project folder instead to use them for that project only. See
 [The model files](reference/models-yaml.md).
 

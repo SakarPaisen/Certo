@@ -270,7 +270,8 @@ export CERTO_LLM_API_KEY=sk-...
 
 ## Next steps
 
-- Use more than one model: let Certo pick one per task
+- Use more than one model: `certo init models` sets them up and tests
+  them. Then let Certo pick one per task
   ([Pick models automatically](guides/pick-models-automatically.md)), or
   hand a task to the next model when one can't finish or its provider
   fails ([Escalate between models](guides/escalate-between-models.md)).
