@@ -29,6 +29,7 @@ from dataclasses import dataclass, field
 from importlib import resources
 from typing import TextIO
 
+from . import menus as _menus
 from .catalog_report import print_catalog_report, print_task_routing
 from .config import (
     ConfigError,
@@ -154,7 +155,9 @@ class Cancelled(Exception):
 
 
 class Prompter:
-    """Terminal questions. Injected functions keep it testable."""
+    """Terminal questions. Injected functions keep it testable. On a real
+    terminal (the default input and output), `choose` and `confirm` are
+    arrow-key menus (menus.py); otherwise numbered questions."""
 
     def __init__(
         self,
@@ -162,10 +165,14 @@ class Prompter:
         input_fn: Callable[[str], str] = input,
         secret_fn: Callable[[str], str] = getpass.getpass,
         out: TextIO | None = None,
+        menus: bool | None = None,
     ) -> None:
         self._input = input_fn
         self._secret = secret_fn
         self.out = out or sys.stdout
+        if menus is None:
+            menus = input_fn is input and out is None and _menus.available()
+        self.menus = menus
 
     def say(self, text: str = "") -> None:
         print(text, file=self.out, flush=True)
@@ -182,6 +189,11 @@ class Prompter:
         return answer or (default or "")
 
     def confirm(self, question: str) -> bool:
+        if self.menus:
+            try:
+                return _menus.confirm(question)
+            except (KeyboardInterrupt, EOFError) as exc:
+                raise Cancelled from exc
         while True:
             answer = self._read(self._input, f"{question} [Y/n]: ").lower()
             if answer in ("", "y", "yes"):
@@ -191,6 +203,11 @@ class Prompter:
             self.say("Please answer y or n.")
 
     def choose(self, question: str, options: list[str], default: int = 0) -> int:
+        if self.menus:
+            try:
+                return _menus.choose(question, options, default)
+            except (KeyboardInterrupt, EOFError) as exc:
+                raise Cancelled from exc
         self.say(question)
         for i, option in enumerate(options, start=1):
             self.say(f"  {i}. {option}")
@@ -275,7 +292,13 @@ def _ask_ollama(
         return Settings(provider, _with_prefix(provider, model or ""), base_url=base_url)
 
     preferred = _preferred_installed(provider, installed)
-    index = prompter.choose("Which installed model?", installed, preferred) if ask else preferred
+    if not ask:
+        return Settings(provider, f"ollama/{installed[preferred]}", base_url=base_url)
+    options = [*installed, "Another model (type its name)"]
+    index = prompter.choose("Which installed model?", options, preferred)
+    if index == len(installed):
+        name = prompter.ask("Model name, as Ollama knows it", _ollama_name(provider.model))
+        return Settings(provider, _with_prefix(provider, name), base_url=base_url)
     return Settings(provider, f"ollama/{installed[index]}", base_url=base_url)
 
 

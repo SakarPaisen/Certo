@@ -26,6 +26,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 import yaml
 
+from . import menus as _menus
 from .catalog_report import _profile_lines, entry_config
 from .config import load_settings_files, user_settings_path
 from .escalation import EscalationError, derive_ladder, describe_rung
@@ -255,7 +256,11 @@ def _choose(
     listed: list[ModelCatalogEntry],
     env: dict[str, str],
 ) -> None:
-    """Numbers toggle a model on or off, or run an action; Enter ends."""
+    """Numbers toggle a model on or off, or run an action; Enter ends. On
+    a real terminal, an arrow-key checklist instead."""
+    if prompter.menus:
+        _choose_in_menu(prompter, setup, actions, listed, env)
+        return
     while True:
         prompter.say()
         _show(prompter, setup.candidates, actions)
@@ -277,6 +282,43 @@ def _choose(
                 _add_key(prompter, setup, actions, action, listed, env)
             else:
                 _add_typed(prompter, setup, listed)
+
+
+def _choose_in_menu(
+    prompter: Prompter,
+    setup: _Setup,
+    actions: list[_Action],
+    listed: list[ModelCatalogEntry],
+    env: dict[str, str],
+) -> None:
+    while True:
+        rows: list[_menus.Row] = []
+        group = None
+        for candidate in setup.candidates:
+            if candidate.group != group:
+                group = candidate.group
+                rows.append(_menus.Row("header", group))
+            rows.append(
+                _menus.Row("item", candidate.entry.name, candidate.note, candidate.selected)
+            )
+        rows.append(_menus.Row("header", "More"))
+        rows += [_menus.Row("action", action.label) for action in actions]
+        rows.append(_menus.Row("action", "Done"))
+        state = _menus.ChecklistState(rows)
+        try:
+            picked = _menus.checklist("Which models?", state)
+        except (KeyboardInterrupt, EOFError) as exc:
+            raise Cancelled from exc
+        items = [row for row in rows if row.kind == "item"]
+        for candidate, row in zip(setup.candidates, items, strict=True):
+            candidate.selected = row.checked
+        if picked is None or rows[picked].label == "Done":
+            return
+        action = actions[[r for r in rows if r.kind == "action"].index(rows[picked])]
+        if action.provider is not None:
+            _add_key(prompter, setup, actions, action, listed, env)
+        else:
+            _add_typed(prompter, setup, listed)
 
 
 def _add_key(prompter, setup, actions, action, listed, env) -> None:

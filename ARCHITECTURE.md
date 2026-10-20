@@ -265,6 +265,14 @@ given design was chosen.
   `src/certo/starter/`: `providers.toml` (menu order, default models),
   the workspace `README.md`, `gitignore`, and `tasks/wordle.md`/
   `asteroids.md`.
+- **`menus.py`** — arrow-key menus for `init` and `init models`:
+  prompt_toolkit's `choice()` for one choice, and `checklist()`, an
+  inline Application (prompt_toolkit's only multi-select is a full-screen
+  dialog). Its state, `ChecklistState`, is plain Python and tested
+  without a terminal. `Prompter` uses the menus only with its default
+  input and output on a real terminal (`menus.available()`: both ends a
+  TTY, `TERM` not empty or `dumb`); tests and pipes get the numbered
+  questions. Checked in a pseudo-terminal with real key presses.
 - **`init_models.py`** — `certo init models` (`init_main` hands over when
   the first argument is `models`). `_gather()` builds the candidates from
   the saved `CERTO_LLM_*` model, the Ollama server's `/api/tags`, and the

@@ -208,6 +208,16 @@ def test_ollama_lists_installed_models_and_preselects_a_coder(tmp_path, monkeypa
     assert "Anthropic (Claude)" in (tmp_path / "w" / ".env").read_text()
 
 
+def test_ollama_offers_another_model_by_name(tmp_path, monkeypatch, checks):
+    # The installed list plus one line to type a model that isn't pulled yet.
+    script = Script(answers=["6", "", "3", "qwen2.5-coder:7b", ""])
+
+    _run(tmp_path, monkeypatch, ["w"], script, models=["llama3:latest", "qwen3-coder:30b"])
+
+    assert "  3. Another model (type its name)" in script.text
+    assert _active(tmp_path / "w")[0] == "CERTO_LLM_MODEL=ollama/qwen2.5-coder:7b"
+
+
 def test_ollama_preselects_the_recommended_model_over_a_coder(tmp_path, monkeypatch, checks):
     # qwen3.8:27b beat qwen3-coder:30b in the 0.1.18 local benchmark, so
     # when both are installed the recommended one is offered first.

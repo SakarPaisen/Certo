@@ -45,6 +45,14 @@ to use for every run, with one model as the default. A model that isn't
 in Certo's list is rated by you, next to the list's ratings of the
 models you chose. See [Commands](../reference/commands.md#certo-init-models).
 
+## New: arrow-key menus in `certo init`
+
+On a terminal, `certo init` and `certo init models` now ask with menus:
+↑↓ and Enter to choose, and in `certo init models` a checklist where
+Space turns a model on or off. The Ollama model menu also has **Another
+model**, to type one that isn't installed yet. Without a full terminal
+(output piped, or `TERM=dumb`), the questions are numbered, as before.
+
 ## New: `certo models update`
 
 Your `models_list.yaml` is a copy of the example list, and a Certo release

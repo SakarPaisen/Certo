@@ -140,8 +140,10 @@ that `init` didn't write is never replaced. With "All projects", the
 folder gets no `.env`, and a folder that already has files is skipped.
 
 **Questions**, on a terminal: provider; model; API key (hidden), or the
-Ollama address and installed model; where to save; whether to create the
-sample folder. If you already have a user settings file, `init` shows its
+Ollama address and installed model (or another model, typed); where to
+save; whether to create the sample folder. The choices are arrow-key
+menus (↑↓ and Enter). Without a full terminal (output piped, or
+`TERM=dumb`), the same questions are numbered, and you type the number. If you already have a user settings file, `init` shows its
 provider and model (never the key) and asks before replacing it. Nothing
 is written until the last answer, so Ctrl-C leaves everything as it was
 (exit 130).
@@ -177,7 +179,11 @@ computer can reach:
 - for every other provider, a line that asks for its key (hidden);
 - **Another model**, any LiteLLM model id.
 
-Numbers turn a model on or off; Enter ends the choice. A model that isn't
+On a terminal the models are a checklist: ↑↓ move, Space turns a model
+on or off, Enter on a line under **More** opens it (a key, another model),
+and Enter anywhere else ends the choice. Without a full terminal, the
+list is numbered: numbers turn a model on or off, and Enter ends the
+choice. A model that isn't
 in Certo's list needs your ratings (1 to 5, shown next to the list's
 ratings of the other models you chose; 0 leaves it out), because Certo
 never invents them. Each chosen model is then tested with the same request

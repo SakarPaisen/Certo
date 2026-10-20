@@ -50,31 +50,34 @@ This page needs version 0.1.19 or newer. If you see an older version, run
 certo init
 ```
 
-`certo init` asks a few questions. Press Enter to accept the default shown
-in `[brackets]`:
+`certo init` asks a few questions. Choose with ↑↓ and Enter, or type an
+answer; Enter alone accepts the default shown in `[brackets]`:
 
 ```console
 $ certo init
 Certo setup. Press Enter to accept the default in [brackets].
 
 Which model provider do you want to use?
-  1. OpenAI
-  2. Anthropic (Claude)
-  3. Google Gemini
-  4. DeepSeek
-  5. Kimi (Moonshot AI)
-  6. Ollama (local models, no API key)
-  7. Other (any LiteLLM model id)
-Choice [1]:
+▸  1. OpenAI
+   2. Anthropic (Claude)
+   3. Google Gemini
+   4. DeepSeek
+   5. Kimi (Moonshot AI)
+   6. Ollama (local models, no API key)
+   7. Other (any LiteLLM model id)
 
 Model [openai/gpt-6.1-sol]:
 API key (hidden):
 Save these settings for:
-  1. All projects on this computer (recommended)
-  2. This folder only
-Choice [1]:
-Create a folder with sample tasks to try? [Y/n]:
+▸  1. All projects on this computer (recommended)
+   2. This folder only
+Create a folder with sample tasks to try?
+▸  1. Yes
+   2. No
 ```
+
+Without a full terminal (output piped, or `TERM=dumb`), the same questions
+are numbered and you type the number.
 
 - The API key is typed at a hidden prompt. It is never shown or printed.
   There is no command-line flag for it on purpose, so it can't end up in
