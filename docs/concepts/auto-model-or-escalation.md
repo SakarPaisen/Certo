@@ -197,7 +197,9 @@ CERTO_MODEL_SELECTION=escalate
 ```
 
 Before a run, `certo check` shows your model files, the active models,
-each ladder and the ladder Certo would derive, with any problems found.
+the models each task profile would use, each ladder and the ladder Certo
+would derive, with any problems found. `certo check --task "..."` shows
+which profile and models one task would get, without running it.
 
 ## Related
 

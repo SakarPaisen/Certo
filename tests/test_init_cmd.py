@@ -1064,6 +1064,86 @@ def test_certo_check_reports_the_catalog(tmp_path, monkeypatch, checks):
     assert [c.model for c in checks] == ["openai/main"]  # no --models: only the main model
 
 
+_PROFILES_CATALOG = _CATALOG.replace(
+    """task_profiles:
+  default:""",
+    """task_profiles:
+  debugging:
+    triggers: [fix, bug]
+    weights: {reasoning: 3, code: 1}
+    model: gpt-luna
+  scaffolding:
+    triggers: [scaffold]
+    weights: {cost: 2}
+  default:""",
+)
+
+
+def _split_check(tmp_path, monkeypatch, argv):
+    from model_file_helpers import write_split_model_files
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CERTO_LLM_MODEL", "openai/main")
+    monkeypatch.setenv("CERTO_LLM_API_KEY", "k")
+    write_split_model_files(tmp_path, _PROFILES_CATALOG)
+    out = io.StringIO()
+    code = init_cmd.check_main(list(argv), out=out)
+    return code, out.getvalue()
+
+
+def test_certo_check_shows_the_models_each_task_profile_would_use(tmp_path, monkeypatch, checks):
+    code, text = _split_check(tmp_path, monkeypatch, [])
+
+    assert code == 0
+    assert "Task profiles (--auto-model), checked in this order:" in text
+    assert "    debugging, title has: fix, bug\n" in text
+    assert (
+        "      gpt-luna (named by the profile, score 13), claude-sonnet (score 20), "
+        "qwen-local (score 9)\n"
+    ) in text
+    assert "    scaffolding, title has: scaffold\n" in text
+    assert "    default, when no other profile matches\n" in text
+    assert "sk-CATALOG-SECRET" not in text
+
+
+def test_certo_check_task_shows_the_route_and_calls_no_model(tmp_path, monkeypatch, checks):
+    code, text = _split_check(tmp_path, monkeypatch, ["--task", "Fix the bugs in the parser"])
+
+    assert code == 0
+    assert checks == []
+    assert "Task title: Fix the bugs in the parser" in text
+    assert 'Profile: debugging ("fix" is in the title)' in text
+    assert (
+        "Models, in the order --auto-model tries them "
+        "(the profile names gpt-luna; fallbacks ranked by weights):\n"
+        "  1. gpt-luna (named by the profile, score 13)\n"
+        "  2. claude-sonnet (score 20)\n"
+        "  3. qwen-local (score 9)\n"
+    ) in text
+    assert "Active models" not in text  # only the route, not the whole report
+
+
+def test_certo_check_task_reads_a_task_file_and_falls_back_to_default(
+    tmp_path, monkeypatch, checks
+):
+    # The body says "fix", but only the title counts.
+    (tmp_path / "task.md").write_text("# A Wordle game\n\nFix every bug you find.\n")
+    code, text = _split_check(tmp_path, monkeypatch, ["--task", "task.md"])
+
+    assert code == 0
+    assert "Task title: A Wordle game" in text
+    assert "Profile: default (no other profile's trigger word is in the title)" in text
+    assert "  1. claude-sonnet (score 12)" in text
+
+
+def test_certo_check_task_without_model_files_is_an_error(tmp_path, monkeypatch, checks):
+    monkeypatch.chdir(tmp_path)
+    out = io.StringIO()
+
+    assert init_cmd.check_main(["--task", "Fix it"], out=out) == 1
+    assert "Error: No models_list.yaml found" in out.getvalue()
+
+
 def test_certo_check_names_the_models_left_out_of_the_derived_ladder(tmp_path, monkeypatch, checks):
     # gemma-local active: as cheap as qwen-local and weaker, so it isn't a rung.
     catalog = _CATALOG.replace("    activated: false\n", "")

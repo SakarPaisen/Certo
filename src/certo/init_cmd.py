@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from importlib import resources
 from typing import TextIO
 
-from .catalog_report import print_catalog_report
+from .catalog_report import print_catalog_report, print_task_routing
 from .config import (
     ConfigError,
     SettingSource,
@@ -486,7 +486,17 @@ def build_check_parser() -> argparse.ArgumentParser:
             "CERTO_LLM_* variables, then .env in the current folder, then the "
             "user settings file. Prints where each setting came from first. When "
             "a models.yaml (CERTO_MODELS_FILE) exists, also checks it: models, "
-            "ladders, errors and warnings."
+            "the models each task profile would use, ladders, errors and warnings."
+        ),
+    )
+    parser.add_argument(
+        "--task",
+        metavar="TASK",
+        help=(
+            "Show how --auto-model would route this task (text, a task file or a "
+            "URL, as for a run): the task profile it matches, why, and every "
+            "model in the order it would try them. Calls no model and changes no "
+            "file."
         ),
     )
     parser.add_argument(
@@ -510,6 +520,16 @@ def check_main(argv: list[str], *, out: TextIO | None = None) -> int:
     """`certo check`: re-run init's model check against the current settings."""
     args = build_check_parser().parse_args(argv)
     out = out or sys.stdout
+    if args.task is not None:
+        from .cli import resolve_task_source  # cli imports this module
+
+        load_settings_files()  # the model-file settings can be in .env
+        try:
+            task = resolve_task_source(args.task)
+        except ValueError as exc:
+            print(f"Error: {exc}", file=out)
+            return 1
+        return 0 if print_task_routing(out, task) else 1
     print_setting_sources(load_settings_files(), out)
     ok = run_check(None, out, timeout=args.timeout)
     print(file=out)

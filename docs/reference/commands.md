@@ -156,12 +156,14 @@ Check that the configured model works.
 
 ```text
 certo check [--timeout SECONDS] [--models]
+certo check --task TASK
 ```
 
 | Flag | Default | Effect |
 |---|---|---|
 | `--timeout SECONDS` | `120` | How long to wait for each answer. A local model may need time to load. |
 | `--models` | off | Also send the same test request to every model enabled in `models.yaml`, one line per model. |
+| `--task TASK` | none | Show only how `--auto-model` would route this task, and stop. `TASK` is text, a task file or a URL, as for a run. No model is called. See below. |
 
 It reads the settings like a run does, prints each LLM setting and where
 it came from (`environment variable`, `./.env (<path>)` or
@@ -174,7 +176,8 @@ answers with a tool call. Every message and its fix:
 [where Certo looks](models-yaml.md#where-certo-looks)), `certo check` also
 reports them: which files it found (including the optional
 `task_profiles.yaml` and `escalation.yaml`, or `none`), the active and inactive models, how
-many listed models aren't used, each ladder with its usable rungs, the
+many listed models aren't used, for each task profile the first three
+models `--auto-model` would try (with their scores), each ladder with its usable rungs, the
 ladder Certo would build from the ratings (and the models it leaves out
 of it, with the model that beats each one), and every error and warning
 (see [Checks](models-yaml.md#checks)). A missing file is an error with the
@@ -188,6 +191,13 @@ Model files:
   Escalation: .../escalation.yaml
   Active models: qwen-local, gpt-luna, claude-sonnet
   Inactive models: gemma-local
+  Task profiles (--auto-model), checked in this order:
+    debugging, title has: fix, bug
+      gpt-luna (named by the profile, score 13), claude-sonnet (score 20), qwen-local (score 9)
+    scaffolding, title has: scaffold
+      qwen-local (score 10), gpt-luna (score 8), claude-sonnet (score 4)
+    default, when no other profile matches
+      claude-sonnet (score 12), gpt-luna (score 11), qwen-local (score 10)
   Ladder 'default': qwen-local -> gpt-luna -> claude-sonnet
   Ladder 'local-only': qwen-local (1 rung(s) skipped)
   Derived ladder: qwen-local (capability 5, cost rating 5) -> gpt-luna (capability 7, cost rating 4) -> claude-sonnet (capability 10, cost rating 2)
@@ -199,9 +209,26 @@ With `--models`, each active model gets a line such as
 `qwen-local (ollama/qwen3-coder:30b)... ok: reachable, tool calling works.`
 A broken key or a model without tool calling shows up here, before a run.
 
+**One task: `--task`.** `certo check --task "Fix the bugs in the parser"`
+shows what `--auto-model` would do with that task, without running it:
+the task's title, the profile it matches and why, and every active model
+in the order Certo would try it. It makes no model call and doesn't check
+the main model:
+
+```text
+Task title: Fix the bugs in the parser
+Profile: debugging ("fix" is in the title)
+Models, in the order --auto-model tries them (the profile names gpt-luna; fallbacks ranked by weights):
+  1. gpt-luna (named by the profile, score 13)
+  2. claude-sonnet (score 20)
+  3. qwen-local (score 9)
+The first model runs the task. The next one takes over if its provider fails, or if a fix attempt still fails Certo's checks.
+```
+
 **Exit code.** 0 when the model check passes, the catalog has no error,
 and (with `--models`) every model passes; 1 otherwise. `--models` without
-the model files is an error.
+the model files is an error. With `--task`: 0 when the model files load,
+1 when they can't be found or read.
 
 ## `certo bench`
 

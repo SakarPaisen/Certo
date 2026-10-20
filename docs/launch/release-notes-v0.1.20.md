@@ -3,7 +3,8 @@
 The task profiles and the escalation ladders move out of
 `models_list.yaml` into files of their own, a run that uses all its steps
 is checked instead of ending `stuck`, a task profile can name the model to
-use, and `--auto-model` reads a task's title instead of its whole text.
+use, `certo check` shows which models your task profiles pick, and
+`--auto-model` reads a task's title instead of its whole text.
 
 ## Changed: one file per mode for your model choices
 
@@ -79,6 +80,16 @@ fails, the weights pick the next one. When it isn't enabled, the weights
 decide as before, and `MODEL_DECISIONS.md` says why. `certo check` reports
 a name that doesn't exist. See
 [Pick models automatically](../guides/pick-models-automatically.md#always-use-one-model-for-a-kind-of-task).
+
+## New: see which models your task profiles pick, before a run
+
+`certo check` now lists every task profile, its trigger words, and the
+first three models `--auto-model` would try for it, with their scores.
+`certo check --task "..."` (text or a task file) shows what one task
+would get: its title, the profile it matches and why, and every model in
+order. Neither calls a model, so you can tune `task_profiles.yaml` and
+check again at no cost. See
+[Pick models automatically](../guides/pick-models-automatically.md#preview-and-tune-the-choice).
 
 ## Fixed: `--auto-model` reads the task's title, not its whole text
 

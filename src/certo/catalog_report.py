@@ -1,6 +1,7 @@
 """The model catalog part of `certo check`: what `models.yaml` holds, the
-ladders it gives, its problems, and (with `--models`) a real tool-call test
-of every active model. Never prints a key."""
+model order each task profile gives, the ladders, its problems, and (with
+`--models`) a real tool-call test of every active model. With `--task`,
+how `--auto-model` would route one task. Never prints a key."""
 
 from __future__ import annotations
 
@@ -17,7 +18,13 @@ from .model_catalog import (
     ModelCatalog,
     ModelCatalogEntry,
     ModelCatalogError,
+    TaskProfile,
+    classify_task,
+    find_trigger,
     load_model_catalog,
+    rank_for_profile,
+    score_entry,
+    task_title,
 )
 from .model_files import find, missing_message, resolve, resolve_optional
 from .model_selection import config_for_entry
@@ -49,6 +56,52 @@ def entry_config(entry: ModelCatalogEntry) -> Config:
     return config_for_entry(base, entry)
 
 
+# Models shown per profile in `certo check`; `certo check --task` shows all.
+_PROFILE_MODELS_SHOWN = 3
+
+
+def _ranked(catalog: ModelCatalog, profile: TaskProfile) -> list[tuple[str, str]]:
+    """(name, note) per model, in the order --auto-model tries them. Empty
+    when no model is active."""
+    try:
+        ranked, _how = rank_for_profile(catalog, profile)
+    except ModelCatalogError:
+        return []
+    rows = []
+    for entry in ranked:
+        note = f"score {score_entry(entry, profile.weights):g}"
+        if entry.name == profile.model:
+            note = f"named by the profile, {note}"
+        rows.append((entry.name, note))
+    return rows
+
+
+def _profile_lines(catalog: ModelCatalog) -> list[str]:
+    """Each task profile, its trigger words and the models it would run,
+    in the order they are checked: the first profile whose word is in the
+    task's title wins, `default` when none is."""
+    if not catalog.task_profiles:
+        return []
+    lines = ["  Task profiles (--auto-model), checked in this order:"]
+    rows = [
+        (p.name, f"title has: {', '.join(p.triggers) or '(no trigger words)'}", p)
+        for p in catalog.task_profiles
+        if p.name != "default"
+    ]
+    # The 'default' profile, or Certo's own (empty weights) when there is none.
+    fallback = classify_task("", catalog)
+    name = fallback.name if fallback in catalog.task_profiles else "(no 'default' profile)"
+    rows.append((name, "when no other profile matches", fallback))
+    for name, when, profile in rows:
+        models = _ranked(catalog, profile)
+        shown = ", ".join(f"{n} ({note})" for n, note in models[:_PROFILE_MODELS_SHOWN])
+        if len(models) > _PROFILE_MODELS_SHOWN:
+            shown += f", +{len(models) - _PROFILE_MODELS_SHOWN} more"
+        lines.append(f"    {name}, {when}")
+        lines.append(f"      {shown or 'no active model'}")
+    return lines
+
+
 def _catalog_lines(catalog: ModelCatalog) -> list[str]:
     active = [m.name for m in catalog.models if m.activated]
     inactive = [m.name for m in catalog.models if m.configured and not m.activated]
@@ -60,6 +113,7 @@ def _catalog_lines(catalog: ModelCatalog) -> list[str]:
         lines.append(
             f"  {unlisted} other model(s) in models_list.yaml, not used (not in models.yaml)"
         )
+    lines.extend(_profile_lines(catalog))
     for ladder in catalog.escalation.ladders.values():
         usable = usable_rungs(ladder, catalog)
         rungs = " -> ".join(r.model for r in usable) or "no usable rung"
@@ -76,6 +130,71 @@ def _catalog_lines(catalog: ModelCatalog) -> list[str]:
         if derived.skipped:
             lines.append(f"  Left out of the derived ladder: {', '.join(derived.skipped)}")
     return lines
+
+
+def _load_catalog(out: TextIO) -> ModelCatalog | None:
+    """Find and load the model files, printing which ones are used. None
+    after printing the error."""
+    models_file, list_file = _setting("MODELS_FILE"), _setting("MODELS_LIST_FILE")
+    print("Model files:", file=out)
+    try:
+        list_path, models_path = resolve(models_file, list_file)
+        profiles_path, escalation_path = resolve_optional(
+            _setting("TASK_PROFILES_FILE"), _setting("ESCALATION_FILE")
+        )
+        print(f"  List: {list_path}", file=out)
+        print(f"  Personal settings: {models_path}", file=out)
+        print(f"  Task profiles: {profiles_path or 'none (optional, for --auto-model)'}", file=out)
+        print(f"  Escalation: {escalation_path or 'none (optional, for --escalate)'}", file=out)
+        return load_model_catalog(
+            list_path,
+            models_path,
+            profiles_path=profiles_path,
+            escalation_path=escalation_path,
+            strict=False,
+        )
+    except ModelCatalogError as exc:
+        print(f"  Error: {exc}", file=out)
+        print(file=out)
+        return None
+
+
+def print_task_routing(out: TextIO, task_text: str) -> bool:
+    """`certo check --task`: the profile --auto-model would pick for this
+    task, why, and every model in the order it would try them. No model is
+    called. False when the model files can't be loaded."""
+    catalog = _load_catalog(out)
+    if catalog is None:
+        return False
+    print(file=out)
+    title = task_title(task_text)
+    print(f"Task title: {title or '(empty)'}", file=out)
+    profile = classify_task(task_text, catalog)
+    trigger = find_trigger(task_text, profile) if profile.name != "default" else None
+    if trigger is not None:
+        why = f'"{trigger}" is in the title'
+    elif profile in catalog.task_profiles:
+        why = "no other profile's trigger word is in the title"
+    else:
+        why = "no profile matches and there is no 'default' profile; file order"
+    print(
+        f"Profile: {profile.name if profile in catalog.task_profiles else '(none)'} ({why})",
+        file=out,
+    )
+    try:
+        _ranked_entries, how = rank_for_profile(catalog, profile)
+    except ModelCatalogError as exc:
+        print(f"  Error: {exc}", file=out)
+        return False
+    print(f"Models, in the order --auto-model tries them ({how}):", file=out)
+    for i, (name, note) in enumerate(_ranked(catalog, profile), start=1):
+        print(f"  {i}. {name} ({note})", file=out)
+    print(
+        "The first model runs the task. The next one takes over if its provider "
+        "fails, or if a fix attempt still fails Certo's checks.",
+        file=out,
+    )
+    return True
 
 
 def print_catalog_report(
@@ -97,26 +216,8 @@ def print_catalog_report(
             print(f"--models: {missing_message(MODELS_FILE, 'CERTO_MODELS_FILE')}", file=out)
             return False
         return True
-    print("Model files:", file=out)
-    try:
-        list_path, models_path = resolve(models_file, list_file)
-        profiles_path, escalation_path = resolve_optional(
-            _setting("TASK_PROFILES_FILE"), _setting("ESCALATION_FILE")
-        )
-        print(f"  List: {list_path}", file=out)
-        print(f"  Personal settings: {models_path}", file=out)
-        print(f"  Task profiles: {profiles_path or 'none (optional, for --auto-model)'}", file=out)
-        print(f"  Escalation: {escalation_path or 'none (optional, for --escalate)'}", file=out)
-        catalog = load_model_catalog(
-            list_path,
-            models_path,
-            profiles_path=profiles_path,
-            escalation_path=escalation_path,
-            strict=False,
-        )
-    except ModelCatalogError as exc:
-        print(f"  Error: {exc}", file=out)
-        print(file=out)
+    catalog = _load_catalog(out)
+    if catalog is None:
         return False
     report = check_catalog(catalog)
     for line in _catalog_lines(catalog):

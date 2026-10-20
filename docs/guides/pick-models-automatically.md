@@ -150,6 +150,51 @@ task_profiles:
 - `certo check` reports a name that isn't in `models_list.yaml` as an
   error, and a model that isn't enabled as a warning.
 
+## Preview and tune the choice
+
+You don't need to run a task to see which model it gets. `certo check`
+lists every task profile with the first three models it would try:
+
+```text
+  Task profiles (--auto-model), checked in this order:
+    debugging, title has: fix, bug
+      gpt-luna (named by the profile, score 13), claude-sonnet (score 20), qwen-local (score 9)
+    scaffolding, title has: scaffold
+      qwen-local (score 10), gpt-luna (score 8), claude-sonnet (score 4)
+    default, when no other profile matches
+      claude-sonnet (score 12), gpt-luna (score 11), qwen-local (score 10)
+```
+
+For one task, `certo check --task` shows the profile it matches and the
+whole order. Give it the task the way you would give it to a run (text
+or a task file):
+
+```bash
+certo check --task "Write a Wordle game in Python"
+certo check --task tasks/wordle.md
+```
+
+```text
+Task title: Write a Wordle game in Python
+Profile: default (no other profile's trigger word is in the title)
+Models, in the order --auto-model tries them (ranked by the profile's weights):
+  1. claude-sonnet (score 12)
+  2. gpt-luna (score 11)
+  3. qwen-local (score 10)
+The first model runs the task. The next one takes over if its provider fails, or if a fix attempt still fails Certo's checks.
+```
+
+Neither one calls a model, so you can change `task_profiles.yaml` and run
+them again as often as you like:
+
+- **The wrong profile?** Add a trigger word to the profile you want, or
+  reword the task's title. Remember that the first matching profile wins.
+- **The wrong first model?** Raise the weight of the axis that model is
+  rated well on, or name it with `model:`.
+- **The wrong fallback?** The second line is the model that takes over
+  when the first one fails. If you want a stronger model there, raise its
+  axis in the weights: `model:` only fixes the first one.
+
 ## See what was chosen and why
 
 Before the verdict, the output says which model did the work:
