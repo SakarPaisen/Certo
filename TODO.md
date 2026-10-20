@@ -33,6 +33,22 @@ first item is the suggested next one.
   don't call it an outage. Related: a small `certo bench` run of the
   Haiku → Sonnet ladder, so the README can drop one "not benchmarked
   yet". Done when the GIF is in the README, linked to its record page.
+- **README wording: no comparisons with other agents, no local-first
+  leftovers.** Two fixes, with the matching `docs/` pages in the same
+  commit:
+  1. "Any model, and the right one for each task" opens with "Most coding
+     agents are built around one provider." Certo shouldn't claim what
+     other agents do or don't do: say it about Certo only, for example
+     "Certo isn't tied to any provider: the model is one setting…". While
+     there, search the README and `docs/` for other comparative claims
+     ("most agents", "other agents", "unlike", "the only", "the first")
+     and rewrite them the same way.
+  2. "Why the verdict can be trusted" says the verdict "decides when a
+     local model's work is good enough to keep", a leftover from the
+     local-first positioning. Make it "a model's work".
+
+  Done when neither sentence is left and the search finds no other
+  comparative claim.
 - **Unpin the release runner from `ubuntu-24.04`.** Pinned for 0.1.18
   because `ubuntu-latest` moved to Ubuntu 26 on 2026-10-19. Switch the
   three jobs back once a run on `ubuntu-latest` has passed (the
