@@ -273,49 +273,6 @@ the first task, Wordle, ended `verified` in 11m 49s. What got in the way
 is in the first item and in "Smaller bugs". (The quieter run, 0.1.21,
 cut that first run's output from 2,949 lines to 1,021.)
 
-- **`certo init` sets up more than one model, in menus, and runs a
-  first task.** Today a second model means: copy three examples from
-  deep inside the tool's install folder (`certo check` prints the `cp`
-  commands only once a model file exists, although the pick-models guide
-  says it prints them when one is missing), then edit 600 lines of YAML.
-  The copied `models.yaml` is live at once: three models enabled, one at
-  a made-up `192.168.1.50`, one cloud model with an empty key, and
-  `certo check` warns only about the key. The model `init` already saved
-  has to be entered again, under another name. Instead, `init` (or `certo
-  init models`) offers a navigable menu (arrow keys; `prompt_toolkit` and
-  `rich` come with the SDK already, so declare them as Certo's own
-  dependencies before using them): start from the model already saved,
-  offer models from the example list for the keys and Ollama models it
-  finds, never invent ratings, take keys at a hidden prompt into the
-  settings file and name them in `models.yaml` as `${VAR}`, test each one with the `check --models`
-  call and leave failures disabled, write only the models that work, then
-  show `certo check`'s profile table. At the end it offers to run one
-  sample task, so the user sees a verdict without typing another command.
-  The plain one-model path must stay as short as it is. Done when a new
-  user gets from `uv tool install` to an `--auto-model` run without
-  editing a file, measured like the first run.
-
-  Agreed with the Author on 2026-10-20 (screens reviewed as mockups):
-  - "Add more models?" defaults to No, and the last screen always offers
-    "Just one model, without --auto-model or --escalate" (which one, from
-    the models set up) as the default, besides `--auto-model` and
-    `--escalate` as the mode for every run.
-  - Every list (provider, Ollama model, extra models) ends with "Another
-    model": a typed LiteLLM id, tested like the others. A model that
-    isn't in the example list gets ratings from the user (1 to 5, Enter
-    keeps 3), saved as "rated by you"; without them it can be used only
-    alone.
-  - Keys stay only in the settings file; `models.yaml` refers to them as
-    `${VAR}` (see DECISIONS.md).
-  - `models_list.yaml` is the example list, copied unchanged, kept up to
-    date by `certo models update`.
-  - Order, one commit each: `${VAR}` in `models.yaml` (done, 0.1.21);
-    `certo init models` (extra models, testing, the preview and the mode;
-    done, 0.1.21); `certo models update` (done, 0.1.21); menus for all
-    of `init` (done, 0.1.21); the sample run (done, 0.1.21). Left: the
-    "Done when" measurement, a new user from `uv tool install` to an
-    `--auto-model` run, timed like the first run, once 0.1.21 is on
-    PyPI.
 - **A first run in minutes, with one model.** No catalog, no ladders:
   `certo init`, then a first verified project. Getting started shows only
   that path. Measured 2026-10-19 in an empty home folder: 88.5s from
