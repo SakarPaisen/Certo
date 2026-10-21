@@ -268,7 +268,7 @@ given design was chosen.
   (so tests never run it); the CLI passes `run_sample_task`. Package data in
   `src/certo/starter/`: `providers.toml` (menu order, default models),
   the workspace `README.md`, `gitignore`, and `tasks/wordle.md`/
-  `asteroids.md`.
+  `space-rocks.md`.
 - **`menus.py`** — arrow-key menus for `init` and `init models`:
   prompt_toolkit's `choice()` for one choice, and `checklist()`, an
   inline Application (prompt_toolkit's only multi-select is a full-screen

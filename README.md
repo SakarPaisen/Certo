@@ -168,7 +168,7 @@ cd certo-workspace
 certo tasks/wordle.md --project wordle
 ```
 
-`certo init` asks which provider you use (OpenAI, Anthropic, Gemini, a local Ollama, or any LiteLLM model), takes your API key at a hidden prompt, saves the settings, and makes one real call to check the model works. It also leaves two sample tasks in `tasks/`: a terminal Wordle in Python and a browser Asteroids game (which needs Node 18+). With a cloud model a run uses your credits, and Certo prints the cost at the end. The generated project lands in `projects/wordle`.
+`certo init` asks which provider you use (OpenAI, Anthropic, Gemini, a local Ollama, or any LiteLLM model), takes your API key at a hidden prompt, saves the settings, and makes one real call to check the model works. It also leaves two sample tasks in `tasks/`: a terminal Wordle in Python and a browser space-rocks shooter (which needs Node 18+). With a cloud model a run uses your credits, and Certo prints the cost at the end. The generated project lands in `projects/wordle`.
 
 ### More than one model
 
@@ -243,7 +243,7 @@ The exit code is nonzero for every failure state, so Certo works in scripts and 
 - **Picks the best model per task.** Rate your models in `models_list.yaml`, enable the ones you have keys for in `models.yaml`, describe your kinds of task in `task_profiles.yaml`, and Certo routes each task to the best fit, with fallback when a provider fails. No extra LLM call to decide. Add `--auto-model`.
 - **Hands over when a model fails.** Give Certo a ladder of models. Each task starts on the first, and moves to the next when verification shows the model couldn't finish, or its provider fails. Add `--escalate`. See [Escalate between models](https://github.com/alessioricco/certo/blob/main/docs/guides/escalate-between-models.md).
 - **A benchmark.** `certo bench` compares models and strategies on tasks graded by hidden tests, and counts how often Certo itself was fooled. See [Benchmark models and strategies](https://github.com/alessioricco/certo/blob/main/docs/guides/benchmark.md).
-- **Compare models on your own task.** A small script runs one task on a list of models, each in its own folder, and ends with a table of verdicts, times and costs. See [Compare models on one task](https://github.com/alessioricco/certo/blob/main/docs/guides/compare-models-on-a-task.md), and a real example with screenshots: [five models build Asteroids](https://github.com/alessioricco/certo/blob/main/docs/benchmark/compare-asteroids-0.1.19.md), where the cheapest cloud model, GPT-5.6 Luna, built a verified game for $0.07.
+- **Compare models on your own task.** A small script runs one task on a list of models, each in its own folder, and ends with a table of verdicts, times and costs. See [Compare models on one task](https://github.com/alessioricco/certo/blob/main/docs/guides/compare-models-on-a-task.md), and a real example with screenshots: [five models build an Asteroids-style game](https://github.com/alessioricco/certo/blob/main/docs/benchmark/compare-asteroids-0.1.19.md), where the cheapest cloud model, GPT-5.6 Luna, built a verified game for $0.07.
 
 **Checks you can trust**
 

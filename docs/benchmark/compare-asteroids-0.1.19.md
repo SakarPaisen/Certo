@@ -1,7 +1,7 @@
-# Five models build Asteroids (Certo 0.1.19)
+# Five models build an Asteroids-style game (Certo 0.1.19)
 
 One run of [Compare models on one task](../guides/compare-models-on-a-task.md):
-the same task, a browser Asteroids game, given to five models one after
+the same task, a browser Asteroids-style game, given to five models one after
 the other. It shows what a model comparison looks like on a task bigger
 than the benchmark's, and what Certo's verdict did and didn't catch. It
 is one run per model, so it is a first look, not a ranking: for that, see
@@ -34,21 +34,21 @@ runs had ended. Each screenshot shows the game running in a browser.
 
 ### Claude Sonnet 5.5: `verified`
 
-![Asteroids built by Claude Sonnet 5.5, verified in 10m 49s for $1.40](../assets/asteroids-claude-sonnet-5-5.png)
+![The game built by Claude Sonnet 5.5, verified in 10m 49s for $1.40](../assets/asteroids-claude-sonnet-5-5.png)
 
 The most tests by far (52), and the build, tests and lint all pass. The
 most expensive run.
 
 ### GPT-6.1 Sol: `verified`
 
-![Asteroids built by GPT-6.1 Sol, verified in 19m 01s for $1.24](../assets/asteroids-gpt-6-1-sol.png)
+![The game built by GPT-6.1 Sol, verified in 19m 01s for $1.24](../assets/asteroids-gpt-6-1-sol.png)
 
 The slowest of the three that finished: 19 minutes, almost twice the
 others. 15 tests; the build, tests and lint pass.
 
 ### GPT-5.6 Luna: `verified`
 
-![Asteroids built by GPT-5.6 Luna, verified in 11m 17s for $0.07](../assets/asteroids-gpt-5-6-luna.png)
+![The game built by GPT-5.6 Luna, verified in 11m 17s for $0.07](../assets/asteroids-gpt-5-6-luna.png)
 
 A complete game for 7 cents, about a twentieth of what Sonnet and Sol
 cost. It is the only one of the three with a type check, which passed
@@ -56,7 +56,7 @@ too. Only 6 tests: fewer tests means a `verified` verdict proves less.
 
 ### Claude Haiku 5.5: `stuck`
 
-![Asteroids built by Claude Haiku 5.5: the run ended stuck after 13m 04s, $0.28](../assets/asteroids-claude-haiku-5-5.png)
+![The game built by Claude Haiku 5.5: the run ended stuck after 13m 04s, $0.28](../assets/asteroids-claude-haiku-5-5.png)
 
 The game runs, as the screenshot shows, but the run didn't finish. Haiku
 used all 50 of its steps while still editing, so the run ended before

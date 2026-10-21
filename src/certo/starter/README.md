@@ -22,7 +22,7 @@ certo tasks/wordle.md --project wordle
 ```
 
 A task is a plain text file saying what to build. Open `tasks/wordle.md`
-to see one, then write your own the same way. `tasks/asteroids.md` builds
+to see one, then write your own the same way. `tasks/space-rocks.md` builds
 a browser game and needs Node 18 or newer.
 
 ## 3. Find the result

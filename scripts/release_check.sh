@@ -114,7 +114,7 @@ run init 0 "  certo tasks/wordle.md --project wordle" "${noenv[@]}" "$certo" ini
 [ "$(mode "$user_env")" = 600 ] && pass "the user file has mode 600" || fail "the user file has mode $(mode "$user_env"), expected 600"
 grep -qx "CERTO_LLM_MODEL=openai/.*" "$user_env" && pass "the user file selects the OpenAI default" || fail "the user file has no active CERTO_LLM_MODEL"
 ws="$work/cwd-init/certo-workspace"
-for f in .gitignore README.md tasks/wordle.md tasks/asteroids.md; do
+for f in .gitignore README.md tasks/wordle.md tasks/space-rocks.md; do
   [ -f "$ws/$f" ] && pass "init wrote $f" || fail "init did not write $f"
 done
 [ ! -e "$ws/.env" ] && pass "the sample folder has no .env" || fail "init --yes wrote $ws/.env"

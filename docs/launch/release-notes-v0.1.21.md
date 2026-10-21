@@ -103,6 +103,14 @@ When the variable isn't set, the model is now left out and Certo says
 which variable is missing. The example `models.yaml` uses this form. See
 [The model files](../reference/models-yaml.md#modelsyaml).
 
+## Changed: the browser sample is `tasks/space-rocks.md`
+
+The browser sample that `certo init` leaves in `tasks/` was
+`asteroids.md`. It is now `space-rocks.md`, with the same game and the
+same tests under a generic name, so Certo doesn't use another company's
+game title for its own sample. A folder made by an earlier `certo init`
+keeps its `asteroids.md`.
+
 ## Fixed: `certo --escalate "task"` runs the task
 
 `--escalate` takes an optional ladder name, so with the flag before the

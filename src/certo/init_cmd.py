@@ -812,7 +812,7 @@ def init_main(
             print(note, file=out)
         if shutil.which("node") is None:
             print(
-                "\ntasks/asteroids.md needs Node 18 or newer, which isn't installed here. "
+                "\ntasks/space-rocks.md needs Node 18 or newer, which isn't installed here. "
                 "Start with Wordle.",
                 file=out,
             )

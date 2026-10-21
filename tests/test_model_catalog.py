@@ -323,7 +323,7 @@ _BUNDLED_TASKS = Path(__file__).resolve().parent.parent / "src" / "certo"
         ("benchmark_tasks/token-bucket/task.md", "default"),
         ("benchmark_tasks/wordle-score/task.md", "default"),
         ("starter/tasks/wordle.md", "default"),
-        ("starter/tasks/asteroids.md", "default"),
+        ("starter/tasks/space-rocks.md", "default"),
     ],
 )
 def test_shipped_profiles_classify_the_bundled_tasks(tmp_path, task_file, expected):

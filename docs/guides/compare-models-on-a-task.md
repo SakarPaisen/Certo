@@ -22,8 +22,8 @@ leap-year function with tests):
 
 Then you can open each model's project and compare the code, the tests
 and the README it wrote. A full example, five models building an
-Asteroids game, with screenshots and what each verdict meant:
-[Five models build Asteroids](../benchmark/compare-asteroids-0.1.19.md).
+Asteroids-style game, with screenshots and what each verdict meant:
+[Five models build an Asteroids-style game](../benchmark/compare-asteroids-0.1.19.md).
 
 ## 1. Get the script
 
@@ -145,7 +145,7 @@ Two settings change how it runs:
   best in Certo's benchmark
 - [OpenAI, Claude and Gemini](openai-claude-gemini.md#try-another-model-for-one-run):
   change the model for a single run
-- [Five models build Asteroids](../benchmark/compare-asteroids-0.1.19.md):
+- [Five models build an Asteroids-style game](../benchmark/compare-asteroids-0.1.19.md):
   a real comparison made with this script
 - [Provider swap in 0.1.19](../benchmark/provider-swap-0.1.19.md): the
   same task on an OpenAI and an Anthropic model, and what running each

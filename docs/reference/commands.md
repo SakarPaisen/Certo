@@ -135,7 +135,7 @@ then every other provider's lines commented out.
 
 **The sample folder** gets `.gitignore` (`.env`, `projects/`,
 `artifacts/`; an existing file only gains missing lines), `tasks/wordle.md`
-and `tasks/asteroids.md`, and a `README.md` with next steps. A `README.md`
+and `tasks/space-rocks.md`, and a `README.md` with next steps. A `README.md`
 that `init` didn't write is never replaced. With "All projects", the
 folder gets no `.env`, and a folder that already has files is skipped.
 
