@@ -395,6 +395,14 @@ database).
 
 ## Smaller bugs
 
+- **Four `tests/test_server.py` tests need a model setting.**
+  `test_health` and the three unknown-id/project tests call
+  `server.create_app()`, which loads the config, so they fail with
+  `CERTO_LLM_MODEL is required` in a checkout without a `.env` (seen
+  2026-10-21 in a fresh worktree of `main`). They pass here only because
+  the repo's `.env` sets it. Give them a model in the test (monkeypatch),
+  like the other server tests. Done when the suite passes in a fresh
+  clone with no `.env`.
 - **Stop reading `task_profiles:` / `escalation:` in `models_list.yaml`.**
   Since 0.1.20 they have their own files; the old sections are still read
   with a warning. Remove that path (and the tests that use the old layout
