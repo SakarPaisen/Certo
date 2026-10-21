@@ -1,15 +1,18 @@
-# Certo v0.1.21 (not released yet)
+# Certo v0.1.21
 
 This release is about the first hour with Certo, from a walk-through as
 a new user:
 
 - **Setting up:** `certo init` asks with arrow-key menus, offers DeepSeek
-  and Kimi, and can run your first task at the end. `certo init models`
-  sets up more than one model without editing a file, and `certo models
-  update` keeps your list of models up to date. Keys stay in one place,
-  your settings file.
+  and Kimi, and ends with a menu of five sample tasks to run right away.
+  `certo init models` sets up more than one model without editing a
+  file, and `certo models update` keeps your list of models up to date.
+  Keys stay in one place, your settings file.
 - **Running:** a run prints a third of what it did, and Certo's own notes
   show as they happen.
+- **Also:** Python projects on Windows get their own virtual environment
+  right, thanks to @Erfouni, and two packages with critical security
+  advisories, certifi and Pillow, are updated.
 
 ## Changed: a quieter run
 
@@ -131,6 +134,17 @@ following arguments are required: task". Now a single value after
 `--escalate` is the task, on the default ladder, as the docs showed.
 `certo --escalate hard "task"` still uses the ladder named `hard`. See
 [Commands](../reference/commands.md#certo).
+
+## Fixed: Python virtual environments on Windows
+
+Certo looked for a Python project's interpreter in `.venv/bin/python`, the
+macOS and Linux layout, so checking a Python project on Windows probably
+failed. It now uses `.venv\Scripts\python.exe` on Windows, and `;`
+between PATH entries; Docker keeps the Linux paths. Contributed by
+@Erfouni in [#8](https://github.com/alessioricco/certo/pull/8). The rest
+of Windows support, mostly the test suite, is still open in
+[#7](https://github.com/alessioricco/certo/issues/7). See
+[Verification by language](../reference/verification-by-language.md).
 
 ## Security: certifi and Pillow updated
 
