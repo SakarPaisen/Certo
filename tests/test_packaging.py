@@ -171,6 +171,9 @@ def test_wheel_ships_the_certo_init_starter_files(built):
         "certo/starter/gitignore",
         "certo/starter/tasks/wordle.md",
         "certo/starter/tasks/space-rocks.md",
+        "certo/starter/tasks/hanoi.md",
+        "certo/starter/tasks/mazeman.md",
+        "certo/starter/tasks/invaders.md",
     } <= repo
     assert repo <= names
 

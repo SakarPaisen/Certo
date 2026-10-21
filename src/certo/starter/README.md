@@ -22,8 +22,15 @@ certo tasks/wordle.md --project wordle
 ```
 
 A task is a plain text file saying what to build. Open `tasks/wordle.md`
-to see one, then write your own the same way. `tasks/space-rocks.md` builds
-a browser game and needs Node 18 or newer.
+to see one, then write your own the same way. The other samples:
+
+- `tasks/hanoi.md`: the Tower of Hanoi in the terminal, in Python;
+- `tasks/space-rocks.md`: a ship shooting space rocks, in the browser;
+- `tasks/mazeman.md`: a maze chase with ghosts, in the browser;
+- `tasks/invaders.md`: a cannon against a marching alien fleet, in the
+  browser.
+
+The browser games need Node 18 or newer, for their tests.
 
 ## 3. Find the result
 

@@ -661,7 +661,13 @@ def test_creates_the_workspace_files(tmp_path, monkeypatch, no_check):
         "projects/",
         "artifacts/",
     ]
-    assert sorted(p.name for p in (folder / "tasks").iterdir()) == ["space-rocks.md", "wordle.md"]
+    assert sorted(p.name for p in (folder / "tasks").iterdir()) == [
+        "hanoi.md",
+        "invaders.md",
+        "mazeman.md",
+        "space-rocks.md",
+        "wordle.md",
+    ]
     readme = (folder / "README.md").read_text()
     assert readme.startswith(init_cmd.README_TITLE)
     for needle in ("certo check", "certo verify", "cost", "OLLAMA_CONTEXT_LENGTH", "projects/"):
@@ -732,7 +738,7 @@ def test_missing_node_is_mentioned(tmp_path, monkeypatch, no_check):
 
     _code, script = _run(tmp_path, monkeypatch, ["w"], interactive=False)
 
-    assert "space-rocks.md needs Node 18 or newer" in script.text
+    assert "The browser games (space-rocks, mazeman, invaders) need Node 18" in script.text
     assert (tmp_path / "w" / "tasks" / "space-rocks.md").exists()
 
 

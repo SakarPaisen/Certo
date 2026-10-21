@@ -168,7 +168,7 @@ cd certo-workspace
 certo tasks/wordle.md --project wordle
 ```
 
-`certo init` asks which provider you use (OpenAI, Anthropic, Gemini, a local Ollama, or any LiteLLM model), takes your API key at a hidden prompt, saves the settings, and makes one real call to check the model works. It also leaves two sample tasks in `tasks/`: a terminal Wordle in Python and a browser space-rocks shooter (which needs Node 18+). With a cloud model a run uses your credits, and Certo prints the cost at the end. The generated project lands in `projects/wordle`.
+`certo init` asks which provider you use (OpenAI, Anthropic, Gemini, a local Ollama, or any LiteLLM model), takes your API key at a hidden prompt, saves the settings, and makes one real call to check the model works. It also leaves five sample tasks in `tasks/`: Wordle and the Tower of Hanoi in the terminal, in Python, and three browser games (a space-rocks shooter, a maze chase and an alien-fleet shooter), which need Node 18+. With a cloud model a run uses your credits, and Certo prints the cost at the end. The generated project lands in `projects/wordle`.
 
 ### More than one model
 

@@ -103,6 +103,15 @@ When the variable isn't set, the model is now left out and Certo says
 which variable is missing. The example `models.yaml` uses this form. See
 [The model files](../reference/models-yaml.md#modelsyaml).
 
+## New: three more sample tasks
+
+`certo init` now leaves five sample tasks in `tasks/`: Wordle, plus the
+Tower of Hanoi in the terminal (`hanoi.md`, Python) and two more browser
+games, a maze chase (`mazeman.md`) and a cannon against an alien fleet
+(`invaders.md`), which need Node 18 or newer like `space-rocks.md`. Each
+one names the functions to write and the test cases to copy, so Certo
+can check the result with the project's own tests.
+
 ## Changed: the browser sample is `tasks/space-rocks.md`
 
 The browser sample that `certo init` leaves in `tasks/` was

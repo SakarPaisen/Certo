@@ -812,8 +812,8 @@ def init_main(
             print(note, file=out)
         if shutil.which("node") is None:
             print(
-                "\ntasks/space-rocks.md needs Node 18 or newer, which isn't installed here. "
-                "Start with Wordle.",
+                "\nThe browser games (space-rocks, mazeman, invaders) need Node 18 or newer, "
+                "which isn't installed here. Start with Wordle or Hanoi.",
                 file=out,
             )
     elif blocked and scope == USER_SCOPE and not args.no_samples:

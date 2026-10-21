@@ -267,8 +267,7 @@ given design was chosen.
   folder as its own process. `init_main(run_sample=)` is None by default
   (so tests never run it); the CLI passes `run_sample_task`. Package data in
   `src/certo/starter/`: `providers.toml` (menu order, default models),
-  the workspace `README.md`, `gitignore`, and `tasks/wordle.md`/
-  `space-rocks.md`.
+  the workspace `README.md`, `gitignore`, and the sample tasks in `tasks/`.
 - **`menus.py`** — arrow-key menus for `init` and `init models`:
   prompt_toolkit's `choice()` for one choice, and `checklist()`, an
   inline Application (prompt_toolkit's only multi-select is a full-screen

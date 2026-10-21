@@ -14,8 +14,8 @@ steps in order.
   Certo prints the cost at the end. Later you can use more than one: for
   example a local model first, and a cloud model only for the tasks it
   couldn't finish (see [Next steps](#next-steps)).
-- **Node 18 or newer**, only for the browser sample task. The Python sample
-  needs nothing else.
+- **Node 18 or newer**, only for the browser sample tasks. The Python
+  samples need nothing else.
 
 ## 1. Install
 
@@ -96,7 +96,7 @@ model works and can call tools, which Certo's agent needs:
 Checking the model openai/gpt-6.1-sol... ok: reachable, tool calling works.
 ```
 
-It also creates `certo-workspace/`, with two sample tasks in `tasks/` and
+It also creates `certo-workspace/`, with five sample tasks in `tasks/` and
 a `README.md` with these next steps.
 
 ## 3. Check the model: `certo check`
