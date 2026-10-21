@@ -65,6 +65,16 @@ first item is the suggested next one.
     `PROMPT_TOOLKIT_NO_CPR=1`).
 
   Done when each is checked, or fixed.
+- **The other Dependabot alerts (20, seen 2026-10-21).** All in
+  packages that come in through the SDK, listed in `uv.lock`: aiohttp
+  (fixed in 3.14.4), pypdf (6.19.0), urllib3 (2.8.0), Mako (1.4.2),
+  multidict (6.9.1), oauthlib (4.0.0), PyJWT (2.15.0). The two critical
+  ones are done: certifi 2026.10.19, and Pillow 13.0.0, which also
+  closes Pillow's eight other alerts.
+  For each: check that a dependency allows the fixed version, update it
+  with `uv lock --upgrade-package <name>`, run the suite, and test the
+  part of the SDK that uses it (oauthlib 4 is a major version). Done
+  when Dependabot shows no open alert, or each one left has a reason here.
 - **Unpin the release runner from `ubuntu-24.04`.** Pinned for 0.1.18
   because `ubuntu-latest` moved to Ubuntu 26 on 2026-10-19. Switch the
   three jobs back once a run on `ubuntu-latest` has passed (the
