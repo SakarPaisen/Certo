@@ -615,6 +615,9 @@ def test_not_now_keeps_the_next_steps(tmp_path, monkeypatch, checks):
     assert code == 0
     assert ran == []
     assert "certo tasks/wordle.md --project wordle" in text
+    # And how to build a project of your own.
+    assert '  certo "A command-line to-do list in Python, with tests" --project todo' in text
+    assert "Each project lands in projects/<name>/" in text
 
 
 def test_a_local_model_is_said_to_be_free_and_slower(tmp_path, monkeypatch, checks):

@@ -158,8 +158,10 @@ name: for example `tasks/hanoi.md --project hanoi`. Without Node, the
 browser games aren't in the menu. `init` says how long Wordle takes (a
 few minutes on a cloud model, 10 to 15 on a local one; the others weren't
 timed), that a cloud model uses your credits, and that the result's
-quality depends on the model. **Not now** prints the Wordle command
-instead. It is never offered with `--yes` or `--no-check`.
+quality depends on the model. It is never offered with `--yes` or
+`--no-check`. Under "Next", `init` then prints the command for the Wordle
+sample (unless a sample ran) and an example for a project of your own:
+`certo "A command-line to-do list in Python, with tests" --project todo`.
 
 **Without a terminal** and without `--provider`, `--model` or `--yes`,
 `init` asks nothing and writes `FOLDER/.env` with every provider commented

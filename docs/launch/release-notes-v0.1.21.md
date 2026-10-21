@@ -57,8 +57,9 @@ sample tasks (Wordle, Hanoi and three browser games) and runs the one you
 pick right away, so a new user sees a first verdict without typing
 another command. It says how long Wordle takes, that a cloud model uses
 your credits, and that how good the result is depends on the model.
-Without Node, the browser games aren't offered. **Not now** prints the
-command for later, as before.
+Without Node, the browser games aren't offered. Under "Next", `init`
+prints the command for a sample and an example for a project of your
+own, so **Not now** still shows how to build one.
 
 ## New: arrow-key menus in `certo init`
 

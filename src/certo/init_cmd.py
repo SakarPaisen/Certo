@@ -849,8 +849,13 @@ def init_main(
         print("  certo check", file=out)
     if samples and not ran_sample:
         print("  certo tasks/wordle.md --project wordle", file=out)
+        print("      builds the Wordle sample; every file in tasks/ works the same way", file=out)
     if ran_sample:
         print(f"  open projects/{ran_sample.project}/ to see what the agent built", file=out)
+    if samples:
+        print(f"  certo {_OWN_TASK_EXAMPLE} --project todo", file=out)
+        print("      builds your own project: describe it in quotes, or in a file", file=out)
+        print("  Each project lands in projects/<name>/, the name given by --project.", file=out)
     if scope == USER_SCOPE:
         print(
             '\nYou can now run certo "<task>" in any project folder: the settings apply '
@@ -859,6 +864,9 @@ def init_main(
         )
     return 0
 
+
+# The task shown under "Next" for building your own project.
+_OWN_TASK_EXAMPLE = '"A command-line to-do list in Python, with tests"'
 
 # Measured first Wordle runs: 4m03s on a cloud model (gpt-5.6-luna,
 # docs/benchmark/first-run-0.1.19.md); 9m28s, 11m49s and 15m04s on
