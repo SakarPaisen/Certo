@@ -49,6 +49,22 @@ first item is the suggested next one.
 
   Done when neither sentence is left and the search finds no other
   comparative claim.
+- **Check the arrow-key menus by hand in a real terminal.** The tests
+  drive them through a pipe, and a pseudo-terminal run worked, but
+  neither shows what a person sees. In `certo init` and `certo init
+  models`, check by hand:
+  - the ▸ symbol, the highlight and the grey notes look right with your
+    font and colours (light and dark theme);
+  - the checklist redraws cleanly when it's taller than the window, and
+    after the window is resized;
+  - the keys work over SSH (for example on turing.local) and inside
+    tmux;
+  - no "your terminal doesn't support cursor position requests (CPR)"
+    warning. A pseudo-terminal that doesn't answer CPR prints it; if a
+    real terminal does too, hide it (prompt_toolkit's
+    `PROMPT_TOOLKIT_NO_CPR=1`).
+
+  Done when each is checked, or fixed.
 - **Unpin the release runner from `ubuntu-24.04`.** Pinned for 0.1.18
   because `ubuntu-latest` moved to Ubuntu 26 on 2026-10-19. Switch the
   three jobs back once a run on `ubuntu-latest` has passed (the

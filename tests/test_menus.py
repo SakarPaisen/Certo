@@ -1,9 +1,13 @@
 """The arrow-key menus' state and the Prompter's choice between menus and
-numbered questions. Nothing is drawn: no terminal is needed."""
+numbered questions. The real menus are driven with keys sent through a
+pipe and drawn to a dummy output: no terminal is needed."""
 
 from __future__ import annotations
 
 import pytest
+from prompt_toolkit.application import create_app_session
+from prompt_toolkit.input import create_pipe_input
+from prompt_toolkit.output import DummyOutput
 
 from certo import menus
 from certo.init_cmd import Cancelled, Prompter
@@ -75,3 +79,59 @@ def test_ctrl_c_in_a_menu_cancels(monkeypatch):
 def test_no_menus_without_a_usable_terminal(monkeypatch):
     monkeypatch.setenv("TERM", "dumb")
     assert menus.available() is False
+
+
+# --- the real menus, driven by keys ---------------------------------------------
+
+UP, DOWN, ENTER, CTRL_C = "\x1b[A", "\x1b[B", "\r", "\x03"
+
+
+def _press(keys: str, menu, *args, **kwargs):
+    with create_pipe_input() as pipe, create_app_session(input=pipe, output=DummyOutput()):
+        pipe.send_text(keys)
+        return menu(*args, **kwargs)
+
+
+def test_choose_returns_the_option_the_arrows_reach():
+    assert _press(ENTER, menus.choose, "Pick", ["a", "b", "c"]) == 0
+    assert _press(DOWN + DOWN + ENTER, menus.choose, "Pick", ["a", "b", "c"]) == 2
+    assert _press(UP + ENTER, menus.choose, "Pick", ["a", "b", "c"], default=2) == 1
+
+
+def test_confirm_starts_on_its_default():
+    assert _press(ENTER, menus.confirm, "Sure?") is True
+    assert _press(ENTER, menus.confirm, "Sure?", default=False) is False
+    assert _press(DOWN + ENTER, menus.confirm, "Sure?") is False
+
+
+def test_choose_ctrl_c_raises_keyboard_interrupt():
+    with pytest.raises(KeyboardInterrupt):
+        _press(CTRL_C, menus.choose, "Pick", ["a", "b"])
+
+
+def test_checklist_space_selects_and_enter_on_a_model_is_done():
+    state = ChecklistState(_rows())
+
+    # Down to gemma, select it, deselect qwen, Enter on qwen.
+    result = _press(DOWN + " " + UP + " " + ENTER, menus.checklist, "Models", state)
+
+    assert result is None
+    assert [row.checked for row in state.rows[1:3]] == [False, True]
+
+
+def test_checklist_enter_on_an_action_returns_its_row_and_keeps_the_choice():
+    state = ChecklistState(_rows())
+
+    result = _press(DOWN + " " + DOWN + ENTER, menus.checklist, "Models", state)
+
+    assert result == 4  # "DeepSeek models (asks for a key)", past the header
+    assert state.rows[2].checked is True
+    # Opened again after the action, the list keeps the cursor and the ticks.
+    # Done is an action too; init_models ends the list on its label.
+    assert _press(DOWN + ENTER, menus.checklist, "Models", state) == 5
+    assert state.rows[2].checked is True
+
+
+def test_checklist_ctrl_c_raises_keyboard_interrupt():
+    with pytest.raises(KeyboardInterrupt):
+        _press(" " + CTRL_C, menus.checklist, "Models", ChecklistState(_rows()))
