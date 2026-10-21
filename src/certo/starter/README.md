@@ -51,6 +51,10 @@ python3 wordle.py
 
 ## Good to know
 
+- **The model matters.** The same task can come out quite differently on
+  different models: a smaller or local model may build a plainer game, or
+  one whose tests fail. The verdict says whether the tests passed, not how
+  polished the game is.
 - **Cost.** A run with a cloud model (OpenAI, Anthropic, Gemini) uses your
   model credits. Certo prints the tokens used and the cost at the end of
   every run, under "Run summary".

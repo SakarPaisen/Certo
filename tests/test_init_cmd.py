@@ -568,7 +568,7 @@ def _with_sample(tmp_path, monkeypatch, answers, *, models=None):
         env={},
         interactive=True,
         fetch_models=lambda _url: list(models or []),
-        run_sample=lambda folder: ran.append(folder) or 0,
+        run_sample=lambda folder, sample: ran.append((folder, sample.project)) or 0,
     )
     return code, script.text, ran
 
@@ -577,15 +577,40 @@ def test_after_a_passing_check_init_offers_to_run_the_sample(tmp_path, monkeypat
     code, text, ran = _with_sample(tmp_path, monkeypatch, ["2", "", "1"])
 
     assert code == 0
-    assert "a Wordle game, built in w/projects/wordle/. It takes a few minutes; it uses" in text
-    assert "Certo prints the cost at the end." in text
-    assert ran == ["w"]
+    assert "It is built in w/projects/<name>/.\nWordle takes a few minutes;" in text
+    assert "A run uses your model credits; Certo prints the cost at the end." in text
+    assert "How good the result is depends on your model" in text
+    assert ran == [("w", "wordle")]
     assert "certo tasks/wordle.md --project wordle" not in text  # it already ran
     assert "open projects/wordle/ to see what the agent built" in text
 
 
+def test_the_menu_offers_every_sample(tmp_path, monkeypatch, checks):
+    monkeypatch.setattr(init_cmd.shutil, "which", lambda name: f"/usr/bin/{name}")
+    code, text, ran = _with_sample(tmp_path, monkeypatch, ["2", "", "4"])
+
+    assert code == 0
+    for sample in init_cmd.SAMPLES:
+        assert sample.label in text
+        assert (tmp_path / "w" / "tasks" / sample.file).exists()
+    assert ran == [("w", "mazeman")]
+    assert "open projects/mazeman/ to see what the agent built" in text
+    # Every task `init` copies is in the menu.
+    copied = {p.name for p in (tmp_path / "w" / "tasks").iterdir()}
+    assert copied == {sample.file for sample in init_cmd.SAMPLES}
+
+
+def test_without_node_the_browser_games_are_not_offered(tmp_path, monkeypatch, checks):
+    monkeypatch.setattr(init_cmd.shutil, "which", lambda _name: None)
+    _code, text, ran = _with_sample(tmp_path, monkeypatch, ["2", "", "3"])
+
+    assert "Space rocks" not in text.split("Which one?")[1]
+    assert "  3. Not now" in text
+    assert ran == []
+
+
 def test_not_now_keeps_the_next_steps(tmp_path, monkeypatch, checks):
-    code, text, ran = _with_sample(tmp_path, monkeypatch, ["2", "", "2"])
+    code, text, ran = _with_sample(tmp_path, monkeypatch, ["2", "", str(len(init_cmd.SAMPLES) + 1)])
 
     assert code == 0
     assert ran == []
@@ -594,10 +619,11 @@ def test_not_now_keeps_the_next_steps(tmp_path, monkeypatch, checks):
 
 def test_a_local_model_is_said_to_be_free_and_slower(tmp_path, monkeypatch, checks):
     _code, text, _ran = _with_sample(
-        tmp_path, monkeypatch, ["6", "", "", "2"], models=["qwen3.8:27b"]
+        tmp_path, monkeypatch, ["6", "", "", str(len(init_cmd.SAMPLES) + 1)], models=["qwen3.8:27b"]
     )
 
-    assert "It takes 10 to 15 minutes; free on your local model." in text
+    assert "Wordle takes 10 to 15 minutes;" in text
+    assert "A run is free on your local model." in text
 
 
 def test_no_sample_offer_when_the_check_failed(tmp_path, monkeypatch):
@@ -606,7 +632,7 @@ def test_no_sample_offer_when_the_check_failed(tmp_path, monkeypatch):
     )
     _code, text, ran = _with_sample(tmp_path, monkeypatch, ["2", ""])
 
-    assert "Run it?" not in text
+    assert "Which one?" not in text
     assert ran == []
 
 
@@ -621,6 +647,9 @@ def test_the_sample_runs_as_a_normal_certo_run(monkeypatch, tmp_path):
 
     assert init_cmd.run_sample_task(str(tmp_path)) == 0
     assert seen["command"][1:] == ["-m", "certo", "tasks/wordle.md", "--project", "wordle"]
+    hanoi = init_cmd.SAMPLES[1]
+    assert init_cmd.run_sample_task(str(tmp_path), hanoi) == 0
+    assert seen["command"][1:] == ["-m", "certo", "tasks/hanoi.md", "--project", "hanoi"]
     assert seen["cwd"] == str(tmp_path)
 
 

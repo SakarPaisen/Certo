@@ -262,9 +262,10 @@ given design was chosen.
   (`write_user_settings`) or `FOLDER/.env`, as the scope question
   (`--global`/`--local`) decides. `check_main()` prints
   `print_setting_sources()` before `run_check()`. On a terminal, after a
-  passing check with the sample folder, `_offer_sample()` asks to run the
-  Wordle task now; `run_sample_task()` runs `python -m certo` in the
-  folder as its own process. `init_main(run_sample=)` is None by default
+  passing check with the sample folder, `_offer_sample()` offers a menu of
+  `SAMPLES` (the browser games only when `node` is on PATH);
+  `run_sample_task(folder, sample)` runs `python -m certo` in the folder as
+  its own process. `init_main(run_sample=)` is None by default
   (so tests never run it); the CLI passes `run_sample_task`. Package data in
   `src/certo/starter/`: `providers.toml` (menu order, default models),
   the workspace `README.md`, `gitignore`, and the sample tasks in `tasks/`.

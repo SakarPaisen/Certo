@@ -127,8 +127,9 @@ its fix, is in [Troubleshooting](troubleshooting.md).
 
 ## 4. Run your first task
 
-When the model check passed, `certo init` ends by offering to run this
-task for you (**Run it now**). Otherwise, or later, run it yourself:
+When the model check passed, `certo init` ends with a menu of the sample
+tasks, and runs the one you pick. This page follows Wordle, the first.
+Otherwise, or later, run it yourself:
 
 ```bash
 cd certo-workspace

@@ -52,10 +52,12 @@ models you chose. See [Commands](../reference/commands.md#certo-init-models).
 
 ## New: `certo init` can run your first task
 
-When the model check passes, `certo init` now ends by offering to run the
-sample task (a Wordle game) right away, so a new user sees a first
-verdict without typing another command. It says how long that takes and,
-for a cloud model, that it uses your credits. **Not now** prints the
+When the model check passes, `certo init` now ends with a menu of the
+sample tasks (Wordle, Hanoi and three browser games) and runs the one you
+pick right away, so a new user sees a first verdict without typing
+another command. It says how long Wordle takes, that a cloud model uses
+your credits, and that how good the result is depends on the model.
+Without Node, the browser games aren't offered. **Not now** prints the
 command for later, as before.
 
 ## New: arrow-key menus in `certo init`
