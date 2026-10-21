@@ -111,3 +111,15 @@ following arguments are required: task". Now a single value after
 `--escalate` is the task, on the default ladder, as the docs showed.
 `certo --escalate hard "task"` still uses the ladder named `hard`. See
 [Commands](../reference/commands.md#certo).
+
+## Security: certifi and Pillow updated
+
+Two packages Certo installs through the OpenHands SDK had critical
+advisories. certifi 2026.10.19 removes root certificates whose
+intermediate keys were compromised
+([GHSA-6q48-6c7w-9gw2](https://github.com/advisories/GHSA-6q48-6c7w-9gw2)).
+Pillow 13.0.0 fixes a heap overflow when decoding JPEG images
+([GHSA-8g5g-8vmr-9782](https://github.com/advisories/GHSA-8g5g-8vmr-9782)).
+A new install gets them. An existing one gets them with
+`uv tool upgrade certo`, or with pip,
+`pip install -U certo certifi pillow`.
