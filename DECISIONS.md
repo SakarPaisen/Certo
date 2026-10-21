@@ -817,3 +817,9 @@ considered and live-verification detail: `docs/ROADMAP.txt`.
   one place and `certo init` never writes a key into a second file
   (`${VAR}` expansion added in 0.1.21; an unset variable leaves the model
   out instead of sending the literal text). A secret manager may replace the settings file later (TODO.md).
+- **Python environment paths follow the execution platform.** Local
+  Windows environments use `Scripts/python.exe`, `pip.exe` and a semicolon
+  on PATH. Docker keeps Linux paths and a colon even on a Windows host.
+  Existing Windows layouts can also be identified from their interpreter
+  file, so portable tests exercise both layouts without replacing `os.name`.
+  The test helper uses Python's installation scheme to locate site-packages.

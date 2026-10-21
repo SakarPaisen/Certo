@@ -69,7 +69,8 @@ def test_reuses_an_existing_working_dot_venv(tmp_path, project_venv):
 
     assert setup.env is not None
     assert setup.env.host_dir == venv
-    assert setup.env.python == (os.path.join(venv, "bin", "python"),)
+    scripts, executable = ("Scripts", "python.exe") if os.name == "nt" else ("bin", "python")
+    assert os.path.normpath(setup.env.python[0]) == os.path.join(venv, scripts, executable)
     assert setup.notices == []
 
 
@@ -202,7 +203,7 @@ def test_install_targets_the_project_env_never_certos_interpreter(tmp_path, tool
 
     (command,) = runner.commands
     joined = " ".join(command)
-    assert f"{tmp_path}/.venv/bin/python" in joined
+    assert f"{tmp_path / '.venv'}/bin/python" in joined
     assert sys.executable not in joined
     assert sys.prefix not in joined
     assert command[-1] == "pytest"
@@ -332,7 +333,7 @@ def test_terminal_env_puts_the_project_venv_first(tmp_path):
 
     assert env == {
         "VIRTUAL_ENV": str(tmp_path / ".venv"),
-        "PATH": f"{tmp_path}/.venv/bin{os.pathsep}/usr/bin",
+        "PATH": f"{tmp_path / '.venv'}/bin:/usr/bin",
     }
 
 

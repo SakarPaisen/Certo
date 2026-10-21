@@ -151,10 +151,10 @@ limitation below.
 - **Covered languages:** Python, Node, Go, Rust and Java. Other projects,
   and standalone HTML pages, end `inconclusive`. Java needs Maven or Gradle
   installed. See [Verification by language](reference/verification-by-language.md).
-- **Windows is untested.** Certo is developed and tested on macOS and
-  Linux. On Windows, checking a Python project probably fails, because
-  Certo looks for the project's Python in `.venv/bin/`, where Windows has
-  `.venv\Scripts\`. Tracked in [#7](https://github.com/alessioricco/certo/issues/7).
+- **Windows support is partial.** Python environment discovery and
+  verification use the Windows virtual environment layout. Other Windows
+  path, file-permission and shell assumptions remain in the test suite.
+  Tracked in [#7](https://github.com/alessioricco/certo/issues/7).
 - **Docker mode is experimental** (see above): it needs an image built
   from a source checkout, and automatic model selection can't switch
   models in the middle of a Docker run. See [Run in Docker](guides/run-in-docker.md).

@@ -125,14 +125,12 @@ first item is the suggested next one.
 
 ## 3. Languages and verification
 
-- **Windows: the tests and Python verification assume the macOS/Linux
-  virtual environment layout** ([#7](https://github.com/alessioricco/certo/issues/7),
-  reported in #6). `tests/conftest.py:32` globs `lib/python*/site-packages`
-  (Windows: `Lib\site-packages`), so the suite can't run there;
-  `project_env.py` uses `.venv/bin/python` (Windows:
-  `.venv\Scripts\python.exe`), so verifying a Python project probably
-  fails too. Never tried. Done when the suite passes on Windows and the
-  Known limitations line in `docs/README.md` can go.
+- **Finish Windows test-suite support** ([#7](https://github.com/alessioricco/certo/issues/7),
+  reported in #6). Python environment discovery, dependency installation
+  and verification now handle Windows virtual environments. The suite still
+  has Windows failures involving path comparisons, Unix permissions,
+  symlink privileges and shell wrappers. Done when the suite passes on
+  Windows and the Known limitations line in `docs/README.md` can go.
 - **Run-the-app verification.** Start a server and probe an HTTP
   endpoint; build a frontend and load it in a headless browser (the SDK
   ships a browser tool) for a blank page or console errors.

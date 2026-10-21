@@ -462,7 +462,7 @@ def test_python_plan_has_pytest_as_the_only_primary_check(tmp_path):
     assert plan[0].primary is True
     assert plan[0].command == [sys.executable, "-m", "pytest", "-q"]
     assert plan[0].env["VIRTUAL_ENV"] == str(tmp_path / ".venv")
-    assert plan[0].env["PATH"].startswith(str(tmp_path / ".venv" / "bin"))
+    assert plan[0].env["PATH"].startswith(f"{tmp_path / '.venv'}/bin:")
 
 
 def test_python_plan_adds_ruff_when_configured_and_in_the_project_env(tmp_path):
@@ -542,13 +542,23 @@ def test_python_verification_commands_never_reference_certos_own_interpreter(
     (tmp_path / "main.py").write_text("if __name__ == '__main__':\n    pass\n")
     (tmp_path / "ruff.toml").write_text("")
 
-    run = run_full_verification(str(tmp_path))
+    commands = []
+
+    class RecordingRunner(LocalRunner):
+        def run(self, command, **kwargs):
+            commands.append(list(command))
+            return super().run(command, **kwargs)
+
+    run = run_full_verification(str(tmp_path), runner=RecordingRunner())
 
     assert run.commands
     for command in run.commands:
         assert sys.executable not in command
         assert os.path.join(sys.prefix, "bin") not in command
-    assert all(c.split()[0] == str(tmp_path / ".venv" / "bin" / "python") for c in run.commands)
+    scripts, executable = ("Scripts", "python.exe") if os.name == "nt" else ("bin", "python")
+    expected = os.path.join(str(tmp_path), ".venv", scripts, executable)
+    assert commands
+    assert all(os.path.normpath(command[0]) == expected for command in commands)
 
 
 def test_node_plan_prefers_build_as_primary_over_test(tmp_path):
