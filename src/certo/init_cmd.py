@@ -870,8 +870,10 @@ _OWN_TASK_EXAMPLE = '"A command-line to-do list in Python, with tests"'
 
 # Measured first Wordle runs: 4m03s on a cloud model (gpt-5.6-luna,
 # docs/benchmark/first-run-0.1.19.md); 9m28s, 11m49s and 15m04s on
-# qwen3.8:27b over Ollama (2026-10-20). No cost figure is quoted: one
-# measurement isn't one.
+# qwen3.8:27b over Ollama (2026-10-20). The other samples, once each on
+# claude-sonnet-5-5 (2026-10-21), all verified: hanoi 37s, space-rocks
+# 1m41s, invaders 1m38s, mazeman 2m34s; not timed on a local model yet.
+# No cost figure is quoted: one measurement isn't one.
 _SAMPLE_TIME_CLOUD = "a few minutes"
 _SAMPLE_TIME_LOCAL = "10 to 15 minutes"
 
@@ -908,7 +910,11 @@ def _offer_sample(
 ) -> Sample | None:
     """Ask which sample task to run now; the one that ran, or None."""
     local = settings.provider.id == "ollama"
-    took = _SAMPLE_TIME_LOCAL if local else _SAMPLE_TIME_CLOUD
+    took = (
+        f"Wordle takes {_SAMPLE_TIME_LOCAL}; the others weren't timed yet."
+        if local
+        else f"Each takes {_SAMPLE_TIME_CLOUD}."
+    )
     cost = (
         "A run is free on your local model."
         if local
@@ -917,7 +923,7 @@ def _offer_sample(
     where = os.path.join(folder.rstrip("/"), "projects")
     prompter.say(
         f"\nYou can run a sample task now. It is built in {where}/<name>/.\n"
-        f"Wordle takes {took}; the others weren't timed yet. {cost}\n"
+        f"{took} {cost}\n"
         "How good the result is depends on your model: a smaller or local model may\n"
         "build a plainer game, or one whose tests fail. The verdict at the end says which."
     )

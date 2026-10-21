@@ -49,13 +49,13 @@ first item is the suggested next one.
 
   Done when neither sentence is left and the search finds no other
   comparative claim.
-- **Run the new sample tasks once each.** `hanoi.md`, `mazeman.md`,
-  `invaders.md` (new) and `space-rocks.md` (renamed) have never been run
-  by a model; only their worked test examples were checked, against
-  reference implementations. Run each from the `certo init` menu on a
-  cloud model and on a local one, and fix any spec that doesn't end
-  `verified`. Record the times, so the menu can quote them as it does
-  Wordle's. Done when each one has ended `verified` on both.
+- **Run the new sample tasks on a local model.** `hanoi.md`,
+  `mazeman.md`, `invaders.md` and `space-rocks.md` each ended `verified`
+  once on `claude-sonnet-5-5` (2026-10-21, 37s to 2m34s, $0.11 to $0.43),
+  but were never run on a local model, so on Ollama the menu quotes only
+  Wordle's time. Run each on `qwen3.8:27b`, fix any spec that doesn't end
+  `verified`, and record the times in `init_cmd.py`. Done when each one
+  has ended `verified` locally and the menu quotes a local time.
 - **Check the arrow-key menus by hand in a real terminal.** The tests
   drive them through a pipe, and a pseudo-terminal run worked, but
   neither shows what a person sees. In `certo init` and `certo init

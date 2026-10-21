@@ -577,7 +577,7 @@ def test_after_a_passing_check_init_offers_to_run_the_sample(tmp_path, monkeypat
     code, text, ran = _with_sample(tmp_path, monkeypatch, ["2", "", "1"])
 
     assert code == 0
-    assert "It is built in w/projects/<name>/.\nWordle takes a few minutes;" in text
+    assert "It is built in w/projects/<name>/.\nEach takes a few minutes." in text
     assert "A run uses your model credits; Certo prints the cost at the end." in text
     assert "How good the result is depends on your model" in text
     assert ran == [("w", "wordle")]
@@ -625,7 +625,7 @@ def test_a_local_model_is_said_to_be_free_and_slower(tmp_path, monkeypatch, chec
         tmp_path, monkeypatch, ["6", "", "", str(len(init_cmd.SAMPLES) + 1)], models=["qwen3.8:27b"]
     )
 
-    assert "Wordle takes 10 to 15 minutes;" in text
+    assert "Wordle takes 10 to 15 minutes; the others weren't timed yet." in text
     assert "A run is free on your local model." in text
 
 
