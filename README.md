@@ -114,7 +114,7 @@ On every ladder, your own limits stop the climb instead: a task that runs out of
 
 ## Any model, and the right one for each task
 
-Most coding agents are built around one provider. Certo isn't tied to any: the model is one setting, and the same task runs on Ollama, Anthropic, OpenAI, Gemini, DeepSeek or any [LiteLLM model](https://docs.litellm.ai/docs/providers). The same task, run with only that setting changed, was `verified` on both OpenAI and Anthropic ([provider swap](https://github.com/alessioricco/certo/blob/main/docs/benchmark/provider-swap-0.1.19.md)). Because Certo checks the result itself, it can also decide *which* model to use:
+Certo isn't tied to any provider: the model is one setting, and the same task runs on Ollama, Anthropic, OpenAI, Gemini, DeepSeek or any [LiteLLM model](https://docs.litellm.ai/docs/providers). The same task, run with only that setting changed, was `verified` on both OpenAI and Anthropic ([provider swap](https://github.com/alessioricco/certo/blob/main/docs/benchmark/provider-swap-0.1.19.md)). Because Certo checks the result itself, it can also decide *which* model to use:
 
 | | What Certo does | Add |
 | --- | --- | --- |
@@ -146,7 +146,7 @@ Agents say "done", and sometimes they're wrong. Two real runs from building Cert
 - **"There are errors in the tests around sequence handling and state transitions."** The truth: the file didn't even run. An `IndentationError` stopped every test before it started. The agent never re-ran the tests; the diagnosis was made up.
 - **Every unit test passed, and the game crashed the moment a user picked "solve".** The agent said success, and so did pytest.
 
-The agent's report is a claim, not evidence. Certo looks at the evidence, and its verdict is also what decides when a local model's work is good enough to keep:
+The agent's report is a claim, not evidence. Certo looks at the evidence, and its verdict is also what decides when a model's work is good enough to keep:
 
 | When the agent... | Certo... | Verdict |
 | --- | --- | --- |
