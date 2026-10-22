@@ -214,7 +214,7 @@ first item is the suggested next one.
   fixed ~500k input / ~20k output tokens (far too high: a cloud run used
   ~124k in the baseline). Use the per-model average from earlier
   `cost.json` files in the same parent folder; guess only for models with
-  no history.
+  no history. Starter issue: [#10](https://github.com/alessioricco/certo/issues/10).
 - **A cost ceiling for single-model runs.** `CERTO_MAX_TASK_COST`
   applies to escalation only (checked before each rung), and bench has
   `--max-cost`; a plain run is bounded by time and iterations, not money.
@@ -243,9 +243,6 @@ first item is the suggested next one.
 - **Auto-model: per-sub-step model choice** (a cheap model for
   scaffolding, a strong one for the hard part), hooked on `task_tracker`
   items. Needs interrupting a run mid-call; open design.
-- **Preview model choice without a run**: `certo check` shows ladders, but
-  nothing shows which task profile and ranking `--auto-model` would pick
-  for a given task text (`classify_task`/`rank_candidates` are pure).
 - **Other SDK reasoning fields** (`reasoning_summary`,
   `extended_thinking_budget`, `enable_encrypted_reasoning`): left unwired
   on purpose (provider-specific). Only if a provider needs one.
@@ -272,7 +269,8 @@ cut that first run's output from 2,949 lines to 1,021.)
 - **Docs articles still to write** (ideas from 2026-10-18): build an
   app in several tasks (needs real runs); review the agent's work safely;
   share your benchmark results (with the benchmark file, as `docs/benchmark/` does); keep costs down; use `certo verify`
-  without the agent (pre-commit, any AI tool).
+  without the agent (pre-commit, any AI tool: starter issue
+  [#13](https://github.com/alessioricco/certo/issues/13)).
 - **Prebuilt Docker image.** Docker execution from a pip install fails:
   `workspace.py` builds from `docker/agent-server.Dockerfile` relative to
   the repo, which isn't in the wheel. Ship the Dockerfile and tool source
@@ -365,17 +363,19 @@ database).
   no model files, which also created `.certo/` in the current folder with
   a `RUNS.md` entry saying "Model: ollama/qwen3.8:27b (picked by
   --auto-model)", although nothing was picked or run. Print the error
-  alone, after the banner or instead of it, and write nothing.
+  alone, after the banner or instead of it, and write nothing. Open for
+  contributors: [#12](https://github.com/alessioricco/certo/issues/12).
 - **The `--resume` hint ignores `CERTO_PROJECTS_DIR` from the
   environment.** It prints `certo --resume --project NAME`, which then
   looks in the default projects folder. Print the setting too when it
-  isn't the default.
+  isn't the default. Starter issue: [#9](https://github.com/alessioricco/certo/issues/9).
 - **`--model` alone fails when no model is configured.** `certo TASK
   --model X` with no `CERTO_LLM_MODEL` anywhere stops with "CERTO_LLM_MODEL
   is required": `load_config()` validates before `override_llm()` applies
   the flags. Same for a local `--base-url` with no key. Found 2026-10-19
   writing `examples/compare-models.sh.example`, which works around it by
-  setting the variables. Done when the flags alone are enough.
+  setting the variables. Done when the flags alone are enough. Open for
+  contributors: [#11](https://github.com/alessioricco/certo/issues/11).
 - **Third-party skills: narrow license detection, `SKILL.md` only.** Eight
   permissive licenses are recognised; anything else is `unknown` and needs
   acknowledgement. Legacy single-file upstream skills can't be installed.
