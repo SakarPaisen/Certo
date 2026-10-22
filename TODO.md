@@ -84,8 +84,8 @@ first item is the suggested next one.
   when Dependabot shows no open alert, or each one left has a reason here.
 - **Unpin the release runner from `ubuntu-24.04`.** Pinned for 0.1.18
   because `ubuntu-latest` moved to Ubuntu 26 on 2026-10-19. Switch the
-  three jobs back once a run on `ubuntu-latest` has passed (the
-  pull-request CI below, when it exists, is the cheapest place to try).
+  three jobs back once `.github/workflows/ci.yml`, which runs on
+  `ubuntu-latest`, has passed on GitHub.
   While there, check the 0.1.18 release run showed no Node.js 20 warning.
 
 ## 1. Prove it
@@ -122,10 +122,6 @@ first item is the suggested next one.
   and #6 for Java in `ARCHITECTURE.md` say "not re-verified live" (#2, #4
   and #6 for Go/Rust were, 2026-10-19). #1 and #5 are hard to trigger on
   purpose; #10 is reachable from a benchmark task.
-- **Pull-request CI with tests and a ruff gate.** Only `release.yml`
-  exists, and `main` has lint/format findings (`server.py`, tests) to
-  clear first ([#2](https://github.com/alessioricco/certo/issues/2), a starter issue). Add `release_check.sh` to it
-  too.
 - **Move the historical planning docs into `docs/history/`**
   (`docs/KICKOFF.md`, `docs/SPEC.md`, `docs/ROADMAP.txt`), so readers
   don't take them for current docs; fix every reference. Starter issue:

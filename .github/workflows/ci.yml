@@ -1,0 +1,52 @@
+name: ci
+
+# Runs on every pull request and every push to main: ruff, the full test
+# suite with no API key (server extra included, so its tests don't skip),
+# and scripts/release_check.sh against a freshly built wheel. The same
+# checks the release workflow runs, so a release tag finds nothing new.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Runs on ubuntu-latest on purpose: a green run here is what allows the
+# release workflow to drop its ubuntu-24.04 pin (TODO.md).
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: uv sync --locked --extra dev --extra server
+      - name: Lint and format
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: Test (no API key)
+        run: uv run pytest -q
+
+  release-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          python-version: "3.12"
+      - run: uv build
+      - name: Release check (installed wheel, no LLM)
+        run: scripts/release_check.sh --wheel dist/*.whl
