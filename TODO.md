@@ -56,16 +56,17 @@ first item is the suggested next one.
     `PROMPT_TOOLKIT_NO_CPR=1`).
 
   Done when each is checked, or fixed.
-- **The other Dependabot alerts (20, seen 2026-10-21).** All in
-  packages that come in through the SDK, listed in `uv.lock`: aiohttp
-  (fixed in 3.14.4), pypdf (6.19.0), urllib3 (2.8.0), Mako (1.4.2),
-  multidict (6.9.1), oauthlib (4.0.0), PyJWT (2.15.0). The two critical
-  ones are done: certifi 2026.10.19, and Pillow 13.0.0, which also
-  closes Pillow's eight other alerts.
-  For each: check that a dependency allows the fixed version, update it
-  with `uv lock --upgrade-package <name>`, run the suite, and test the
-  part of the SDK that uses it (oauthlib 4 is a major version). Done
-  when Dependabot shows no open alert, or each one left has a reason here.
+- **Check that Dependabot closed its alerts after the next push.**
+  `uv.lock` has every fixed version (certifi and Pillow 2026-10-21; aiohttp
+  3.14.5, pypdf 6.21.2, urllib3 2.8.0, Mako 1.4.3, multidict 6.9.1, PyJWT
+  2.15.1, oauthlib 4.0.0 on 2026-10-22). On 2026-10-22 GitHub's dependency
+  graph still showed Pillow 12.3.0 and the old certifi: it hadn't re-read
+  the lockfile pushed the day before, so 54 alerts stayed open, 28 of them
+  Pillow. multidict is held at 6.9.1, not 7 (it sits under aiohttp, used
+  by every model call); oauthlib 4 is a major version but is used only by
+  `browser-use`'s Google sign-in, which Certo doesn't use. Done when
+  Dependabot shows no open alert; if they stay open after the push, ask
+  GitHub to rescan (Security → Dependabot).
 - **Unpin the release runner from `ubuntu-24.04`.** Pinned for 0.1.18
   because `ubuntu-latest` moved to Ubuntu 26 on 2026-10-19. Switch the
   three jobs back once `.github/workflows/ci.yml`, which runs on
