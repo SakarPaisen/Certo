@@ -21,7 +21,7 @@ first item is the suggested next one.
   for the top of the README: a task moves to another provider's model
   when the first fails, and still ends `verified`. Setup: a two-rung
   ladder across providers in `escalation.yaml` (for example
-  `claude-sonnet-5-5` → a cheap OpenAI model), with an invalid key for
+  `claude-sonnet-5-5` → `gpt-6-luna`, chosen 2026-10-22), with an invalid key for
   rung 1 in `models.yaml`; the bundled Wordle task, with `--escalate`.
   Dry run first: check what Certo prints when a rung fails on a provider
   error. If the line is unclear or buried, improve it before recording (a
@@ -115,9 +115,9 @@ first item is the suggested next one.
   qwen3.6 wrote the module, then its test file as a text tool call, so
   nothing could be checked and haiku was never asked. Decide whether a
   rung whose last message is a tool call written as text should climb.
-  Two options to discuss (2026-10-19): just climb, or climb and ask the
-  next rung to write the missing tests first. Done when decided
-  (DECISIONS.md) and, if yes, tested.
+  Decided 2026-10-22: it climbs (the simpler of the two options; the next
+  rung is already told what the last one left). Done when built, tested
+  and recorded in DECISIONS.md.
 - **Re-verify the "confident but wrong" fixes live**: #1, #3, #5, #10
   and #6 for Java in `ARCHITECTURE.md` say "not re-verified live" (#2, #4
   and #6 for Go/Rust were, 2026-10-19). #1 and #5 are hard to trigger on
@@ -209,8 +209,8 @@ first item is the suggested next one.
   - **Certo doesn't check the work once the budget is gone**
     (`_verify_and_report` returns `budget_exhausted` first). The checks
     need no model; running them would turn these into `verified` or a
-    real failure. Decide whether the verdict should then be `verified`
-    or stay `budget_exhausted` with the check results shown.
+    real failure. Decided 2026-10-22: run the checks, and the verdict is
+    `verified` when they pass.
   - **The budget can't stop a run in progress.** It is checked only
     before each `.run()`; one run makes up to 50 model calls, each up to
     `CERTO_LLM_TIMEOUT_SECONDS` × 6 attempts (the SDK retries timeouts 5
