@@ -57,6 +57,15 @@ def _cfg(**overrides) -> Config:
     return Config(**base)
 
 
+@pytest.fixture(autouse=True)
+def _isolated_server(monkeypatch, tmp_path):
+    """Every test runs in its own empty folder with a model configured, so
+    no test reads the current folder's `.env` or leaves project folders in
+    it. Tests that need another config patch `load_config` again."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(server, "load_config", lambda: _cfg(projects_dir=str(tmp_path)))
+
+
 class _FakeContent:
     def __init__(self, text: str) -> None:
         self.text = text

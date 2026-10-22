@@ -369,14 +369,6 @@ database).
 
 ## Smaller bugs
 
-- **Four `tests/test_server.py` tests need a model setting.**
-  `test_health` and the three unknown-id/project tests call
-  `server.create_app()`, which loads the config, so they fail with
-  `CERTO_LLM_MODEL is required` in a checkout without a `.env` (seen
-  2026-10-21 in a fresh worktree of `main`). They pass here only because
-  the repo's `.env` sets it. Give them a model in the test (monkeypatch),
-  like the other server tests. Done when the suite passes in a fresh
-  clone with no `.env`.
 - **Stop reading `task_profiles:` / `escalation:` in `models_list.yaml`.**
   Since 0.1.20 they have their own files; the old sections are still read
   with a warning. Remove that path (and the tests that use the old layout
@@ -399,15 +391,6 @@ database).
   the flags. Same for a local `--base-url` with no key. Found 2026-10-19
   writing `examples/compare-models.sh.example`, which works around it by
   setting the variables. Done when the flags alone are enough.
-- **The server tests leak into the current folder and read its `.env`.**
-  Run from any folder, `tests/test_server.py` creates
-  `projects/acme-website`, `delete-me` and `keep-me` there (found
-  2026-10-19 in the repo's own `projects/`). And 4 tests (`test_health`,
-  the two unknown-id 404s, `delete_tasks_by_project_unknown_project`)
-  fail without a `CERTO_LLM_MODEL` in `./.env`. CI skips them (no
-  `server` extra), so only a developer with the extra and no `.env` sees
-  it. Give the server fixture its own config and a `tmp_path` projects
-  dir.
 - **Third-party skills: narrow license detection, `SKILL.md` only.** Eight
   permissive licenses are recognised; anything else is `unknown` and needs
   acknowledgement. Legacy single-file upstream skills can't be installed.
