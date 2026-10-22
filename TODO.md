@@ -21,7 +21,7 @@ first item is the suggested next one.
   for the top of the README: a task moves to another provider's model
   when the first fails, and still ends `verified`. Setup: a two-rung
   ladder across providers in `escalation.yaml` (for example
-  `claude-sonnet-5-5` → `gpt-6-luna`, chosen 2026-10-22), with an invalid key for
+  `claude-sonnet-5-5` → `gpt-5.6-luna`, chosen 2026-10-22), with an invalid key for
   rung 1 in `models.yaml`; the bundled Wordle task, with `--escalate`.
   Dry run first: check what Certo prints when a rung fails on a provider
   error. If the line is unclear or buried, improve it before recording (a
@@ -137,7 +137,11 @@ first item is the suggested next one.
 - **Independent acceptance tests from the spec.** Before building, a
   separate conversation (optionally another model) writes tests from the
   task text only; the builder may not edit them. Brings the benchmark's
-  hidden-test idea to real runs.
+  hidden-test idea to real runs. Agreed 2026-10-22: the first version is
+  opt-in and report-only (the results are shown next to the verdict but
+  don't change it), written by the same model by default, another model
+  as an option. The verdict rule is decided later from the benchmark:
+  how often these tests catch a real bug, and how often they are wrong.
 - **Protect verification files from silent agent changes.** The agent can
   weaken or delete tests, build scripts or lint config before Certo
   verifies; only prompts discourage it (golden rule 6 gap). Record those
