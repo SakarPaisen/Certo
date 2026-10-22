@@ -7,6 +7,8 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://github.com/alessioricco/certo/blob/main/pyproject.toml)
 [![Built on OpenHands SDK](https://img.shields.io/badge/built%20on-OpenHands%20SDK-6f42c1.svg)](https://docs.openhands.dev/sdk)
 
+**[Documentation](https://github.com/alessioricco/certo/blob/main/docs/README.md)** · [Getting started](https://github.com/alessioricco/certo/blob/main/docs/getting-started.md) · [Troubleshooting](https://github.com/alessioricco/certo/blob/main/docs/troubleshooting.md)
+
 Certo runs coding tasks on any model, local or cloud. It can pick the best model for each task. When a model can't finish, or its provider goes down, it hands the task to the next one, with a note on where things stand.
 
 It knows when to switch because it doesn't take the agent's word for it: when the agent says it's done, Certo runs your real tests and build itself, with no AI involved, and ends with one verdict and an exit code a script can rely on. *Certo* is Italian for "sure".
